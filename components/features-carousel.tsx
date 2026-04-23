@@ -7,22 +7,22 @@ import { Zap, Users, Star } from "lucide-react"
 
 const features = [
   {
-    icon: Zap,
-    iconColor: "text-pool-yellow",
-    title: "Simple Splitting",
-    description: "Easily split payments for daily lunches, group trips, or any activity with friends. No more complicated calculations or awkward math!"
-  },
-  {
     icon: Users,
-    iconColor: "text-pool-blue", 
-    title: "Virtual Card Access",
-    description: "Everyone gets access to a virtual card for tap-to-pay at any location. No more fighting over who pays - just tap and go!"
+    iconColor: "text-pool-blue",
+    title: "Your People, Your Pools",
+    description: "Create pools around the things you actually do together—roommates, brunch crew, travel group, or your everyday coffee run."
   },
   {
     icon: Star,
     iconColor: "text-pool-pink",
-    title: "No More IOUs", 
-    description: "No more waiting for friends to pay you back or keeping track of receipts. Deposit once and enjoy stress-free group activities!"
+    title: "Shared Moments",
+    description: "Stay connected through shared activity. See what your group is up to and make every outing feel like part of something bigger."
+  },
+  {
+    icon: Zap,
+    iconColor: "text-pool-yellow",
+    title: "Tap. Done.",
+    description: "When it's time to pay, Pool handles it. Tap-to-pay for the whole crew—no IOUs, no awkward math, no receipts to chase."
   }
 ]
 

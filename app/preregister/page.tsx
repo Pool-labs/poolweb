@@ -271,8 +271,8 @@ export default function PreregisterPage() {
             {/* Additional Info */}
             <div className="mt-8 p-6 bg-gradient-to-br from-pool-blue/10 to-pool-pink/10 rounded-2xl">
               <p className="text-pool-navy text-center text-sm">
-                By preregistering, you'll be among the first to experience Pool's revolutionary
-                group payment features on mobile. We'll send you exclusive early access!
+                By preregistering, you'll be among the first to experience Pool—the social network
+                for the things you actually do together. We'll send you exclusive early access!
               </p>
             </div>
           </div>

@@ -10,19 +10,19 @@ const steps = [
     icon: Plus,
     iconColor: "text-white",
     title: "Create Your Pool",
-    description: "Each friend deposits an equal amount into your shared pool. Start pooling funds effortlessly!"
+    description: "Start a pool around the thing you actually do together—your crew, your routine, your moments."
   },
   {
     icon: CreditCard,
     iconColor: "text-white",
-    title: "Get Virtual Cards",
-    description: "Everyone or select members get access to a virtual card for payments. Spend with ease!"
+    title: "Bring In Your People",
+    description: "Add your friends and share the activity. Everyone gets a virtual card so spending together is seamless."
   },
   {
     icon: Smartphone,
     iconColor: "text-white",
-    title: "Tap & Pay",
-    description: "Pay for group activities with simple tap-to-pay. That's it! Enjoy hassle-free payments!"
+    title: "Tap. Done.",
+    description: "Pay in one tap and stay connected to what your group is up to. Every outing, part of something bigger."
   }
 ]
 

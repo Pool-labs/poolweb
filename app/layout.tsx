@@ -14,9 +14,9 @@ import { Analytics } from "@vercel/analytics/next"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Pool - Group Funds Made Simple",
+  title: "Pool - A Social Network for the Things You Do Together",
   description:
-    "Split payments for group activities effortlessly. No more IOUs, receipts, or complicated calculations. Just deposit, tap, and enjoy!",
+    "Pool is a social network for people who spend time — and money — together. Create pools around your roommates, brunch crew, travel group, or everyday coffee run. Pool. Tap. Done.",
   icons: {
     icon: "/images/pool-logo-new.png"
   },

@@ -1,7 +1,7 @@
 {
-  "name": "Pool - Group Funds Made Simple",
+  "name": "Pool - A Social Network for the Things You Do Together",
   "short_name": "Pool",
-  "description": "Split payments for group activities effortlessly. No more IOUs, receipts, or complicated calculations.",
+  "description": "Pool is a social network for people who spend time — and money — together. Create pools around your crew, your routines, and the moments you share.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
