@@ -11,15 +11,13 @@ export interface SurveyData {
   splitWithOther?: string;
   splitTypes?: string[];
   splitTypesOther?: string;
-  splitFrequency?: string;
-  iouFrequency?: string;
-  causesTension?: string;
-  currentTool?: string;
-  toolLikes?: string;
-  toolChanges?: string;
-  tryNewApp?: string;
-  prefunding?: string;
-  prefundingWhy?: string;
+  poolWithAcquaintance?: string;
+  poolWithStranger?: string;
+  dailyRoutinePooling?: string;
+  discoveryInterest?: string;
+  openPoolTypes?: string[];
+  openPoolTypesOther?: string;
+  trustRequirements?: string;
   valuableFeatures?: string[];
   concerns?: string;
 }
@@ -315,11 +313,12 @@ function checkIfAllQuestionsAnswered(surveyData: SurveyData): boolean {
     'avgSpend',
     'splitWith',
     'splitTypes',
-    'splitFrequency',
-    'iouFrequency',
-    'causesTension',
-    'currentTool',
-    'tryNewApp',
+    'poolWithAcquaintance',
+    'poolWithStranger',
+    'dailyRoutinePooling',
+    'discoveryInterest',
+    'openPoolTypes',
+    'trustRequirements',
     'valuableFeatures',
     'concerns'
   ];
@@ -331,13 +330,16 @@ function checkIfAllQuestionsAnswered(surveyData: SurveyData): boolean {
       if (field === 'splitWith' && value === 'Other' && !surveyData.splitWithOther) {
         return false;
       }
-      if (field === 'splitTypes' && value?.includes('Other') && !surveyData.splitTypesOther) {
+      if (field === 'splitTypes' && Array.isArray(value) && value.includes('Other') && !surveyData.splitTypesOther) {
+        return false;
+      }
+      if (field === 'openPoolTypes' && Array.isArray(value) && value.includes('Other') && !surveyData.openPoolTypesOther) {
         return false;
       }
       return false;
     }
   }
-  
+
   return true;
 }
 

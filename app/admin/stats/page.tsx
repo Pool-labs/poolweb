@@ -70,33 +70,23 @@ export default function AdminStatsPage() {
         options: {},
         total: 0
       },
-      splitFrequency: {
-        question: 'How often do you split expenses?',
+      poolWithAcquaintance: {
+        question: 'Would you pool money with an acquaintance for a shared trip or event?',
         options: {},
         total: 0
       },
-      iouFrequency: {
-        question: 'How often do you have IOUs with friends?',
+      poolWithStranger: {
+        question: 'Would you pool with a stranger who has the same trip / goal as you?',
         options: {},
         total: 0
       },
-      causesTension: {
-        question: 'Does splitting expenses ever cause tension?',
+      dailyRoutinePooling: {
+        question: 'Would you pool on daily routines (coffee, lunch, gym, rideshare) with people on a similar routine?',
         options: {},
         total: 0
       },
-      currentTool: {
-        question: 'What tool do you currently use for expense splitting?',
-        options: {},
-        total: 0
-      },
-      tryNewApp: {
-        question: 'Would you try a new expense splitting app?',
-        options: {},
-        total: 0
-      },
-      prefunding: {
-        question: 'Would you use a prefunding feature?',
+      discoveryInterest: {
+        question: 'Want POOL to surface people with similar trips, budgets, or interests?',
         options: {},
         total: 0
       }
@@ -105,11 +95,12 @@ export default function AdminStatsPage() {
     // Process each user's survey data
     surveyUsers.forEach(user => {
       const survey = user.surveyData!;
-      
+
       // Single choice questions
       const singleChoiceFields = [
-        'hangoutFrequency', 'avgSpend', 'splitWith', 'splitFrequency',
-        'iouFrequency', 'causesTension', 'currentTool', 'tryNewApp', 'prefunding'
+        'hangoutFrequency', 'avgSpend', 'splitWith',
+        'poolWithAcquaintance', 'poolWithStranger',
+        'dailyRoutinePooling', 'discoveryInterest'
       ];
 
       singleChoiceFields.forEach(field => {
@@ -157,6 +148,23 @@ export default function AdminStatsPage() {
         });
         statsData.valuableFeatures.total++;
       }
+
+      if (survey.openPoolTypes && Array.isArray(survey.openPoolTypes)) {
+        if (!statsData.openPoolTypes) {
+          statsData.openPoolTypes = {
+            question: 'Which kinds of pools would you join with people who aren\'t close friends?',
+            options: {},
+            total: 0
+          };
+        }
+        survey.openPoolTypes.forEach(type => {
+          if (!statsData.openPoolTypes.options[type]) {
+            statsData.openPoolTypes.options[type] = 0;
+          }
+          statsData.openPoolTypes.options[type]++;
+        });
+        statsData.openPoolTypes.total++;
+      }
     });
 
     setStats(statsData);
@@ -166,10 +174,8 @@ export default function AdminStatsPage() {
     const surveyUsers = users.filter(u => u.surveyData && u.hasCompletedSurvey);
     
     const textFields = [
-      { key: 'concerns', question: 'What concerns do you have about expense splitting?' },
-      { key: 'toolLikes', question: 'What do you like about your current tool?' },
-      { key: 'toolChanges', question: 'What would you change about your current tool?' },
-      { key: 'prefundingWhy', question: 'Why would/wouldn\'t you use prefunding?' }
+      { key: 'concerns', question: 'What would your biggest concerns be about POOL?' },
+      { key: 'trustRequirements', question: 'What would make you trust pooling money with someone you don\'t know well?' }
     ];
 
     const analysis: Record<string, TextAnalysis> = {};

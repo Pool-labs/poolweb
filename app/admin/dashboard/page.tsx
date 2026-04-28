@@ -83,22 +83,23 @@ export default function AdminDashboardPage() {
 
   const countAnsweredQuestions = (surveyData: any): number => {
     if (!surveyData) return 0;
-    
-    // Only count the main 11 questions from the questionnaire
+
+    // Only count the main 12 questions from the questionnaire
     const questions = [
       'hangoutFrequency',
       'avgSpend',
       'splitWith',
       'splitTypes',
-      'splitFrequency',
-      'iouFrequency',
-      'causesTension',
-      'currentTool',
-      'tryNewApp',
+      'poolWithAcquaintance',
+      'poolWithStranger',
+      'dailyRoutinePooling',
+      'discoveryInterest',
+      'openPoolTypes',
+      'trustRequirements',
       'valuableFeatures',
       'concerns'
     ];
-    
+
     let count = 0;
     questions.forEach(q => {
       const value = surveyData[q];
@@ -106,7 +107,7 @@ export default function AdminDashboardPage() {
         count++;
       }
     });
-    
+
     return count;
   };
 
@@ -124,15 +125,12 @@ export default function AdminDashboardPage() {
       'Average Spend',
       'Split With',
       'Split Types',
-      'Split Frequency',
-      'IOU Frequency',
-      'Causes Tension',
-      'Current Tool',
-      'Tool Likes',
-      'Tool Changes',
-      'Try New App',
-      'Prefunding',
-      'Prefunding Why',
+      'Pool With Acquaintance',
+      'Pool With Stranger',
+      'Daily Routine Pooling',
+      'Discovery Interest',
+      'Open Pool Types',
+      'Trust Requirements',
       'Valuable Features',
       'Concerns'
     ];
@@ -145,22 +143,19 @@ export default function AdminDashboardPage() {
         user.location ? user.location.split(',').pop()?.trim() || 'Unknown' : 'Unknown',
         user.hasPreregistered ? 'Yes' : 'No',
         user.hasCompletedSurvey ? 'Yes' : 'No',
-        `${countAnsweredQuestions(user.surveyData)}/11`,
+        `${countAnsweredQuestions(user.surveyData)}/12`,
         user.hasVisitedSite ? 'Yes' : 'No',
         user.submittedAt ? format(new Date(user.submittedAt), 'yyyy-MM-dd HH:mm') : '',
         survey.hangoutFrequency || '',
         survey.avgSpend || '',
         survey.splitWith || '',
         Array.isArray(survey.splitTypes) ? survey.splitTypes.join('; ') : '',
-        survey.splitFrequency || '',
-        survey.iouFrequency || '',
-        survey.causesTension || '',
-        survey.currentTool || '',
-        survey.toolLikes || '',
-        survey.toolChanges || '',
-        survey.tryNewApp || '',
-        survey.prefunding || '',
-        survey.prefundingWhy || '',
+        survey.poolWithAcquaintance || '',
+        survey.poolWithStranger || '',
+        survey.dailyRoutinePooling || '',
+        survey.discoveryInterest || '',
+        Array.isArray(survey.openPoolTypes) ? survey.openPoolTypes.join('; ') : '',
+        survey.trustRequirements || '',
         Array.isArray(survey.valuableFeatures) ? survey.valuableFeatures.join('; ') : '',
         survey.concerns || ''
       ];
@@ -344,7 +339,7 @@ export default function AdminDashboardPage() {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm">
-                          {countAnsweredQuestions(user.surveyData)}/11
+                          {countAnsweredQuestions(user.surveyData)}/12
                         </span>
                       </TableCell>
                       <TableCell>
@@ -406,7 +401,7 @@ export default function AdminDashboardPage() {
                   </div>
                   
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Questions: {countAnsweredQuestions(user.surveyData)}/11</span>
+                    <span>Questions: {countAnsweredQuestions(user.surveyData)}/12</span>
                     <span>{user.submittedAt && format(new Date(user.submittedAt), 'MMM d, yyyy')}</span>
                   </div>
                   
