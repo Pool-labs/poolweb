@@ -7,42 +7,42 @@ import type React from "react"
 import { useEffect, useState } from "react"
 
 type FormData = {
-  hangoutFrequency: string
-  avgSpend: string
-  splitWith: string
-  splitWithOther: string
+  prefunding: string
+  prefundingWhy: string
+  settlementMethods: string[]
+  settlementMethodsOther: string
+  settlementFeedback: string
+  moneyInAir: string
+  moneyInAirAmount: string
+  weeklySpend: string
   splitTypes: string[]
   splitTypesOther: string
-  poolWithAcquaintance: string
-  poolWithStranger: string
-  dailyRoutinePooling: string
-  discoveryInterest: string
-  openPoolTypes: string[]
-  openPoolTypesOther: string
-  trustRequirements: string
-  valuableFeatures: string[]
-  concerns: string
+  hangoutPoolWillingness: string
+  hangoutPoolWhy: string
+  socialFeatures: string[]
+  socialFeaturesOther: string
+  friendConversion: string
   firstName: string
   lastName: string
   email: string
 }
 
 const initialFormData: FormData = {
-  hangoutFrequency: "",
-  avgSpend: "",
-  splitWith: "",
-  splitWithOther: "",
+  prefunding: "",
+  prefundingWhy: "",
+  settlementMethods: [],
+  settlementMethodsOther: "",
+  settlementFeedback: "",
+  moneyInAir: "",
+  moneyInAirAmount: "",
+  weeklySpend: "",
   splitTypes: [],
   splitTypesOther: "",
-  poolWithAcquaintance: "",
-  poolWithStranger: "",
-  dailyRoutinePooling: "",
-  discoveryInterest: "",
-  openPoolTypes: [],
-  openPoolTypesOther: "",
-  trustRequirements: "",
-  valuableFeatures: [],
-  concerns: "",
+  hangoutPoolWillingness: "",
+  hangoutPoolWhy: "",
+  socialFeatures: [],
+  socialFeaturesOther: "",
+  friendConversion: "",
   firstName: "",
   lastName: "",
   email: "",
@@ -52,66 +52,36 @@ const STORAGE_KEY = "survey_progress"
 
 // Helper function to check if form data is complete
 function checkIfFormDataComplete(data: FormData): boolean {
-  const requiredFields = [
-    'hangoutFrequency',
-    'avgSpend',
-    'splitWith',
-    'splitTypes',
-    'poolWithAcquaintance',
-    'poolWithStranger',
-    'dailyRoutinePooling',
-    'discoveryInterest',
-    'openPoolTypes',
-    'trustRequirements',
-    'valuableFeatures',
-    'concerns'
-  ];
-
-  for (const field of requiredFields) {
-    const value = data[field as keyof FormData];
-    if (!value || (Array.isArray(value) && value.length === 0)) {
-      // Check for "Other" fields that might need to be filled
-      if (field === 'splitWith' && value === 'Other' && !data.splitWithOther) {
-        return false;
-      }
-      if (field === 'splitTypes' && Array.isArray(value) && value.includes('Other') && !data.splitTypesOther) {
-        return false;
-      }
-      if (field === 'openPoolTypes' && Array.isArray(value) && value.includes('Other') && !data.openPoolTypesOther) {
-        return false;
-      }
-      return false;
-    }
-  }
+  // Q1 prefunding + why
+  if (!data.prefunding || !data.prefundingWhy.trim()) return false;
+  // Q2 settlement methods + feedback
+  if (data.settlementMethods.length === 0) return false;
+  if (data.settlementMethods.includes("Other") && !data.settlementMethodsOther.trim()) return false;
+  if (!data.settlementFeedback.trim()) return false;
+  // Q3 money in air (amount required only if Yes)
+  if (!data.moneyInAir) return false;
+  if (data.moneyInAir === "Yes" && !data.moneyInAirAmount.trim()) return false;
+  // Q4 weekly spend
+  if (!data.weeklySpend.trim() || isNaN(Number(data.weeklySpend))) return false;
+  // Q5 split types
+  if (data.splitTypes.length === 0) return false;
+  if (data.splitTypes.includes("Other") && !data.splitTypesOther.trim()) return false;
+  // Q6 hangout/pool willingness (why is optional)
+  if (!data.hangoutPoolWillingness) return false;
+  // Q7 social features
+  if (data.socialFeatures.length === 0) return false;
+  if (data.socialFeatures.includes("Other") && !data.socialFeaturesOther.trim()) return false;
+  // Q8 friend conversion
+  if (!data.friendConversion) return false;
 
   return true;
 }
 
 export default function SurveyPage() {
   const router = useRouter()
-  // Initialize form data from localStorage if available
-  const [formData, setFormData] = useState<FormData>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedProgress = localStorage.getItem(STORAGE_KEY)
-        if (savedProgress) {
-          const parsedData = JSON.parse(savedProgress)
-          // Check if this is a complete survey
-          const isComplete = checkIfFormDataComplete(parsedData)
-          if (isComplete) {
-            // If survey was already 100% complete, clear it from storage
-            localStorage.removeItem(STORAGE_KEY)
-            return initialFormData
-          }
-          // Merge with initialFormData so any newly-introduced fields exist
-          return { ...initialFormData, ...parsedData }
-        }
-      } catch (error) {
-        // Error loading initial progress
-      }
-    }
-    return initialFormData
-  })
+  // Initialize with the empty form. localStorage is read in the mount effect
+  // below to avoid SSR/CSR hydration mismatches.
+  const [formData, setFormData] = useState<FormData>(initialFormData)
 
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -127,107 +97,113 @@ export default function SurveyPage() {
   const [showSiteVisitModal, setShowSiteVisitModal] = useState(false)
   const [userEmail, setUserEmail] = useState<string>("")
 
-  const totalSteps = 5
-  const totalQuestions = 12
+  const totalSteps = 4
+  const totalQuestions = 8
 
-  // Handle navigation and visibility changes
+  // Initial localStorage load — runs once on mount, after hydration. Keeping
+  // it inside an effect (not inside useState's initializer) ensures the SSR
+  // and first client render produce identical HTML.
   useEffect(() => {
-    if (!isInitialized) {
-      setIsInitialized(true)
-      return
+    try {
+      const savedProgress = localStorage.getItem(STORAGE_KEY)
+      if (savedProgress) {
+        const parsedData = JSON.parse(savedProgress)
+        if (checkIfFormDataComplete(parsedData)) {
+          // Already-complete survey — clear it so the user starts fresh
+          localStorage.removeItem(STORAGE_KEY)
+        } else {
+          // Merge so newly-introduced fields exist
+          setFormData({ ...initialFormData, ...parsedData })
+        }
+      }
+    } catch {
+      // Bad JSON or storage unavailable — start fresh
     }
+    setIsInitialized(true)
+  }, [])
+
+  // Reload saved progress when the tab regains focus / page becomes visible /
+  // user navigates back. Only attached after the initial load.
+  useEffect(() => {
+    if (!isInitialized) return
 
     const loadSavedProgress = () => {
       try {
-        // Loading saved progress
         const savedProgress = localStorage.getItem(STORAGE_KEY)
         if (savedProgress) {
-          // Found saved progress
           const parsedProgress = JSON.parse(savedProgress)
-          // Only update if there's actual data
           if (Object.values(parsedProgress).some(value =>
             value !== "" &&
             (Array.isArray(value) ? value.length > 0 : true)
           )) {
             setFormData({ ...initialFormData, ...parsedProgress })
-            // Progress loaded successfully
-          } else {
-            // Saved progress was empty, keeping current state
           }
-        } else {
-          // No saved progress found
         }
-      } catch (error) {
-        // Error loading saved progress
+      } catch {
         localStorage.removeItem(STORAGE_KEY)
       }
     }
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        // Page became visible, reloading progress
-        loadSavedProgress()
-      }
+      if (document.visibilityState === 'visible') loadSavedProgress()
     }
 
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY) {
-        // Storage changed, reloading progress
-        loadSavedProgress()
-      }
+      if (event.key === STORAGE_KEY) loadSavedProgress()
     }
 
-    const handleRouteChange = () => {
-      // Route changed, reloading progress
-      loadSavedProgress()
-    }
-
-    // Add event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('storage', handleStorageChange)
     window.addEventListener('focus', loadSavedProgress)
     window.addEventListener('pageshow', loadSavedProgress)
-    window.addEventListener('popstate', handleRouteChange)
-    // Cleanup event listeners
+    window.addEventListener('popstate', loadSavedProgress)
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('focus', loadSavedProgress)
       window.removeEventListener('pageshow', loadSavedProgress)
-      window.removeEventListener('popstate', handleRouteChange)
+      window.removeEventListener('popstate', loadSavedProgress)
     }
   }, [isInitialized])
 
-  // Save progress whenever form data changes
+  // Save progress whenever form data changes — but only once we've completed
+  // the initial load, so we don't overwrite saved data with the empty seed.
   useEffect(() => {
+    if (!isInitialized) return
     try {
-      // Saving progress
       localStorage.setItem(STORAGE_KEY, JSON.stringify(formData))
-    } catch (error) {
-      // Error saving progress
+    } catch {
+      // Storage unavailable — silently skip
     }
-  }, [formData])
+  }, [formData, isInitialized])
 
   // Calculate questions answered whenever form data changes
   useEffect(() => {
     let answered = 0;
 
-    // Q1: Hangout frequency
-    if (formData.hangoutFrequency) answered++
+    // Q1: Prefunding + why
+    if (formData.prefunding && formData.prefundingWhy.trim()) answered++
 
-    // Q2: Average spend
-    if (formData.avgSpend && !isNaN(Number(formData.avgSpend))) answered++
+    // Q2: Settlement methods + feedback
+    if (
+      formData.settlementMethods.length > 0 &&
+      (!formData.settlementMethods.includes("Other") || formData.settlementMethodsOther.trim()) &&
+      formData.settlementFeedback.trim()
+    ) answered++
 
-    // Q3: Split with whom
-    if (formData.splitWith) {
-      if (formData.splitWith !== "Other") {
+    // Q3: Money in air (amount required only when Yes)
+    if (formData.moneyInAir) {
+      if (formData.moneyInAir === "No") {
         answered++
-      } else if (formData.splitWithOther.trim()) {
+      } else if (formData.moneyInAirAmount.trim()) {
         answered++
       }
     }
 
-    // Q4: Split types (checkbox)
+    // Q4: Weekly spend
+    if (formData.weeklySpend.trim() && !isNaN(Number(formData.weeklySpend))) answered++
+
+    // Q5: Split types (checkbox)
     if (formData.splitTypes.length > 0) {
       if (!formData.splitTypes.includes("Other")) {
         answered++
@@ -236,35 +212,20 @@ export default function SurveyPage() {
       }
     }
 
-    // Q5: Pool with acquaintance
-    if (formData.poolWithAcquaintance) answered++
+    // Q6: Hangout / pool willingness (why is optional)
+    if (formData.hangoutPoolWillingness) answered++
 
-    // Q6: Pool with stranger sharing the same plan
-    if (formData.poolWithStranger) answered++
-
-    // Q7: Daily routine pooling
-    if (formData.dailyRoutinePooling) answered++
-
-    // Q8: Discovery interest
-    if (formData.discoveryInterest) answered++
-
-    // Q9: Open pool types (checkbox)
-    if (formData.openPoolTypes.length > 0) {
-      if (!formData.openPoolTypes.includes("Other")) {
+    // Q7: Social features
+    if (formData.socialFeatures.length > 0) {
+      if (!formData.socialFeatures.includes("Other")) {
         answered++
-      } else if (formData.openPoolTypesOther.trim()) {
+      } else if (formData.socialFeaturesOther.trim()) {
         answered++
       }
     }
 
-    // Q10: Trust requirements
-    if (formData.trustRequirements.trim()) answered++
-
-    // Q11: Valuable features
-    if (formData.valuableFeatures.length > 0) answered++
-
-    // Q12: Concerns
-    if (formData.concerns.trim()) answered++
+    // Q8: Friend conversion
+    if (formData.friendConversion) answered++
 
     setQuestionsAnswered(answered)
   }, [formData])
@@ -273,7 +234,7 @@ export default function SurveyPage() {
     setFormData({ ...formData, [field]: value })
   }
 
-  const handleCheckboxChange = (field: "splitTypes" | "valuableFeatures" | "openPoolTypes", value: string) => {
+  const handleCheckboxChange = (field: "splitTypes" | "socialFeatures" | "settlementMethods", value: string) => {
     const currentValues = formData[field] as string[]
     const newValues = currentValues.includes(value)
       ? currentValues.filter((v) => v !== value)
@@ -282,23 +243,7 @@ export default function SurveyPage() {
   }
 
   const isAllQuestionsAnswered = (): boolean => {
-    return (
-      formData.hangoutFrequency !== "" &&
-      formData.avgSpend !== "" &&
-      formData.splitWith !== "" &&
-      (formData.splitWith !== "Other" || formData.splitWithOther !== "") &&
-      formData.splitTypes.length > 0 &&
-      (!formData.splitTypes.includes("Other") || formData.splitTypesOther !== "") &&
-      formData.poolWithAcquaintance !== "" &&
-      formData.poolWithStranger !== "" &&
-      formData.dailyRoutinePooling !== "" &&
-      formData.discoveryInterest !== "" &&
-      formData.openPoolTypes.length > 0 &&
-      (!formData.openPoolTypes.includes("Other") || formData.openPoolTypesOther !== "") &&
-      formData.trustRequirements !== "" &&
-      formData.valuableFeatures.length > 0 &&
-      formData.concerns !== ""
-    )
+    return checkIfFormDataComplete(formData)
   }
 
   const validateContactInfo = (): boolean => {
@@ -316,28 +261,27 @@ export default function SurveyPage() {
 
   const isQuestionAnswered = (questionNumber: number): boolean => {
     switch (questionNumber) {
-      case 1: return Boolean(formData.hangoutFrequency)
-      case 2: return Boolean(formData.avgSpend && !isNaN(Number(formData.avgSpend)))
-      case 3: return Boolean(formData.splitWith && (formData.splitWith !== "Other" || formData.splitWithOther.trim()))
-      case 4: return Boolean(formData.splitTypes.length > 0 && (!formData.splitTypes.includes("Other") || formData.splitTypesOther.trim()))
-      case 5: return Boolean(formData.poolWithAcquaintance)
-      case 6: return Boolean(formData.poolWithStranger)
-      case 7: return Boolean(formData.dailyRoutinePooling)
-      case 8: return Boolean(formData.discoveryInterest)
-      case 9: return Boolean(formData.openPoolTypes.length > 0 && (!formData.openPoolTypes.includes("Other") || formData.openPoolTypesOther.trim()))
-      case 10: return Boolean(formData.trustRequirements.trim())
-      case 11: return Boolean(formData.valuableFeatures.length > 0)
-      case 12: return Boolean(formData.concerns.trim())
+      case 1: return Boolean(formData.prefunding && formData.prefundingWhy.trim())
+      case 2: return Boolean(
+        formData.settlementMethods.length > 0 &&
+        (!formData.settlementMethods.includes("Other") || formData.settlementMethodsOther.trim()) &&
+        formData.settlementFeedback.trim()
+      )
+      case 3: return Boolean(formData.moneyInAir && (formData.moneyInAir === "No" || formData.moneyInAirAmount.trim()))
+      case 4: return Boolean(formData.weeklySpend.trim() && !isNaN(Number(formData.weeklySpend)))
+      case 5: return Boolean(formData.splitTypes.length > 0 && (!formData.splitTypes.includes("Other") || formData.splitTypesOther.trim()))
+      case 6: return Boolean(formData.hangoutPoolWillingness)
+      case 7: return Boolean(formData.socialFeatures.length > 0 && (!formData.socialFeatures.includes("Other") || formData.socialFeaturesOther.trim()))
+      case 8: return Boolean(formData.friendConversion)
       default: return false
     }
   }
 
   const getQuestionStep = (questionNumber: number): number => {
-    if (questionNumber <= 3) return 1
-    if (questionNumber <= 5) return 2
-    if (questionNumber <= 7) return 3
-    if (questionNumber <= 10) return 4
-    return 5
+    if (questionNumber <= 2) return 1
+    if (questionNumber <= 4) return 2
+    if (questionNumber <= 6) return 3
+    return 4
   }
 
   const findFirstUnansweredQuestion = (): number => {
@@ -604,7 +548,7 @@ export default function SurveyPage() {
                     <>
                       <div className="mb-8 bg-yellow-100 border-2 border-yellow-400 rounded-2xl p-6">
                         <p className="text-lg font-bold text-yellow-800 flex items-center justify-center gap-2 text-center">
-                          Finish the remaining questions to unlock VIP access to our exclusive merch drop and claim a free item of your choice.
+                          Finish the remaining questions to unlock the exclusive merch drop and claim a free item of your choice.
                         </p>
                         <p className="text-yellow-800 text-center mt-2">
                           {questionsAnswered} of {totalQuestions} questions answered
@@ -612,20 +556,20 @@ export default function SurveyPage() {
                       </div>
                       <div className="mb-8">
                         <p className="text-lg text-pool-navy mb-4 text-center text-shadow">
-                          Thank you for taking the time to share your feedback!
+                          Thanks for sharing your thoughts!
                         </p>
                         <p className="text-sm text-pool-navy/80 mb-4 text-center">
-                          You can still submit your responses now, or go back to complete all questions and unlock VIP access to our exclusive merch drop.
+                          Drop your contact info — you’ll be among the first to use POOL when we launch. You can still submit now, or finish the remaining questions to also unlock our exclusive merch drop.
                         </p>
                       </div>
                     </>
                   ) : (
                     <div className="mb-8">
                       <p className="text-lg text-pool-navy mb-4 text-center text-shadow">
-                        Just need your contact info to secure your VIP access to our exclusive merch collection!
+                        Drop your contact info — you’ll be among the first to use POOL when we launch.
                       </p>
                       <p className="text-sm text-pool-navy/80 text-center">
-                        You've completed all questions and unlocked VIP access to our exclusive merch drop!
+                        You’ve completed every question, so you’ve also unlocked our exclusive merch drop and your free item of choice.
                       </p>
                     </div>
                   )}
@@ -633,7 +577,7 @@ export default function SurveyPage() {
 
                 <form onSubmit={handleFinalSubmit} className="space-y-6">
                   <div>
-                    <label className="block text-pool-navy font-bold mb-2 text-shadow">First Name</label>
+                    <label className="block text-pool-navy font-bold mb-2 text-shadow">First Name<span className="text-red-500 ml-1">*</span></label>
                     <input
                       type="text"
                       value={formData.firstName}
@@ -650,7 +594,7 @@ export default function SurveyPage() {
                   </div>
 
                   <div>
-                    <label className="block text-pool-navy font-bold mb-2 text-shadow">Last Name</label>
+                    <label className="block text-pool-navy font-bold mb-2 text-shadow">Last Name<span className="text-red-500 ml-1">*</span></label>
                     <input
                       type="text"
                       value={formData.lastName}
@@ -667,7 +611,7 @@ export default function SurveyPage() {
                   </div>
 
                   <div>
-                    <label className="block text-pool-navy font-bold mb-2 text-shadow">Email</label>
+                    <label className="block text-pool-navy font-bold mb-2 text-shadow">Email<span className="text-red-500 ml-1">*</span></label>
                     <input
                       type="email"
                       value={formData.email}
@@ -729,8 +673,6 @@ export default function SurveyPage() {
     )
   }
 
-  const comfortScale = ["Definitely", "Probably", "Maybe", "Probably not", "Definitely not"]
-
   const renderStep = () => {
     switch (currentStep) {
       case 1:
@@ -738,79 +680,148 @@ export default function SurveyPage() {
           <div className="space-y-8">
             <div>
               <label className="block text-pool-navy font-bold mb-4 text-shadow text-lg">
-                How often do you hang out with friends?
+                Would you pre-fund for activities (put money in before the event)?
               </label>
               <div className="space-y-3">
-                {["Daily", "A few times a week", "Once a week", "A few times a month", "Rarely"].map((option) => (
+                {["Yes", "No"].map((option) => (
                   <label
                     key={option}
                     className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
                   >
                     <input
                       type="radio"
-                      name="hangoutFrequency"
+                      name="prefunding"
                       value={option}
-                      checked={formData.hangoutFrequency === option}
-                      onChange={(e) => handleInputChange("hangoutFrequency", e.target.value)}
+                      checked={formData.prefunding === option}
+                      onChange={(e) => handleInputChange("prefunding", e.target.value)}
                       className="mr-3 w-5 h-5 text-pool-pink focus:ring-pool-pink"
                     />
                     <span className="text-pool-navy font-medium">{option}</span>
                   </label>
                 ))}
               </div>
+              {formData.prefunding && (
+                <textarea
+                  value={formData.prefundingWhy}
+                  onChange={(e) => handleInputChange("prefundingWhy", e.target.value)}
+                  rows={2}
+                  className="w-full mt-3 px-4 py-3 rounded-2xl border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors resize-none"
+                  placeholder="Why?"
+                />
+              )}
             </div>
 
             <div>
               <label className="block text-pool-navy font-bold mb-4 text-shadow text-lg">
-                On average, how much do you spend when you hang out?
-              </label>
-              <input
-                type="number"
-                value={formData.avgSpend}
-                onChange={(e) => handleInputChange("avgSpend", e.target.value)}
-                className="w-full px-4 py-3 rounded-full border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors"
-                placeholder="Enter amount in dollars"
-                min="0"
-                step="0.01"
-              />
-            </div>
-
-            <div>
-              <label className="block text-pool-navy font-bold mb-4 text-shadow text-lg">
-                When you split expenses, who's it usually with?
+                How do you currently settle group expenses? (check all that apply)
               </label>
               <div className="space-y-3">
-                {["Friends", "Family", "Coworkers", "Acquaintances / people I don't know well", "Other"].map((option) => (
+                {[
+                  "Venmo, Cash App, Zelle (or similar payment apps)",
+                  "Pre-funding",
+                  "Split the check",
+                  "Other",
+                ].map((option) => (
                   <label
                     key={option}
                     className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
                   >
+                    <div className="mr-3">
+                      {formData.settlementMethods.includes(option) ? (
+                        <CheckSquare className="w-5 h-5 text-pool-pink" />
+                      ) : (
+                        <Square className="w-5 h-5 text-pool-navy" />
+                      )}
+                    </div>
                     <input
-                      type="radio"
-                      name="splitWith"
+                      type="checkbox"
                       value={option}
-                      checked={formData.splitWith === option}
-                      onChange={(e) => handleInputChange("splitWith", e.target.value)}
-                      className="mr-3 w-5 h-5 text-pool-pink focus:ring-pool-pink"
+                      checked={formData.settlementMethods.includes(option)}
+                      onChange={() => handleCheckboxChange("settlementMethods", option)}
+                      className="sr-only"
                     />
                     <span className="text-pool-navy font-medium">{option}</span>
                   </label>
                 ))}
               </div>
-              {formData.splitWith === "Other" && (
+              {formData.settlementMethods.includes("Other") && (
                 <input
                   type="text"
-                  value={formData.splitWithOther}
-                  onChange={(e) => handleInputChange("splitWithOther", e.target.value)}
+                  value={formData.settlementMethodsOther}
+                  onChange={(e) => handleInputChange("settlementMethodsOther", e.target.value)}
                   className="w-full mt-3 px-4 py-3 rounded-full border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors"
                   placeholder="Please specify..."
                 />
               )}
+              <textarea
+                value={formData.settlementFeedback}
+                onChange={(e) => handleInputChange("settlementFeedback", e.target.value)}
+                rows={3}
+                className="w-full mt-3 px-4 py-3 rounded-2xl border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors resize-none"
+                placeholder="What do you like or dislike about how you currently settle?"
+              />
             </div>
           </div>
         )
 
       case 2:
+        return (
+          <div className="space-y-8">
+            <div>
+              <label className="block text-pool-navy font-bold mb-4 text-shadow text-lg">
+                Do you think there's money "in the air" right now — money owed to you, or that you owe to friends?
+              </label>
+              <div className="space-y-3">
+                {["Yes", "No"].map((option) => (
+                  <label
+                    key={option}
+                    className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
+                  >
+                    <input
+                      type="radio"
+                      name="moneyInAir"
+                      value={option}
+                      checked={formData.moneyInAir === option}
+                      onChange={(e) => handleInputChange("moneyInAir", e.target.value)}
+                      className="mr-3 w-5 h-5 text-pool-pink focus:ring-pool-pink"
+                    />
+                    <span className="text-pool-navy font-medium">{option}</span>
+                  </label>
+                ))}
+              </div>
+              {formData.moneyInAir === "Yes" && (
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={formData.moneyInAirAmount}
+                  onChange={(e) => handleInputChange("moneyInAirAmount", e.target.value)}
+                  className="w-full mt-3 px-4 py-3 rounded-full border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors"
+                  placeholder="Roughly how much, in dollars?"
+                  min="0"
+                  step="0.01"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="block text-pool-navy font-bold mb-4 text-shadow text-lg">
+                How much do you spend weekly with other people (friends, roommates, family, coworkers, etc.)?
+              </label>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={formData.weeklySpend}
+                onChange={(e) => handleInputChange("weeklySpend", e.target.value)}
+                className="w-full px-4 py-3 rounded-full border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors"
+                placeholder="Enter weekly amount in dollars"
+                min="0"
+                step="0.01"
+              />
+            </div>
+          </div>
+        )
+
+      case 3:
         return (
           <div className="space-y-8">
             <div>
@@ -860,79 +871,35 @@ export default function SurveyPage() {
 
             <div>
               <label className="block text-pool-navy font-bold mb-4 text-shadow text-lg">
-                Imagine someone you know but isn't a close friend wants to go on the same trip or event as you. Would you pool money with them to make it happen?
+                Are you willing to hang out with random people with similar interests AND pool money together?
               </label>
               <div className="space-y-3">
-                {comfortScale.map((option) => (
+                {["Hangout Only", "Pool Money Only", "Both", "Neither"].map((option) => (
                   <label
                     key={option}
                     className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
                   >
                     <input
                       type="radio"
-                      name="poolWithAcquaintance"
+                      name="hangoutPoolWillingness"
                       value={option}
-                      checked={formData.poolWithAcquaintance === option}
-                      onChange={(e) => handleInputChange("poolWithAcquaintance", e.target.value)}
+                      checked={formData.hangoutPoolWillingness === option}
+                      onChange={(e) => handleInputChange("hangoutPoolWillingness", e.target.value)}
                       className="mr-3 w-5 h-5 text-pool-pink focus:ring-pool-pink"
                     />
                     <span className="text-pool-navy font-medium">{option}</span>
                   </label>
                 ))}
               </div>
-            </div>
-          </div>
-        )
-
-      case 3:
-        return (
-          <div className="space-y-8">
-            <div>
-              <label className="block text-pool-navy font-bold mb-4 text-shadow text-lg">
-                Now imagine someone you don't know — a stranger on POOL — has the exact same trip, concert, or goal in mind as you. Would you pool with them to share the cost?
-              </label>
-              <div className="space-y-3">
-                {comfortScale.map((option) => (
-                  <label
-                    key={option}
-                    className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
-                  >
-                    <input
-                      type="radio"
-                      name="poolWithStranger"
-                      value={option}
-                      checked={formData.poolWithStranger === option}
-                      onChange={(e) => handleInputChange("poolWithStranger", e.target.value)}
-                      className="mr-3 w-5 h-5 text-pool-pink focus:ring-pool-pink"
-                    />
-                    <span className="text-pool-navy font-medium">{option}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-pool-navy font-bold mb-4 text-shadow text-lg">
-                Would you be open to pooling on everyday spending — coffee runs, lunch, gym, rideshare — with people on a similar daily routine?
-              </label>
-              <div className="space-y-3">
-                {comfortScale.map((option) => (
-                  <label
-                    key={option}
-                    className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
-                  >
-                    <input
-                      type="radio"
-                      name="dailyRoutinePooling"
-                      value={option}
-                      checked={formData.dailyRoutinePooling === option}
-                      onChange={(e) => handleInputChange("dailyRoutinePooling", e.target.value)}
-                      className="mr-3 w-5 h-5 text-pool-pink focus:ring-pool-pink"
-                    />
-                    <span className="text-pool-navy font-medium">{option}</span>
-                  </label>
-                ))}
-              </div>
+              {formData.hangoutPoolWillingness && (
+                <textarea
+                  value={formData.hangoutPoolWhy}
+                  onChange={(e) => handleInputChange("hangoutPoolWhy", e.target.value)}
+                  rows={2}
+                  className="w-full mt-3 px-4 py-3 rounded-2xl border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors resize-none"
+                  placeholder="Why?"
+                />
+              )}
             </div>
           </div>
         )
@@ -942,48 +909,22 @@ export default function SurveyPage() {
           <div className="space-y-8">
             <div>
               <label className="block text-pool-navy font-bold mb-4 text-shadow text-lg">
-                Would you want POOL to surface people with similar trip plans, budgets, or interests so you could pool with them?
-              </label>
-              <div className="space-y-3">
-                {comfortScale.map((option) => (
-                  <label
-                    key={option}
-                    className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
-                  >
-                    <input
-                      type="radio"
-                      name="discoveryInterest"
-                      value={option}
-                      checked={formData.discoveryInterest === option}
-                      onChange={(e) => handleInputChange("discoveryInterest", e.target.value)}
-                      className="mr-3 w-5 h-5 text-pool-pink focus:ring-pool-pink"
-                    />
-                    <span className="text-pool-navy font-medium">{option}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-pool-navy font-bold mb-4 text-shadow text-lg">
-                Which kinds of pools would you be open to joining with people who aren't close friends? (check all that apply)
+                Would you care about social features in a money app? (check all that apply)
               </label>
               <div className="space-y-3">
                 {[
-                  "Trips / vacations",
-                  "Concerts / events",
-                  "Daily routines (coffee, lunch, gym, rideshare)",
-                  "Group purchases (gifts, equipment)",
-                  "Subscriptions (streaming, gym, software)",
-                  "None of the above",
+                  "Leaderboards",
+                  "Messaging",
+                  "Recommended pools nearby",
                   "Other",
+                  "None",
                 ].map((option) => (
                   <label
                     key={option}
                     className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
                   >
                     <div className="mr-3">
-                      {formData.openPoolTypes.includes(option) ? (
+                      {formData.socialFeatures.includes(option) ? (
                         <CheckSquare className="w-5 h-5 text-pool-pink" />
                       ) : (
                         <Square className="w-5 h-5 text-pool-navy" />
@@ -992,19 +933,19 @@ export default function SurveyPage() {
                     <input
                       type="checkbox"
                       value={option}
-                      checked={formData.openPoolTypes.includes(option)}
-                      onChange={() => handleCheckboxChange("openPoolTypes", option)}
+                      checked={formData.socialFeatures.includes(option)}
+                      onChange={() => handleCheckboxChange("socialFeatures", option)}
                       className="sr-only"
                     />
                     <span className="text-pool-navy font-medium">{option}</span>
                   </label>
                 ))}
               </div>
-              {formData.openPoolTypes.includes("Other") && (
+              {formData.socialFeatures.includes("Other") && (
                 <input
                   type="text"
-                  value={formData.openPoolTypesOther}
-                  onChange={(e) => handleInputChange("openPoolTypesOther", e.target.value)}
+                  value={formData.socialFeaturesOther}
+                  onChange={(e) => handleInputChange("socialFeaturesOther", e.target.value)}
                   className="w-full mt-3 px-4 py-3 rounded-full border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors"
                   placeholder="Please specify..."
                 />
@@ -1013,72 +954,26 @@ export default function SurveyPage() {
 
             <div>
               <label className="block text-pool-navy font-bold mb-4 text-shadow text-lg">
-                What would make you trust pooling money with someone you don't already know well?
-              </label>
-              <textarea
-                value={formData.trustRequirements}
-                onChange={(e) => handleInputChange("trustRequirements", e.target.value)}
-                rows={3}
-                className="w-full px-4 py-3 rounded-2xl border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors resize-none"
-                placeholder="e.g., verified profiles, mutual friends, ratings, escrow..."
-              />
-            </div>
-          </div>
-        )
-
-      case 5:
-        return (
-          <div className="space-y-8">
-            <div>
-              <label className="block text-pool-navy font-bold mb-4 text-shadow text-lg">
-                Which of these features would be most valuable to you? (check all that apply)
+                If you wanted your friends to use POOL, how hard would it be to get them to join?
               </label>
               <div className="space-y-3">
-                {[
-                  "Match with people who have similar trips or interests",
-                  "Profile / reputation system to build trust",
-                  "In-app chat with potential pool partners",
-                  "Auto-tracking shared expenses",
-                  "Instant pay / settle up",
-                  "Virtual cards for each pool member",
-                  "Reminders",
-                  "None of the above",
-                ].map((option) => (
+                {["Pretty easy", "Need some convincing", "Pretty hard"].map((option) => (
                   <label
                     key={option}
                     className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
                   >
-                    <div className="mr-3">
-                      {formData.valuableFeatures.includes(option) ? (
-                        <CheckSquare className="w-5 h-5 text-pool-pink" />
-                      ) : (
-                        <Square className="w-5 h-5 text-pool-navy" />
-                      )}
-                    </div>
                     <input
-                      type="checkbox"
+                      type="radio"
+                      name="friendConversion"
                       value={option}
-                      checked={formData.valuableFeatures.includes(option)}
-                      onChange={() => handleCheckboxChange("valuableFeatures", option)}
-                      className="sr-only"
+                      checked={formData.friendConversion === option}
+                      onChange={(e) => handleInputChange("friendConversion", e.target.value)}
+                      className="mr-3 w-5 h-5 text-pool-pink focus:ring-pool-pink"
                     />
                     <span className="text-pool-navy font-medium">{option}</span>
                   </label>
                 ))}
               </div>
-            </div>
-
-            <div>
-              <label className="block text-pool-navy font-bold mb-4 text-shadow text-lg">
-                If POOL existed today, what would your biggest concerns be?
-              </label>
-              <textarea
-                value={formData.concerns}
-                onChange={(e) => handleInputChange("concerns", e.target.value)}
-                rows={3}
-                className="w-full px-4 py-3 rounded-2xl border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors resize-none"
-                placeholder="Share your concerns..."
-              />
             </div>
           </div>
         )
@@ -1145,7 +1040,7 @@ export default function SurveyPage() {
       <div className="min-h-screen py-20">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto">
-            <h1 className="text-5xl font-bold text-pool-navy mb-8 text-center text-shadow">
+            <h1 className="text-3xl sm:text-5xl font-bold text-pool-navy mb-8 text-center text-shadow">
               Questionnaire
             </h1>
 
@@ -1153,7 +1048,7 @@ export default function SurveyPage() {
             <div className="bg-gradient-to-r from-pool-pink to-pool-purple rounded-3xl p-6 mb-8 text-white shadow-xl">
               <div className="flex items-center justify-center space-x-3">
                 <p className="text-lg font-bold text-center text-shadow">
-                  Your input matters. Share your thoughts and we’ll hook you up with first access to our exclusive merch collection! Plus, you’ll get to pick a free item of your choice!
+                  Answer all eight questions to get access to our exclusive merch drop and be the first to use POOL.
                 </p>
               </div>
             </div>
@@ -1254,8 +1149,8 @@ export default function SurveyPage() {
                             setShowProgress(false)
                           }}
                           className={`p-3 rounded-xl text-left flex items-center gap-2 transition-all ${isAnswered
-                              ? "bg-pool-blue/10 text-pool-blue hover:bg-pool-blue/20"
-                              : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                            ? "bg-pool-blue/10 text-pool-blue hover:bg-pool-blue/20"
+                            : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
                             }`}
                         >
                           <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${isAnswered ? "bg-pool-blue text-white" : "bg-yellow-400 text-yellow-900"

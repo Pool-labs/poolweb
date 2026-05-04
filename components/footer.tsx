@@ -35,7 +35,7 @@ export default function Footer() {
           <p className="text-pool-navy text-xl mb-6 max-w-2xl mx-auto">
             {"A social network for people who spend time — and money — together. Your people, your pools, your moments."}
           </p>
-          <div className="flex items-center justify-center gap-5 mb-6">
+          <div className="flex items-center justify-center gap-3 mb-6">
             {socials.map((social) => (
               <a
                 key={social.name}
@@ -43,9 +43,9 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={social.name}
-                className="text-pool-navy hover:text-pool-pink transform hover:scale-110 transition-all"
+                className="inline-flex items-center justify-center w-11 h-11 rounded-full text-pool-navy hover:text-pool-pink hover:bg-pool-navy/5 transform hover:scale-110 transition-all"
               >
-                <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24" aria-hidden="true">
                   <path d={social.path} />
                 </svg>
               </a>

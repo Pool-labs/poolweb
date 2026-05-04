@@ -1,65 +1,41 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { InviteFriendsModal } from "@/components/invite-friends-modal"
+import { Bell, Gift, Sparkles, Star, UserPlus } from "lucide-react"
 import Link from "next/link"
-import { Gift, Star, Sparkles, Bell } from "lucide-react"
-import { preregisterUser } from "@/app/firebase/services"
+import { useEffect, useState } from "react"
 
 export default function SurveyConfirmationPage() {
   const [showConfetti, setShowConfetti] = useState(true)
   const [isComplete, setIsComplete] = useState(false)
-  const [isUpdate, setIsUpdate] = useState(false)
   const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [email, setEmail] = useState("")
-  const [isPreregistering, setIsPreregistering] = useState(false)
-  const [preregisterStatus, setPreregisterStatus] = useState<"idle" | "success" | "error">("idle")
+  const [showInviteModal, setShowInviteModal] = useState(false)
 
   useEffect(() => {
-    // Check if the survey was completed (all questions answered)
     const searchParams = new URLSearchParams(window.location.search)
     setIsComplete(searchParams.get("complete") === "true")
-    setIsUpdate(searchParams.get("updated") === "true")
     setFirstName(searchParams.get("firstName") || "")
-    setLastName(searchParams.get("lastName") || "")
-    setEmail(searchParams.get("email") || "")
 
     // Hide confetti after 5 seconds
     const timer = setTimeout(() => {
       setShowConfetti(false)
     }, 5000)
 
-    return () => clearTimeout(timer)
+    // Auto-open the invite popup shortly after the page lands so it grabs
+    // the user's attention without interrupting the success animation.
+    const popupTimer = setTimeout(() => {
+      setShowInviteModal(true)
+    }, 800)
+
+    return () => {
+      clearTimeout(timer)
+      clearTimeout(popupTimer)
+    }
   }, [])
-
-  const handlePreregister = async () => {
-    if (!firstName || !lastName || !email) {
-      setPreregisterStatus("error")
-      return
-    }
-
-    setIsPreregistering(true)
-    setPreregisterStatus("idle")
-
-    try {
-      await preregisterUser(firstName, lastName, email)
-      setPreregisterStatus("success")
-    } catch (error: any) {
-      // Even if they already preregistered, we consider it a success
-      if (error.message === "USER_ALREADY_EXISTS") {
-        setPreregisterStatus("success")
-      } else {
-        setPreregisterStatus("error")
-      }
-    } finally {
-      setIsPreregistering(false)
-    }
-  }
-
 
   return (
     <div className="min-h-screen py-20 relative overflow-hidden">
-      {/* Animated confetti background - only show for complete submissions */}
+      {/* Animated confetti — only on complete submissions */}
       {showConfetti && isComplete && (
         <div className="absolute inset-0 z-0">
           {[...Array(50)].map((_, i) => (
@@ -74,13 +50,12 @@ export default function SurveyConfirmationPage() {
               }}
             >
               <div
-                className={`w-3 h-3 ${
-                  i % 3 === 0
+                className={`w-3 h-3 ${i % 3 === 0
                     ? "bg-pool-pink"
                     : i % 3 === 1
-                    ? "bg-pool-yellow"
-                    : "bg-pool-blue"
-                } rounded-full`}
+                      ? "bg-pool-yellow"
+                      : "bg-pool-blue"
+                  } rounded-full`}
               />
             </div>
           ))}
@@ -100,14 +75,12 @@ export default function SurveyConfirmationPage() {
             </div>
           </div>
 
-          {/* Combined Thank you & Pre-Register Section */}
+          {/* Thank you & early-access notice */}
           <div className="bg-gradient-to-r from-pool-pink/20 to-pool-yellow/20 backdrop-blur-sm rounded-3xl p-10 shadow-2xl border-2 border-white/40 mb-8 relative overflow-hidden">
-            {/* Decorative elements */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-pool-yellow/10 rounded-full blur-3xl" />
             <div className="absolute bottom-0 left-0 w-40 h-40 bg-pool-pink/10 rounded-full blur-3xl" />
-            
+
             <div className="relative z-10">
-              {/* Thank you message */}
               {isComplete ? (
                 <>
                   <h1 className="text-5xl font-bold text-pool-navy mb-6 text-shadow flex items-center justify-center gap-3">
@@ -115,131 +88,74 @@ export default function SurveyConfirmationPage() {
                     {firstName ? `Thanks, ${firstName}!` : "You're in!"}
                     <Sparkles className="w-12 h-12 text-pool-pink animate-pulse" />
                   </h1>
-                  <div className="space-y-4 mb-8">
-                    <p className="text-2xl font-bold text-pool-navy text-shadow leading-relaxed">
-                      You're officially on the VIP list for early access to our upcoming merch drop!
-                    </p>
-                    <p className="text-lg text-pool-navy/80 text-shadow">
-                      Get ready to choose your favorite piece from our exclusive POOL collection.
-                    </p>
-                  </div>
+                  <p className="text-2xl font-bold text-pool-navy text-shadow leading-relaxed mb-3">
+                    You’ll be one of the first to use POOL when we launch.
+                  </p>
+                  <p className="text-lg text-pool-navy/80 text-shadow">
+                    Plus, you’re on the VIP list for our exclusive merch drop — we’ll email you to pick your free item.
+                  </p>
                 </>
               ) : (
                 <>
                   <h1 className="text-4xl font-bold text-pool-navy mb-6 text-shadow">
-                    {firstName ? `Thanks for sharing, ${firstName}!` : "Thanks for Your Feedback!"}
+                    {firstName ? `Thanks for sharing, ${firstName}!` : "Thanks for sharing!"}
                   </h1>
-                  <p className="text-xl text-pool-navy text-shadow mb-8">
-                    {isUpdate 
-                      ? "Your responses have been updated. Complete all questions to join the VIP list for our exclusive merch drop!"
-                      : "We appreciate you taking the time to share your thoughts with us."
-                    }
+                  <p className="text-xl text-pool-navy text-shadow mb-3">
+                    You’ll be one of the first to use POOL when we launch — we’ll email you with your early-access link.
+                  </p>
+                  <p className="text-base text-pool-navy/80">
+                    Want the exclusive merch drop and a free item too? Finish the remaining questions any time before launch.
                   </p>
                 </>
               )}
 
-              {/* Pre-Register Section */}
+              {/* What's next card */}
               <div className="mt-8 bg-gradient-to-r from-pool-blue/10 to-pool-green/10 rounded-2xl p-6 shadow-inner border border-white/20">
-            <div className="text-center">
-              <div className="flex items-center justify-center mb-4">
-                <Bell className="w-8 h-8 text-pool-navy" />
-              </div>
-              
-              {preregisterStatus === "success" ? (
-                  <>
-                    <h3 className="text-2xl font-bold text-pool-navy mb-4">
-                      You're All Set!
-                    </h3>
-                    <p className="text-pool-navy/80 mb-6">
-                      {firstName ? `Thanks ${firstName}! ` : ""}You're now on the VIP list for POOL launch notifications.
-                    </p>
-                    <div className="bg-green-100 border-2 border-green-300 rounded-2xl p-4 inline-block">
-                      <p className="text-green-800 font-semibold">
-                        Pre-Registration Complete!
-                      </p>
-                    </div>
-                  </>
-                ) : preregisterStatus === "error" ? (
-                  <>
-                    <h3 className="text-2xl font-bold text-pool-navy mb-4">
-                      Oops! Something went wrong
-                    </h3>
-                    <p className="text-pool-navy/80 mb-6">
-                      We couldn't automatically pre-register you. Please try the manual registration.
-                    </p>
-                    <Link href="/preregister">
-                      <button className="bg-gradient-to-r from-pool-blue to-pool-green hover:from-pool-green hover:to-pool-blue text-white font-bold py-4 px-8 rounded-full text-lg transition-all transform hover:scale-105 shadow-lg flex items-center gap-2 mx-auto">
-                        <Bell size={20} />
-                        Go to Pre-Register Page
-                      </button>
-                    </Link>
-                  </>
-                ) : firstName && lastName && email ? (
-                  <>
-                    <h3 className="text-2xl font-bold text-pool-navy mb-4">
-                      Want Early Access to POOL?
-                    </h3>
-                    <p className="text-pool-navy/80 mb-6">
-                      {isComplete 
-                        ? `Hi ${firstName}! As a VIP member, make sure you're first in line when we launch!`
-                        : `Hi ${firstName}! Get notified when POOL launches and join thousands of others who are excited about group payments!`
-                      }
-                    </p>
-                    <button 
-                      onClick={handlePreregister}
-                      disabled={isPreregistering}
-                      className="bg-gradient-to-r from-pool-blue to-pool-green hover:from-pool-green hover:to-pool-blue text-white font-bold py-4 px-8 rounded-full text-lg transition-all transform hover:scale-105 shadow-lg flex items-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Bell size={20} />
-                      {isPreregistering ? "Pre-Registering..." : "Pre-Register for Launch"}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-2xl font-bold text-pool-navy mb-4">
-                      Want Early Access to POOL?
-                    </h3>
-                    <p className="text-pool-navy/80 mb-6">
-                      Get notified when POOL launches and join thousands of others who are excited about group payments!
-                    </p>
-                    <Link href="/preregister">
-                      <button className="bg-gradient-to-r from-pool-blue to-pool-green hover:from-pool-green hover:to-pool-blue text-white font-bold py-4 px-8 rounded-full text-lg transition-all transform hover:scale-105 shadow-lg flex items-center gap-2 mx-auto">
-                        <Bell size={20} />
-                        Pre-Register for Launch
-                      </button>
-                    </Link>
-                  </>
-              )}
+                <div className="flex items-center justify-center mb-3">
+                  <Bell className="w-8 h-8 text-pool-navy" />
                 </div>
+                <h3 className="text-xl font-bold text-pool-navy mb-2">What happens next</h3>
+                <ul className="text-pool-navy/80 text-sm sm:text-base space-y-2 text-left max-w-md mx-auto list-disc list-inside">
+                  <li>We’ll email you the moment POOL is ready so you can be one of the first to use it.</li>
+                  <li>If you’re on the merch list, we’ll send a separate email to claim your free item.</li>
+                  <li>No further action needed — you’re all set.</li>
+                </ul>
               </div>
             </div>
           </div>
 
+          {/* Re-open the invite-friends popup if it was dismissed */}
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setShowInviteModal(true)}
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-pool-blue to-pool-green hover:from-pool-green hover:to-pool-blue text-white font-bold py-3 px-6 rounded-full text-base transform hover:scale-105 transition-all shadow-lg"
+            >
+              <UserPlus className="w-5 h-5" />
+              Invite a friend
+            </button>
+          </div>
 
-          {/* Feedback message for incomplete surveys */}
-          {!isComplete && (
-            <div className="mt-8 bg-white/20 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/30">
-              <p className="text-pool-navy text-lg text-shadow text-center">
-                Your feedback is incredibly valuable and will help shape the future of POOL. 
-                Complete all questionnaire questions to secure your spot on the VIP list!
-              </p>
-            </div>
-          )}
-
-          {/* Call to action */}
-          <div className="mt-12 text-center space-y-6">
-            
-            <div>
-              <Link
-                href="/"
-                className="text-pool-navy hover:text-pool-pink font-bold text-lg transition-colors hover:scale-110 transform inline-flex items-center gap-2"
-              >
-                ← Return to Home
-              </Link>
-            </div>
+          {/* Return home */}
+          <div className="mt-12 text-center">
+            <Link
+              href="/"
+              className="text-pool-navy hover:text-pool-pink font-bold text-lg transition-colors hover:scale-110 transform inline-flex items-center gap-2"
+            >
+              ← Return to Home
+            </Link>
           </div>
         </div>
       </div>
+
+      {/* Pop-up: invite friends + share link */}
+      <InviteFriendsModal
+        open={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        title={firstName ? `Thanks, ${firstName}! 🎉` : "🎉 You’re on the list!"}
+        description="Want to bring a friend along? Add them below or share the questionnaire link."
+        sharePath="/questionnaire"
+      />
     </div>
   )
 }

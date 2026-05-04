@@ -5,12 +5,36 @@ const db = getFirestore(app);
 
 // Types
 export interface SurveyData {
+  // Current schema (v3)
+  prefunding?: string;
+  prefundingWhy?: string;
+  settlementMethods?: string[];
+  settlementMethodsOther?: string;
+  settlementFeedback?: string;
+  moneyInAir?: string;
+  moneyInAirAmount?: string;
+  weeklySpend?: string;
+  splitTypes?: string[];
+  splitTypesOther?: string;
+  hangoutPoolWillingness?: string;
+  hangoutPoolWhy?: string;
+  socialFeatures?: string[];
+  socialFeaturesOther?: string;
+  friendConversion?: string;
+
+  // Legacy fields preserved on existing records (v1 / v2 / v3-pre-q2-split)
+  settlementMethod?: string;
   hangoutFrequency?: string;
   avgSpend?: string;
   splitWith?: string;
   splitWithOther?: string;
-  splitTypes?: string[];
-  splitTypesOther?: string;
+  splitFrequency?: string;
+  iouFrequency?: string;
+  causesTension?: string;
+  currentTool?: string;
+  toolLikes?: string;
+  toolChanges?: string;
+  tryNewApp?: string;
   poolWithAcquaintance?: string;
   poolWithStranger?: string;
   dailyRoutinePooling?: string;
@@ -232,6 +256,8 @@ export async function submitSurvey(
       const updateData: any = {
         surveyData: updatedSurveyData,
         hasCompletedSurvey: allQuestionsAnswered,
+        // Submitting the questionnaire counts as preregistering for early access
+        hasPreregistered: true,
         // Update name fields in case they've changed
         firstName: firstName,
         lastName: lastName,
@@ -251,12 +277,13 @@ export async function submitSurvey(
       // Check if all questions are answered
       const allQuestionsAnswered = checkIfAllQuestionsAnswered(surveyData);
       
-      // Create new user with survey data
+      // Create new user with survey data — submitting the questionnaire
+      // implicitly preregisters them for early access
       const newUser: PreregisterUser = {
         firstName,
         lastName,
         email,
-        hasPreregistered: false, // They didn't preregister, came directly to survey
+        hasPreregistered: true,
         hasCompletedSurvey: allQuestionsAnswered,
         surveyData: surveyData,
         location: location || "Unknown",
@@ -308,37 +335,27 @@ export async function updateUserVisitedSite(email: string, visited: boolean): Pr
  * Helper function to check if all survey questions are answered
  */
 function checkIfAllQuestionsAnswered(surveyData: SurveyData): boolean {
-  const requiredFields = [
-    'hangoutFrequency',
-    'avgSpend',
-    'splitWith',
-    'splitTypes',
-    'poolWithAcquaintance',
-    'poolWithStranger',
-    'dailyRoutinePooling',
-    'discoveryInterest',
-    'openPoolTypes',
-    'trustRequirements',
-    'valuableFeatures',
-    'concerns'
-  ];
-
-  for (const field of requiredFields) {
-    const value = surveyData[field as keyof SurveyData];
-    if (!value || (Array.isArray(value) && value.length === 0)) {
-      // Check for "Other" fields that might need to be filled
-      if (field === 'splitWith' && value === 'Other' && !surveyData.splitWithOther) {
-        return false;
-      }
-      if (field === 'splitTypes' && Array.isArray(value) && value.includes('Other') && !surveyData.splitTypesOther) {
-        return false;
-      }
-      if (field === 'openPoolTypes' && Array.isArray(value) && value.includes('Other') && !surveyData.openPoolTypesOther) {
-        return false;
-      }
-      return false;
-    }
-  }
+  // Q1 prefunding + why
+  if (!surveyData.prefunding || !surveyData.prefundingWhy?.trim()) return false;
+  // Q2 settlement methods + feedback
+  if (!surveyData.settlementMethods || surveyData.settlementMethods.length === 0) return false;
+  if (surveyData.settlementMethods.includes('Other') && !surveyData.settlementMethodsOther?.trim()) return false;
+  if (!surveyData.settlementFeedback?.trim()) return false;
+  // Q3 money in air (amount required only if Yes)
+  if (!surveyData.moneyInAir) return false;
+  if (surveyData.moneyInAir === 'Yes' && !surveyData.moneyInAirAmount?.trim()) return false;
+  // Q4 weekly spend
+  if (!surveyData.weeklySpend?.trim()) return false;
+  // Q5 split types
+  if (!surveyData.splitTypes || surveyData.splitTypes.length === 0) return false;
+  if (surveyData.splitTypes.includes('Other') && !surveyData.splitTypesOther?.trim()) return false;
+  // Q6 hangout/pool willingness (why is optional)
+  if (!surveyData.hangoutPoolWillingness) return false;
+  // Q7 social features
+  if (!surveyData.socialFeatures || surveyData.socialFeatures.length === 0) return false;
+  if (surveyData.socialFeatures.includes('Other') && !surveyData.socialFeaturesOther?.trim()) return false;
+  // Q8 friend conversion
+  if (!surveyData.friendConversion) return false;
 
   return true;
 }

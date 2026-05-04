@@ -50,7 +50,7 @@ export default function ContactPage() {
     <div className="min-h-screen py-20">
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-5xl font-bold text-pool-navy mb-8 text-center text-shadow">
+          <h1 className="text-3xl sm:text-5xl font-bold text-pool-navy mb-8 text-center text-shadow">
             {"Contact Us!"}
           </h1>
 

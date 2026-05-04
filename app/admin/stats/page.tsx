@@ -55,38 +55,23 @@ export default function AdminStatsPage() {
     const surveyUsers = users.filter(u => u.surveyData && u.hasCompletedSurvey);
     
     const statsData: Record<string, StatData> = {
-      hangoutFrequency: {
-        question: 'How often do you hang out with friends?',
+      prefunding: {
+        question: 'Q1: Would you pre-fund for activities?',
         options: {},
         total: 0
       },
-      avgSpend: {
-        question: 'On average, how much do you spend when hanging out?',
+      moneyInAir: {
+        question: 'Q3: Is there money "in the air" — owed to you or by you to friends right now?',
         options: {},
         total: 0
       },
-      splitWith: {
-        question: 'Who do you usually split expenses with?',
+      hangoutPoolWillingness: {
+        question: 'Q6: Willing to hang out with random people with similar interests AND pool money together?',
         options: {},
         total: 0
       },
-      poolWithAcquaintance: {
-        question: 'Would you pool money with an acquaintance for a shared trip or event?',
-        options: {},
-        total: 0
-      },
-      poolWithStranger: {
-        question: 'Would you pool with a stranger who has the same trip / goal as you?',
-        options: {},
-        total: 0
-      },
-      dailyRoutinePooling: {
-        question: 'Would you pool on daily routines (coffee, lunch, gym, rideshare) with people on a similar routine?',
-        options: {},
-        total: 0
-      },
-      discoveryInterest: {
-        question: 'Want POOL to surface people with similar trips, budgets, or interests?',
+      friendConversion: {
+        question: 'Q8: How hard would it be to get your friends to use POOL?',
         options: {},
         total: 0
       }
@@ -98,9 +83,7 @@ export default function AdminStatsPage() {
 
       // Single choice questions
       const singleChoiceFields = [
-        'hangoutFrequency', 'avgSpend', 'splitWith',
-        'poolWithAcquaintance', 'poolWithStranger',
-        'dailyRoutinePooling', 'discoveryInterest'
+        'prefunding', 'moneyInAir', 'hangoutPoolWillingness', 'friendConversion'
       ];
 
       singleChoiceFields.forEach(field => {
@@ -115,10 +98,27 @@ export default function AdminStatsPage() {
       });
 
       // Multiple choice questions
+      if (survey.settlementMethods && Array.isArray(survey.settlementMethods)) {
+        if (!statsData.settlementMethods) {
+          statsData.settlementMethods = {
+            question: 'Q2: How do you currently settle group expenses?',
+            options: {},
+            total: 0
+          };
+        }
+        survey.settlementMethods.forEach(method => {
+          if (!statsData.settlementMethods.options[method]) {
+            statsData.settlementMethods.options[method] = 0;
+          }
+          statsData.settlementMethods.options[method]++;
+        });
+        statsData.settlementMethods.total++;
+      }
+
       if (survey.splitTypes && Array.isArray(survey.splitTypes)) {
         if (!statsData.splitTypes) {
           statsData.splitTypes = {
-            question: 'What types of expenses do you split?',
+            question: 'Q5: What kinds of things do you usually split?',
             options: {},
             total: 0
           };
@@ -132,38 +132,21 @@ export default function AdminStatsPage() {
         statsData.splitTypes.total++;
       }
 
-      if (survey.valuableFeatures && Array.isArray(survey.valuableFeatures)) {
-        if (!statsData.valuableFeatures) {
-          statsData.valuableFeatures = {
-            question: 'What features would be most valuable to you?',
+      if (survey.socialFeatures && Array.isArray(survey.socialFeatures)) {
+        if (!statsData.socialFeatures) {
+          statsData.socialFeatures = {
+            question: 'Q7: Which social features in a money app would you care about?',
             options: {},
             total: 0
           };
         }
-        survey.valuableFeatures.forEach(feature => {
-          if (!statsData.valuableFeatures.options[feature]) {
-            statsData.valuableFeatures.options[feature] = 0;
+        survey.socialFeatures.forEach(feature => {
+          if (!statsData.socialFeatures.options[feature]) {
+            statsData.socialFeatures.options[feature] = 0;
           }
-          statsData.valuableFeatures.options[feature]++;
+          statsData.socialFeatures.options[feature]++;
         });
-        statsData.valuableFeatures.total++;
-      }
-
-      if (survey.openPoolTypes && Array.isArray(survey.openPoolTypes)) {
-        if (!statsData.openPoolTypes) {
-          statsData.openPoolTypes = {
-            question: 'Which kinds of pools would you join with people who aren\'t close friends?',
-            options: {},
-            total: 0
-          };
-        }
-        survey.openPoolTypes.forEach(type => {
-          if (!statsData.openPoolTypes.options[type]) {
-            statsData.openPoolTypes.options[type] = 0;
-          }
-          statsData.openPoolTypes.options[type]++;
-        });
-        statsData.openPoolTypes.total++;
+        statsData.socialFeatures.total++;
       }
     });
 
@@ -174,8 +157,9 @@ export default function AdminStatsPage() {
     const surveyUsers = users.filter(u => u.surveyData && u.hasCompletedSurvey);
     
     const textFields = [
-      { key: 'concerns', question: 'What would your biggest concerns be about POOL?' },
-      { key: 'trustRequirements', question: 'What would make you trust pooling money with someone you don\'t know well?' }
+      { key: 'prefundingWhy', question: 'Q1: Why would / wouldn\'t you pre-fund for activities?' },
+      { key: 'settlementFeedback', question: 'Q2: What do you like or dislike about how you currently settle?' },
+      { key: 'hangoutPoolWhy', question: 'Q6: Why? (hang out + pool with random similar-interest people)' },
     ];
 
     const analysis: Record<string, TextAnalysis> = {};

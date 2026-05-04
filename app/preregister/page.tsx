@@ -1,9 +1,10 @@
 "use client"
 
+import { InviteFriendsModal } from "@/components/invite-friends-modal"
+import { detectClientLocation } from "@/lib/location-utils"
+import { AlertCircle, CheckCircle, ChevronDown, ChevronUp, Sparkles, UserPlus, X } from "lucide-react"
 import type React from "react"
 import { useState } from "react"
-import { Sparkles, CheckCircle, AlertCircle } from "lucide-react"
-import { detectClientLocation } from "@/lib/location-utils"
 
 interface FormData {
   firstName: string
@@ -15,6 +16,15 @@ interface FormErrors {
   firstName?: string
   lastName?: string
   email?: string
+  friendFirstName?: string
+  friendLastName?: string
+  friendEmail?: string
+}
+
+interface FriendData {
+  firstName: string
+  lastName: string
+  email: string
 }
 
 export default function PreregisterPage() {
@@ -27,21 +37,33 @@ export default function PreregisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error" | "duplicate">("idle")
 
+  const [friendOpen, setFriendOpen] = useState(false)
+  const [friendData, setFriendData] = useState<FriendData>({ firstName: "", lastName: "", email: "" })
+  const [friendOutcome, setFriendOutcome] = useState<"idle" | "success" | "duplicate" | "error">("idle")
+  const [friendOutcomeMsg, setFriendOutcomeMsg] = useState<string | null>(null)
+
+  const [showInviteModal, setShowInviteModal] = useState(false)
+
+  const friendHasAnyInput =
+    friendData.firstName.trim() !== "" ||
+    friendData.lastName.trim() !== "" ||
+    friendData.email.trim() !== ""
+
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {}
 
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = "First name is required"
-    }
+    if (!formData.firstName.trim()) newErrors.firstName = "First name is required"
+    if (!formData.lastName.trim()) newErrors.lastName = "Last name is required"
+    if (!formData.email.trim()) newErrors.email = "Email is required"
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Please enter a valid email address"
 
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = "Last name is required"
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required"
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email address"
+    // Friend validation: only required if the user actually started filling in
+    // the friend's info (or expanded the section without leaving it empty).
+    if (friendOpen && friendHasAnyInput) {
+      if (!friendData.firstName.trim()) newErrors.friendFirstName = "Friend's first name is required"
+      if (!friendData.lastName.trim()) newErrors.friendLastName = "Friend's last name is required"
+      if (!friendData.email.trim()) newErrors.friendEmail = "Friend's email is required"
+      else if (!/\S+@\S+\.\S+/.test(friendData.email)) newErrors.friendEmail = "Please enter a valid email"
     }
 
     setErrors(newErrors)
@@ -56,56 +78,75 @@ export default function PreregisterPage() {
     }
   }
 
+  const preregisterUser = async (payload: { firstName: string; lastName: string; email: string }) => {
+    const response = await fetch("/api/preregister", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: payload.firstName.trim(),
+        lastName: payload.lastName.trim(),
+        email: payload.email.trim().toLowerCase(),
+        clientLocation: detectClientLocation(),
+      }),
+    })
+
+    const data = await response.json().catch(() => ({}))
+    return { ok: response.ok, code: data?.code as string | undefined, error: data?.error as string | undefined }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!validateForm()) {
-      return
-    }
+    if (!validateForm()) return
 
     setIsSubmitting(true)
     setSubmitStatus("idle")
+    setFriendOutcome("idle")
+    setFriendOutcomeMsg(null)
 
+    // 1. Register the main user
+    let mainStatus: "success" | "duplicate" | "error" = "success"
     try {
-      // Use the API endpoint which handles location detection
-      const response = await fetch('/api/preregister', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
-          email: formData.email.trim().toLowerCase(),
-          clientLocation: detectClientLocation()
-        })
-      })
-
-      const data = await response.json()
-      
-      if (!response.ok) {
-        if (data.code === "USER_ALREADY_EXISTS") {
-          throw new Error("USER_ALREADY_EXISTS")
-        }
-        throw new Error(data.error || "Failed to preregister")
+      const result = await preregisterUser(formData)
+      if (!result.ok) {
+        mainStatus = result.code === "USER_ALREADY_EXISTS" ? "duplicate" : "error"
       }
-
-      setSubmitStatus("success")
-      // Clear form after successful submission
-      setFormData({
-        firstName: "",
-        lastName: "",
-        email: "",
-      })
-    } catch (error: any) {
-      if (error.message === "USER_ALREADY_EXISTS") {
-        setSubmitStatus("duplicate")
-      } else {
-        setSubmitStatus("error")
-      }
-    } finally {
-      setIsSubmitting(false)
+    } catch {
+      mainStatus = "error"
     }
+    setSubmitStatus(mainStatus)
+
+    // 2. If a friend is filled in, register them too (best effort — main user
+    //    success isn't blocked by friend issues).
+    const shouldRegisterFriend = friendOpen && friendHasAnyInput
+    if (shouldRegisterFriend) {
+      const friendName = `${friendData.firstName.trim()} ${friendData.lastName.trim()}`.trim()
+      try {
+        const result = await preregisterUser(friendData)
+        if (result.ok) {
+          setFriendOutcome("success")
+          setFriendOutcomeMsg(`${friendName} is on the list too!`)
+        } else if (result.code === "USER_ALREADY_EXISTS") {
+          setFriendOutcome("duplicate")
+          setFriendOutcomeMsg(`${friendData.email.trim()} is already on the list.`)
+        } else {
+          setFriendOutcome("error")
+          setFriendOutcomeMsg(result.error || "Couldn't add your friend — try again from the popup.")
+        }
+      } catch {
+        setFriendOutcome("error")
+        setFriendOutcomeMsg("Couldn't add your friend — try again from the popup.")
+      }
+    }
+
+    // Clear forms + open the popup if the main registration worked
+    if (mainStatus === "success") {
+      setFormData({ firstName: "", lastName: "", email: "" })
+      setFriendData({ firstName: "", lastName: "", email: "" })
+      setFriendOpen(false)
+      setShowInviteModal(true)
+    }
+
+    setIsSubmitting(false)
   }
 
   return (
@@ -130,7 +171,7 @@ export default function PreregisterPage() {
                 {/* Decorative elements */}
                 <div className="absolute top-0 right-0 w-24 h-24 bg-pool-yellow/10 rounded-full blur-2xl" />
                 <div className="absolute bottom-0 left-0 w-32 h-32 bg-pool-pink/10 rounded-full blur-2xl" />
-                
+
                 <div className="relative z-10 text-center">
                   <div className="flex justify-center mb-4">
                     <div className="bg-gradient-to-r from-pool-green to-pool-blue p-4 rounded-full">
@@ -191,11 +232,10 @@ export default function PreregisterPage() {
                   type="text"
                   value={formData.firstName}
                   onChange={(e) => handleInputChange("firstName", e.target.value)}
-                  className={`w-full px-4 py-3 rounded-full border-2 ${
-                    errors.firstName
-                      ? "border-red-400 focus:border-red-500"
-                      : "border-pool-blue focus:border-pool-pink"
-                  } outline-none transition-colors`}
+                  className={`w-full px-4 py-3 rounded-full border-2 ${errors.firstName
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-pool-blue focus:border-pool-pink"
+                    } outline-none transition-colors`}
                   placeholder="Enter your first name"
                   disabled={isSubmitting}
                 />
@@ -213,11 +253,10 @@ export default function PreregisterPage() {
                   type="text"
                   value={formData.lastName}
                   onChange={(e) => handleInputChange("lastName", e.target.value)}
-                  className={`w-full px-4 py-3 rounded-full border-2 ${
-                    errors.lastName
-                      ? "border-red-400 focus:border-red-500"
-                      : "border-pool-blue focus:border-pool-pink"
-                  } outline-none transition-colors`}
+                  className={`w-full px-4 py-3 rounded-full border-2 ${errors.lastName
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-pool-blue focus:border-pool-pink"
+                    } outline-none transition-colors`}
                   placeholder="Enter your last name"
                   disabled={isSubmitting}
                 />
@@ -235,11 +274,10 @@ export default function PreregisterPage() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
-                  className={`w-full px-4 py-3 rounded-full border-2 ${
-                    errors.email
-                      ? "border-red-400 focus:border-red-500"
-                      : "border-pool-blue focus:border-pool-pink"
-                  } outline-none transition-colors`}
+                  className={`w-full px-4 py-3 rounded-full border-2 ${errors.email
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-pool-blue focus:border-pool-pink"
+                    } outline-none transition-colors`}
                   placeholder="your@email.com"
                   disabled={isSubmitting}
                 />
@@ -247,6 +285,122 @@ export default function PreregisterPage() {
                   <p className="text-red-500 text-sm mt-2 ml-4">{errors.email}</p>
                 )}
               </div>
+
+              {/* Add a friend (optional) */}
+              <div className="rounded-2xl border-2 border-dashed border-pool-blue/50 bg-white/20 p-4 sm:p-5">
+                <button
+                  type="button"
+                  onClick={() => setFriendOpen((o) => !o)}
+                  disabled={isSubmitting}
+                  className="w-full flex items-center justify-between gap-3 text-left"
+                  aria-expanded={friendOpen}
+                  aria-controls="friend-fields"
+                >
+                  <span className="flex items-center gap-2 text-pool-navy font-bold">
+                    <UserPlus className="w-5 h-5" />
+                    Add a friend
+                  </span>
+                  {friendOpen ? (
+                    <ChevronUp className="w-5 h-5 text-pool-navy" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-pool-navy" />
+                  )}
+                </button>
+                <p className="text-xs text-pool-navy/70 mt-1">
+                  Pre-register a friend at the same time — they’ll be on the list with you.
+                </p>
+
+                {friendOpen && (
+                  <div id="friend-fields" className="mt-4 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <input
+                          type="text"
+                          value={friendData.firstName}
+                          onChange={(e) => {
+                            setFriendData((f) => ({ ...f, firstName: e.target.value }))
+                            if (errors.friendFirstName) setErrors({ ...errors, friendFirstName: undefined })
+                          }}
+                          placeholder="Friend's first name"
+                          disabled={isSubmitting}
+                          className={`w-full px-4 py-3 rounded-full border-2 ${errors.friendFirstName ? "border-red-400 focus:border-red-500" : "border-pool-blue focus:border-pool-pink"} outline-none transition-colors text-sm`}
+                        />
+                        {errors.friendFirstName && (
+                          <p className="text-red-500 text-xs mt-1 ml-4">{errors.friendFirstName}</p>
+                        )}
+                      </div>
+                      <div>
+                        <input
+                          type="text"
+                          value={friendData.lastName}
+                          onChange={(e) => {
+                            setFriendData((f) => ({ ...f, lastName: e.target.value }))
+                            if (errors.friendLastName) setErrors({ ...errors, friendLastName: undefined })
+                          }}
+                          placeholder="Friend's last name"
+                          disabled={isSubmitting}
+                          className={`w-full px-4 py-3 rounded-full border-2 ${errors.friendLastName ? "border-red-400 focus:border-red-500" : "border-pool-blue focus:border-pool-pink"} outline-none transition-colors text-sm`}
+                        />
+                        {errors.friendLastName && (
+                          <p className="text-red-500 text-xs mt-1 ml-4">{errors.friendLastName}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <input
+                        type="email"
+                        value={friendData.email}
+                        onChange={(e) => {
+                          setFriendData((f) => ({ ...f, email: e.target.value }))
+                          if (errors.friendEmail) setErrors({ ...errors, friendEmail: undefined })
+                        }}
+                        placeholder="friend@email.com"
+                        disabled={isSubmitting}
+                        className={`w-full px-4 py-3 rounded-full border-2 ${errors.friendEmail ? "border-red-400 focus:border-red-500" : "border-pool-blue focus:border-pool-pink"} outline-none transition-colors text-sm`}
+                      />
+                      {errors.friendEmail && (
+                        <p className="text-red-500 text-xs mt-1 ml-4">{errors.friendEmail}</p>
+                      )}
+                    </div>
+                    {friendHasAnyInput && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFriendData({ firstName: "", lastName: "", email: "" })
+                          setErrors({ ...errors, friendFirstName: undefined, friendLastName: undefined, friendEmail: undefined })
+                        }}
+                        disabled={isSubmitting}
+                        className="text-xs text-pool-navy/70 hover:text-pool-navy underline inline-flex items-center gap-1"
+                      >
+                        <X className="w-3 h-3" />
+                        Clear friend
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Friend outcome (after submit, if a friend was added) */}
+              {friendOutcomeMsg && (
+                <div
+                  className={`p-3 rounded-2xl flex items-start gap-2 ${friendOutcome === "success"
+                    ? "bg-green-100 border border-green-300"
+                    : "bg-yellow-50 border border-yellow-300"
+                    }`}
+                >
+                  {friendOutcome === "success" ? (
+                    <CheckCircle className="w-5 h-5 text-green-700 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-yellow-700 flex-shrink-0 mt-0.5" />
+                  )}
+                  <p
+                    className={`text-sm ${friendOutcome === "success" ? "text-green-800" : "text-yellow-800"
+                      }`}
+                  >
+                    {friendOutcomeMsg}
+                  </p>
+                </div>
+              )}
 
               {/* Submit Button */}
               <button
@@ -262,7 +416,7 @@ export default function PreregisterPage() {
                 ) : (
                   <>
                     <Sparkles className="w-5 h-5" />
-                    Preregister
+                    {friendOpen && friendHasAnyInput ? "Preregister us" : "Preregister"}
                   </>
                 )}
               </button>
@@ -276,8 +430,17 @@ export default function PreregisterPage() {
               </p>
             </div>
           </div>
+
         </div>
       </div>
+
+      {/* Pop-up: invite more friends + share link */}
+      <InviteFriendsModal
+        open={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        title="🎉 You’re on the list!"
+        description="Want to bring more friends along? Add another below or share the link."
+      />
     </div>
   )
 }
