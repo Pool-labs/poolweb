@@ -58,9 +58,8 @@ function checkIfFormDataComplete(data: FormData): boolean {
   if (data.settlementMethods.length === 0) return false;
   if (data.settlementMethods.includes("Other") && !data.settlementMethodsOther.trim()) return false;
   if (!data.settlementFeedback.trim()) return false;
-  // Q3 money in air (amount required only if Yes)
+  // Q3 money in air
   if (!data.moneyInAir) return false;
-  if (data.moneyInAir === "Yes" && !data.moneyInAirAmount.trim()) return false;
   // Q4 weekly spend
   if (!data.weeklySpend.trim() || isNaN(Number(data.weeklySpend))) return false;
   // Q5 split types
@@ -191,14 +190,8 @@ export default function SurveyPage() {
       formData.settlementFeedback.trim()
     ) answered++
 
-    // Q3: Money in air (amount required only when Yes)
-    if (formData.moneyInAir) {
-      if (formData.moneyInAir === "No") {
-        answered++
-      } else if (formData.moneyInAirAmount.trim()) {
-        answered++
-      }
-    }
+    // Q3: Money in air
+    if (formData.moneyInAir) answered++
 
     // Q4: Weekly spend
     if (formData.weeklySpend.trim() && !isNaN(Number(formData.weeklySpend))) answered++
@@ -267,7 +260,7 @@ export default function SurveyPage() {
         (!formData.settlementMethods.includes("Other") || formData.settlementMethodsOther.trim()) &&
         formData.settlementFeedback.trim()
       )
-      case 3: return Boolean(formData.moneyInAir && (formData.moneyInAir === "No" || formData.moneyInAirAmount.trim()))
+      case 3: return Boolean(formData.moneyInAir)
       case 4: return Boolean(formData.weeklySpend.trim() && !isNaN(Number(formData.weeklySpend)))
       case 5: return Boolean(formData.splitTypes.length > 0 && (!formData.splitTypes.includes("Other") || formData.splitTypesOther.trim()))
       case 6: return Boolean(formData.hangoutPoolWillingness)
@@ -718,7 +711,7 @@ export default function SurveyPage() {
               <div className="space-y-3">
                 {[
                   "Venmo, Cash App, Zelle (or similar payment apps)",
-                  "Pre-funding",
+                  "Collect money up front",
                   "Split the check",
                   "Other",
                 ].map((option) => (
@@ -772,7 +765,7 @@ export default function SurveyPage() {
                 Do you think there's money "in the air" right now — money owed to you, or that you owe to friends?
               </label>
               <div className="space-y-3">
-                {["Yes", "No"].map((option) => (
+                {["$0-$50", "$50-$100", "No IOU's", "Don't know"].map((option) => (
                   <label
                     key={option}
                     className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
@@ -789,18 +782,6 @@ export default function SurveyPage() {
                   </label>
                 ))}
               </div>
-              {formData.moneyInAir === "Yes" && (
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={formData.moneyInAirAmount}
-                  onChange={(e) => handleInputChange("moneyInAirAmount", e.target.value)}
-                  className="w-full mt-3 px-4 py-3 rounded-full border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors"
-                  placeholder="Roughly how much, in dollars?"
-                  min="0"
-                  step="0.01"
-                />
-              )}
             </div>
 
             <div>
