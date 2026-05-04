@@ -1,32 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { submitSurvey } from "@/app/firebase/services"
+import { getLocationFromVercelHeaders } from "@/lib/server-location"
 
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
 
-    // Get location data
-    let location = "Unknown"
-    try {
-      const locationResponse = await fetch(`${request.nextUrl.origin}/api/location`, {
-        headers: {
-          'x-forwarded-for': request.headers.get('x-forwarded-for') || '',
-          'x-real-ip': request.headers.get('x-real-ip') || ''
-        }
-      })
-      if (locationResponse.ok) {
-        const locationData = await locationResponse.json()
-        location = locationData.location || "Unknown"
-      }
-    } catch (error) {
-      console.error("Error fetching location:", error)
-    }
-
-    // Extract user info and survey data
     const { firstName, lastName, email, clientLocation, hasVisitedSite, ...surveyData } = data
 
-    // Use server-detected location if available, otherwise use client location
-    const finalLocation = location !== "Unknown" ? location : (clientLocation || "Unknown")
+    const serverLocation = getLocationFromVercelHeaders(request)
+    const finalLocation = serverLocation || clientLocation || "Unknown"
 
     // Submit to Firebase with location and hasVisitedSite
     const result = await submitSurvey(firstName, lastName, email, surveyData, finalLocation, hasVisitedSite)
