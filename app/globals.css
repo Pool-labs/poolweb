@@ -109,14 +109,11 @@
   
   /* Fix white space appearing on scroll */
   html {
-    overflow-x: hidden;
-    overscroll-behavior-y: none;
     -webkit-overflow-scrolling: touch;
   }
 
   body {
     overflow-x: hidden;
-    overscroll-behavior-y: none;
     position: relative;
     min-height: 100vh;
     min-height: -webkit-fill-available;
