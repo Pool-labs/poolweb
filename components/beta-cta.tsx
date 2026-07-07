@@ -1,4 +1,4 @@
-import { StickerButton } from "@/components/sticker"
+import BurstButton from "@/components/burst-button"
 import { Droplet, Splash } from "@/components/brand/marks"
 import Reveal from "@/components/reveal"
 
@@ -21,9 +21,9 @@ export default function BetaCta() {
             Pre-register and you&rsquo;re first in when it fills.
           </p>
           <div className="mt-8">
-            <StickerButton href="/preregister" variant="pink" className="text-xl px-10 py-4">
+            <BurstButton href="/preregister" className="text-lg sm:text-xl px-8 sm:px-10 py-4 whitespace-nowrap">
               Pre-register for the beta
-            </StickerButton>
+            </BurstButton>
           </div>
         </div>
       </div>

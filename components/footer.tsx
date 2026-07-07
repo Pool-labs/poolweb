@@ -1,6 +1,7 @@
 import Link from "next/link"
 import type { CSSProperties } from "react"
 import { PoolMark, Wordmark } from "@/components/brand/marks"
+import ScallopDivider from "@/components/scallop-divider"
 
 const socials = [
   {
@@ -41,9 +42,11 @@ const moreLinks = [
 export default function Footer() {
   return (
     <footer
-      className="bg-navy text-cloud"
+      className="text-cloud"
       style={{ "--focus-ring": "var(--cloud)" } as CSSProperties}
     >
+      <ScallopDivider color="#14224A" />
+      <div className="bg-navy">
       <div className="container mx-auto px-4 py-14">
         <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr] items-start">
           <div>
@@ -103,6 +106,7 @@ export default function Footer() {
           <p>{"Made with 🌊 in St. Louis."}</p>
           <p>{`© ${new Date().getFullYear()} POOL App. All rights reserved.`}</p>
         </div>
+      </div>
       </div>
     </footer>
   )

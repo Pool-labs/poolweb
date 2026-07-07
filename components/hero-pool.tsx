@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { StickerButton } from "@/components/sticker"
+import BurstButton from "@/components/burst-button"
 
 /**
  * The signature hero: an interactive three-ring pool scene.
@@ -323,9 +324,9 @@ export default function HeroPool() {
             A social network for people who spend time — and money — together.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center">
-            <StickerButton href="/preregister" variant="pink" className="text-lg px-8 py-3.5">
+            <BurstButton href="/preregister" className="text-lg px-8 py-3.5">
               Pre-register for the beta
-            </StickerButton>
+            </BurstButton>
             <StickerButton href="#how-it-works" variant="ghost" className="text-lg px-6 py-3.5">
               See how it works
             </StickerButton>

@@ -5,6 +5,7 @@ import FeedDemo from "@/components/feed-demo"
 import HowItWorks from "@/components/how-it-works"
 import BetaCta from "@/components/beta-cta"
 import Reveal from "@/components/reveal"
+import ScallopDivider from "@/components/scallop-divider"
 import { CloudMark } from "@/components/brand/marks"
 
 export default function HomePage() {
@@ -38,7 +39,8 @@ export default function HomePage() {
       </section>
 
       {/* Shared Moments — the feed demo on the sky band */}
-      <section className="bg-sky-tint border-y-2 border-navy py-16 sm:py-24 relative overflow-hidden" id="shared-moments">
+      <ScallopDivider />
+      <section className="bg-sky-tint py-14 sm:py-20 relative overflow-hidden" id="shared-moments">
         <CloudMark className="cloud-drift absolute top-10 left-[6%] h-10 w-auto opacity-80" />
         <CloudMark className="cloud-drift-slow absolute top-24 right-[8%] h-14 w-auto opacity-70" />
         <CloudMark className="cloud-drift absolute bottom-12 left-[12%] h-8 w-auto opacity-60 hidden lg:block" />
@@ -60,6 +62,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      <ScallopDivider flip />
 
       {/* How It Works */}
       <section className="py-16 sm:py-24" id="how-it-works">
