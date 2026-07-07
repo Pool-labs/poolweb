@@ -231,8 +231,23 @@
 .cloud-drift-slow {
   animation: cloud-drift 38s ease-in-out infinite alternate-reverse;
 }
+
+/* Gentle bob for the hero's mid-air money cluster */
+@keyframes air-bob {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(0, -7px, 0);
+  }
+}
+.air-bob {
+  animation: air-bob 3.8s ease-in-out infinite alternate;
+}
+
 .anim-paused .cloud-drift,
-.anim-paused .cloud-drift-slow {
+.anim-paused .cloud-drift-slow,
+.anim-paused .air-bob {
   animation-play-state: paused;
 }
 
@@ -271,6 +286,7 @@
   .ticker-track,
   .cloud-drift,
   .cloud-drift-slow,
+  .air-bob,
   .droplet-burst {
     animation: none !important;
   }
