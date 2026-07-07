@@ -1,9 +1,11 @@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import BrandPattern from "@/components/brand/pattern"
 
 export default function FAQPage() {
   return (
-    <div className="min-h-screen py-16 sm:py-20">
-      <div className="container mx-auto px-4">
+    <div className="min-h-screen py-16 sm:py-20 bg-pool-sky relative overflow-hidden">
+      <BrandPattern variant="clouds" opacity={0.35} />
+      <div className="container mx-auto px-4 relative z-10">
         <div className="max-w-3xl mx-auto">
           <h1 className="font-display font-extrabold text-4xl sm:text-5xl md:text-6xl text-center mb-6 text-navy">
             <span className="text-sticker text-pool-yellow">WTF</span> Is Pool?!

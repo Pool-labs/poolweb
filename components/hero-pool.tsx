@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { StickerButton } from "@/components/sticker"
 import BurstButton from "@/components/burst-button"
+import { CloudMark } from "@/components/brand/marks"
 
 /**
  * The signature hero: an interactive three-ring pool scene.
@@ -305,14 +306,15 @@ export default function HeroPool() {
     <section
       ref={sectionRef}
       onPointerDown={handleToss}
-      className="relative overflow-hidden cursor-pointer select-none"
-      style={{
-        background:
-          "radial-gradient(ellipse 70% 55% at 50% 38%, rgba(255, 206, 62, 0.13), transparent 70%)",
-      }}
+      className="relative overflow-hidden cursor-pointer select-none bg-pool-sky"
       aria-label="Pool — a shared pool your whole crew spends from. Tap anywhere to toss a coin in."
     >
-      <div className="container mx-auto px-4 pt-10 pb-14 sm:pt-14 lg:pt-20 lg:pb-24 grid lg:grid-cols-[1.05fr_1fr] gap-8 lg:gap-12 items-center">
+      {/* Sky dressing around the text column */}
+      <CloudMark className="cloud-drift-slow absolute top-8 left-[4%] h-9 w-auto opacity-90 hidden md:block" />
+      <CloudMark className="cloud-drift absolute bottom-16 left-[10%] h-7 w-auto opacity-70 hidden lg:block" />
+      <CloudMark className="cloud-drift absolute top-6 right-[3%] h-8 w-auto opacity-80 lg:hidden" />
+
+      <div className="container mx-auto px-4 pt-10 pb-14 sm:pt-14 lg:pt-20 lg:pb-24 grid lg:grid-cols-[1.05fr_1fr] gap-8 lg:gap-12 items-center relative">
         <div className="text-center lg:text-left relative z-10">
           <h1 className="font-display font-extrabold leading-[1.05] text-5xl sm:text-6xl lg:text-7xl xl:text-8xl">
             <span className="text-sticker text-pool-blue">Pool.</span>{" "}

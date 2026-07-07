@@ -45,7 +45,8 @@ export default function Footer() {
       className="text-cloud"
       style={{ "--focus-ring": "var(--cloud)" } as CSSProperties}
     >
-      <ScallopDivider color="#14224A" />
+      {/* Pulled up over the previous section so no page-background sliver shows */}
+      <ScallopDivider color="#14224A" className="-mt-4 sm:-mt-5 relative" />
       <div className="bg-navy">
       <div className="container mx-auto px-4 py-14">
         <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr] items-start">

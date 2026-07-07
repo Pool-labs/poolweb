@@ -6,6 +6,7 @@ import HowItWorks from "@/components/how-it-works"
 import BetaCta from "@/components/beta-cta"
 import Reveal from "@/components/reveal"
 import ScallopDivider from "@/components/scallop-divider"
+import BrandPattern from "@/components/brand/pattern"
 import { CloudMark } from "@/components/brand/marks"
 
 export default function HomePage() {
@@ -15,8 +16,9 @@ export default function HomePage() {
       <Ticker />
 
       {/* WTF Is Pool?! — three pools, slapped on like stickers */}
-      <section className="py-16 sm:py-24" id="wtf">
-        <div className="container mx-auto px-4">
+      <section className="py-16 sm:py-24 bg-tint-yellow relative overflow-hidden" id="wtf">
+        <BrandPattern variant="money" opacity={0.35} />
+        <div className="container mx-auto px-4 relative z-10">
           <Reveal>
             <h2 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl text-center text-navy">
               <span className="text-sticker text-pool-yellow">WTF</span> Is Pool?!
@@ -39,8 +41,9 @@ export default function HomePage() {
       </section>
 
       {/* Shared Moments — the feed demo on the sky band */}
-      <ScallopDivider />
-      <section className="bg-sky-tint py-14 sm:py-20 relative overflow-hidden" id="shared-moments">
+      <ScallopDivider color="#C9EAFB" bg="#FFF1C9" />
+      <section className="bg-pool-sky py-14 sm:py-20 relative overflow-hidden" id="shared-moments">
+        <BrandPattern variant="clouds" opacity={0.3} />
         <CloudMark className="cloud-drift absolute top-10 left-[6%] h-10 w-auto opacity-80" />
         <CloudMark className="cloud-drift-slow absolute top-24 right-[8%] h-14 w-auto opacity-70" />
         <CloudMark className="cloud-drift absolute bottom-12 left-[12%] h-8 w-auto opacity-60 hidden lg:block" />
@@ -62,11 +65,12 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-      <ScallopDivider flip />
+      <ScallopDivider color="#C9EAFB" bg="#FFE3F0" flip />
 
       {/* How It Works */}
-      <section className="py-16 sm:py-24" id="how-it-works">
-        <div className="container mx-auto px-4">
+      <section className="py-16 sm:py-24 bg-tint-pink relative overflow-hidden" id="how-it-works">
+        <BrandPattern variant="droplets" opacity={0.3} />
+        <div className="container mx-auto px-4 relative z-10">
           <Reveal>
             <h2 className="font-display font-extrabold text-4xl sm:text-5xl text-center text-navy mb-14">
               How It Works
@@ -77,8 +81,10 @@ export default function HomePage() {
       </section>
 
       {/* Beta CTA — the velvet rope */}
-      <section className="py-16 sm:py-24 pb-24">
-        <div className="container mx-auto px-4">
+      <ScallopDivider color="#DFF4DF" bg="#FFE3F0" />
+      <section className="py-16 sm:py-24 pb-24 bg-tint-green relative overflow-hidden">
+        <BrandPattern variant="money" opacity={0.3} />
+        <div className="container mx-auto px-4 relative z-10">
           <BetaCta />
         </div>
       </section>

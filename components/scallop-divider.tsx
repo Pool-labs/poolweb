@@ -4,15 +4,18 @@
  */
 export default function ScallopDivider({
   color = "#EAF7FE",
+  bg,
   flip = false,
   className = "",
 }: {
   color?: string
+  /** Fill behind the scallops — the adjacent section's color (avoids slivers between bands). */
+  bg?: string
   flip?: boolean
   className?: string
 }) {
   return (
-    <div className={`leading-[0] ${className}`} aria-hidden="true">
+    <div className={`leading-[0] ${className}`} style={bg ? { backgroundColor: bg } : undefined} aria-hidden="true">
       <svg
         viewBox="0 0 1200 22"
         preserveAspectRatio="none"

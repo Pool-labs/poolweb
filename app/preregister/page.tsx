@@ -3,6 +3,7 @@
 import { InviteFriendsModal } from "@/components/invite-friends-modal"
 import { detectClientLocation } from "@/lib/location-utils"
 import { AlertCircle, CheckCircle, ChevronDown, ChevronUp, Sparkles, UserPlus, X } from "lucide-react"
+import BrandPattern from "@/components/brand/pattern"
 import type React from "react"
 import { useState } from "react"
 
@@ -150,8 +151,9 @@ export default function PreregisterPage() {
   }
 
   return (
-    <div className="min-h-screen py-20">
-      <div className="container mx-auto px-4">
+    <div className="min-h-screen py-20 bg-tint-yellow relative overflow-hidden">
+      <BrandPattern variant="money" opacity={0.3} />
+      <div className="container mx-auto px-4 relative z-10">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
           <div className="text-center mb-12">

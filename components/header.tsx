@@ -7,6 +7,7 @@ import { PoolMark, Wordmark } from "@/components/brand/marks"
 
 const navLinks = [
   { href: "/#how-it-works", label: "How it works" },
+  { href: "/questionnaire", label: "Questionnaire" },
   { href: "/faq", label: "FAQ" },
   { href: "/contact", label: "Contact" },
 ]

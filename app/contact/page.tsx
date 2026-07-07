@@ -4,6 +4,7 @@ import type React from "react"
 import Link from "next/link"
 import { useState } from "react"
 import { MessageCircle, Send, CheckCircle, AlertCircle } from "lucide-react"
+import BrandPattern from "@/components/brand/pattern"
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -47,8 +48,9 @@ export default function ContactPage() {
   }
 
   return (
-    <div className="min-h-screen py-20">
-      <div className="container mx-auto px-4">
+    <div className="min-h-screen py-20 bg-tint-pink relative overflow-hidden">
+      <BrandPattern variant="droplets" opacity={0.3} />
+      <div className="container mx-auto px-4 relative z-10">
         <div className="max-w-4xl mx-auto">
           <h1 className="font-display font-extrabold text-4xl sm:text-5xl text-navy mb-6 text-center">
             {"Contact Us!"}

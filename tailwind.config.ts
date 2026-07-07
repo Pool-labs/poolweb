@@ -61,6 +61,11 @@ const config: Config = {
         navy: "#14224A",
         cloud: "#FDFCF9",
         "sky-tint": "#EAF7FE",
+        // Flat section-band tints (from the framed-card backgrounds in the assets)
+        "pool-sky": "#C9EAFB",
+        "tint-yellow": "#FFF1C9",
+        "tint-pink": "#FFE3F0",
+        "tint-green": "#DFF4DF",
         // Legacy names kept for untouched routes (admin, app-like pages)
         "pool-orange": "#FF9800",
         "pool-purple": "#9C27B0",

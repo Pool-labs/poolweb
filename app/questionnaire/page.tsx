@@ -435,7 +435,7 @@ export default function SurveyPage() {
 
   if (showDuplicateMessage) {
     return (
-      <div className="min-h-screen py-20">
+      <div className="min-h-screen py-20 bg-sky-tint">
         <div className="container mx-auto px-4">
           <div className="max-w-2xl mx-auto">
             <h2 className="text-4xl font-bold text-pool-navy mb-8 text-center text-shadow">
@@ -528,7 +528,7 @@ export default function SurveyPage() {
           </div>
         )}
 
-        <div className="min-h-screen py-20">
+        <div className="min-h-screen py-20 bg-sky-tint">
           <div className="container mx-auto px-4">
             <div className="max-w-2xl mx-auto">
               <h2 className="text-4xl font-bold text-pool-navy mb-8 text-center text-shadow">
@@ -1018,7 +1018,7 @@ export default function SurveyPage() {
         </div>
       )}
 
-      <div className="min-h-screen py-20">
+      <div className="min-h-screen py-20 bg-sky-tint">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto">
             <h1 className="text-3xl sm:text-5xl font-bold text-pool-navy mb-8 text-center text-shadow">

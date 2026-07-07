@@ -34,7 +34,7 @@ export default function SurveyConfirmationPage() {
   }, [])
 
   return (
-    <div className="min-h-screen py-20 relative overflow-hidden">
+    <div className="min-h-screen py-20 relative overflow-hidden bg-sky-tint">
       {/* Animated confetti — only on complete submissions */}
       {showConfetti && isComplete && (
         <div className="absolute inset-0 z-0">
