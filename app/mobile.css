@@ -1,43 +1,13 @@
-/* Mobile-specific styles and optimizations */
+/* Mobile-specific behavioral helpers.
+   Visual overrides for the old v0 design were removed in the
+   sticker-pop redesign — appearance now lives in globals.css. */
 
-/* Disable heavy animations on mobile for better performance */
-@media (max-width: 768px) {
-  /* Reduce animation complexity */
-  .animate-float,
-  .animate-pulse,
-  .animate-gradient-x {
-    animation: none !important;
-  }
-
-  /* Add subtle mobile-friendly animations */
-  .mobile-float {
-    animation: mobile-float 6s ease-in-out infinite;
-  }
-
-  @keyframes mobile-float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-10px); }
-  }
-
-  /* Optimize decorative background for mobile */
-  .decorative-circle {
-    filter: blur(60px) !important;
-    opacity: 0.3 !important;
-  }
-
-  /* Performance optimization - reduce render layers */
-  .decorative-circle {
-    will-change: auto !important;
-    transform: translateZ(0);
-  }
-}
-
-/* Custom viewport height property */
+/* Custom viewport height property (set by MobileInit) */
 :root {
   --vh: 1vh;
 }
 
-/* Mobile container styles */
+/* Mobile container styles (app-like routes) */
 .mobile-container {
   display: flex;
   flex-direction: column;
@@ -46,7 +16,7 @@
   padding-bottom: env(safe-area-inset-bottom, 80px);
 }
 
-/* Bottom navigation for mobile */
+/* Bottom navigation for mobile (app-like routes) */
 .bottom-nav {
   position: fixed;
   bottom: 0;
@@ -91,292 +61,53 @@
   font-weight: 500;
 }
 
-/* Responsive typography */
-@media (max-width: 640px) {
-  /* Hero section */
-  .text-6xl {
-    font-size: 2.25rem;
-    line-height: 2.5rem;
-  }
-  
-  .text-8xl {
-    font-size: 3rem;
-    line-height: 1;
-  }
-  
-  .text-5xl {
-    font-size: 1.875rem;
-    line-height: 2.25rem;
-  }
-  
-  .text-4xl {
-    font-size: 1.5rem;
-    line-height: 2rem;
-  }
-  
-  .text-3xl {
-    font-size: 1.25rem;
-    line-height: 1.75rem;
-  }
-  
-  .text-2xl {
-    font-size: 1.125rem;
-    line-height: 1.75rem;
-  }
-  
-  /* Spacing adjustments */
-  .py-20 {
-    padding-top: 3rem;
-    padding-bottom: 3rem;
-  }
-  
-  .py-16 {
-    padding-top: 2.5rem;
-    padding-bottom: 2.5rem;
-  }
-  
-  .mb-16 {
-    margin-bottom: 2.5rem;
-  }
-  
-  .mb-12 {
-    margin-bottom: 2rem;
-  }
-  
-  .p-12 {
-    padding: 1.5rem;
-  }
-  
-  .px-12 {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-  }
-  
-  .py-6 {
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-  }
-}
-
-/* Touch-friendly buttons and links */
+/* Touch-friendly targets */
 @media (max-width: 768px) {
-  a, button {
+  a,
+  button {
     min-height: 44px;
     min-width: 44px;
   }
-  
-  /* Make gradient buttons more touch-friendly */
-  .bg-gradient-to-r {
-    padding-top: 0.75rem;
-    padding-bottom: 0.75rem;
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-    font-size: 1rem;
-    line-height: 1.5rem;
-  }
-}
 
-/* Optimize card layouts for mobile */
-@media (max-width: 768px) {
-  .grid.md\:grid-cols-3 {
-    grid-template-columns: repeat(1, minmax(0, 1fr));
-    gap: 1rem;
-  }
-  
-  /* Reduce transform effects on mobile */
-  .transform.hover\:scale-105,
-  .transform.hover\:scale-110 {
-    transform: none !important;
-  }
-  
-  .transform.hover\:scale-105:active,
-  .transform.hover\:scale-110:active {
-    transform: scale(0.98) !important;
-  }
-}
-
-/* Mobile-specific header adjustments */
-@media (max-width: 768px) {
-  .sticky.top-0 {
-    position: fixed;
-    width: 100%;
-  }
-  
-  /* Adjust main content to account for fixed header */
-  main {
-    padding-top: 72px;
-  }
-}
-
-/* Color scheme fixes for mobile */
-@media (max-width: 768px) {
-  /* Ensure proper color contrast on mobile */
-  .text-pool-navy {
-    color: #1A237E !important;
-  }
-  
-  .bg-gradient-to-r {
-    background-image: linear-gradient(to right, var(--tw-gradient-stops)) !important;
-  }
-  
-  /* Fix gradient text on mobile */
-  .bg-clip-text {
-    -webkit-background-clip: text !important;
-    background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-  }
-}
-
-/* Performance optimizations */
-@media (max-width: 768px) {
-  /* Reduce blur effects */
-  .blur-\[100px\],
-  .blur-\[120px\],
-  .blur-\[110px\],
-  .blur-\[90px\],
-  .blur-\[80px\],
-  .blur-\[95px\],
-  .blur-\[75px\],
-  .blur-\[85px\],
-  .blur-\[70px\],
-  .blur-\[60px\],
-  .blur-\[65px\],
-  .blur-\[55px\],
-  .blur-\[58px\],
-  .blur-\[62px\] {
-    filter: blur(40px) !important;
-  }
-  
-  /* Optimize backdrop filters */
-  .backdrop-blur-md {
-    backdrop-filter: blur(8px);
-  }
-  
-  .backdrop-blur-sm {
-    backdrop-filter: blur(4px);
-  }
-  
-  /* Reduce shadow complexity */
-  .shadow-2xl {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  }
-  
-  .shadow-xl {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.05);
-  }
-}
-
-/* Font loading optimization */
-@media (max-width: 768px) {
-}
-
-/* Smooth scrolling for mobile */
-@media (max-width: 768px) {
-  html {
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-    background: transparent;
-  }
-
-  /* Prevent horizontal scroll and white gaps on mobile */
   body {
     overflow-x: hidden;
+    position: relative;
     min-height: 100vh;
     min-height: -webkit-fill-available;
-    position: relative;
-    background: transparent !important;
+    margin: 0;
+    padding: 0;
   }
-  
-  /* Ensure no white background on overscroll - using vibrant desktop colors */
-  html::before,
-  body::before {
-    content: '';
-    position: fixed;
-    top: -100%;
-    left: 0;
-    right: 0;
-    height: 100%;
-    background: radial-gradient(circle at top, #FF1493 0%, #FF8C00 50%, transparent 100%);
-    opacity: 0.4;
-    z-index: -10;
-    pointer-events: none;
+
+  html {
+    -webkit-overflow-scrolling: touch;
   }
-  
-  html::after,
-  body::after {
-    content: '';
-    position: fixed;
-    bottom: -100%;
-    left: 0;
-    right: 0;
-    height: 100%;
-    background: radial-gradient(circle at bottom, #4FC3F7 0%, #FFD700 50%, transparent 100%);
-    opacity: 0.4;
-    z-index: -10;
-    pointer-events: none;
-  }
-  
+
   .container {
     max-width: 100%;
   }
-}
 
-/* Mobile-safe animations */
-@media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
-  .mobile-safe-bounce {
-    animation: mobile-bounce 2s ease-in-out infinite;
-  }
-  
-  @keyframes mobile-bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
-  }
-  
-  .mobile-safe-pulse {
-    animation: mobile-pulse 2s ease-in-out infinite;
-  }
-  
-  @keyframes mobile-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.8; }
-  }
-}
-
-/* Responsive images */
-@media (max-width: 768px) {
   img {
     max-width: 100%;
     height: auto;
   }
-  
-  /* Logo adjustments */
-  .w-\[200px\] {
-    width: 150px !important;
-  }
-  
-  .w-\[50px\] {
-    width: 40px !important;
+
+  .min-h-screen {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
   }
 }
 
 /* iOS-specific fixes */
 @supports (-webkit-touch-callout: none) {
-  /* Fix for iOS Safari bottom bar */
+  body {
+    min-height: -webkit-fill-available;
+  }
+
   .bottom-nav {
     padding-bottom: calc(env(safe-area-inset-bottom, 0) + 8px);
   }
-  
-  /* Fix for iOS tap highlight */
+
   * {
     -webkit-tap-highlight-color: transparent;
-  }
-}
-
-/* Android-specific fixes */
-@media (max-width: 768px) {
-  /* Fix for Android Chrome address bar */
-  .min-h-screen {
-    min-height: 100vh;
-    min-height: -webkit-fill-available;
   }
 }

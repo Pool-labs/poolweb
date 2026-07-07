@@ -64,3 +64,41 @@ All Firebase config vars are prefixed `NEXT_PUBLIC_FIREBASE_*`. The Firebase pro
 
 - TypeScript errors and ESLint warnings are **ignored** during `next build` (configured in `next.config.mjs`)
 - Images are set to unoptimized mode
+
+## Brand System — "sticker-pop" (mandatory for all UI work)
+
+Pool is a **social network** for friend groups who spend time and money together — never describe or style it as a bill-splitting/expense/fintech app. The visual world: a kiddie pool with three stacked rings, money splashing in, thick navy outlines, flat fills, no gradients on illustration.
+
+### Color tokens (Tailwind names / CSS vars in `app/globals.css`)
+
+```
+pool-blue   #4EC3F5   top ring, links, sky sections
+pool-yellow #FFCE3E   middle ring, primary buttons
+pool-pink   #FF77B0   bottom ring, pre-register CTA
+pool-green  #63C666   bills, success
+pool-gold   #F5B63C   coins
+navy        #14224A   ALL outlines, text, hard shadows
+cloud       #FDFCF9   page background
+sky-tint    #EAF7FE   alternate section background
+```
+
+Rules: navy is the only text color on light backgrounds (use navy at reduced opacity for hierarchy — never gray). No gradients, no purple/indigo, no glassmorphism, no blurred blobs, no soft `shadow-lg`. White text on yellow is banned (fails contrast).
+
+### Sticker construction (the unifying device)
+
+Every interactive/card-like element: 2.5px solid navy border · hard offset shadow `4px 4px 0 var(--navy)` · radius 12–20px (pills for buttons) · hover lift `translate(-2px,-2px)` + 6px shadow · active press `translate(2px,2px)` + no shadow. Use the primitives: `.sticker`, `.btn-sticker` + `.btn-{yellow|blue|pink|ghost}`, `.chip-sticker`, or the `StickerButton`/`StickerCard`/`Chip` components in `components/sticker.tsx`. Transition `transform` only — never animate `box-shadow`, `filter`, or layout properties.
+
+### Type & marks
+
+- Display: Baloo 2 (`font-display`, weights 700/800) for H1/H2/wordmark only. Body: DM Sans (`font-sans`). Both via `next/font/google` in `app/layout.tsx`. Never use the display face for paragraphs.
+- Brand marks are inline SVG in `components/brand/marks.tsx` (`PoolMark`, `Coin`, `Bill`, `Droplet`, `Splash`, `CloudMark`, `Wordmark`). Never scale the PNG logo for UI.
+
+### Copy rules
+
+- Keep verbatim: "Pool. Tap. Done." · "A social network for people who spend time — and money — together." · "WTF Is Pool?!" · "Ready to Jump In?" · "no IOUs, no awkward math, no receipts to chase."
+- Banned in feature copy: split/splitting, settle/settling, expense(s), tracking-as-feature, fintech, seamless, effortless, elevate, unlock, empower. ("No IOUs / no tracking" as negation is allowed.)
+- Voice: warm, direct, a little cheeky; short sentences; crews/moments/routines — never transactions or "financial wellness". Emoji only inside feed/ticker content, never as heading decoration.
+
+### Motion & a11y budget
+
+Animate `transform`/`opacity` only; all loops pause offscreen (IntersectionObserver) and on `visibilitychange`; `prefers-reduced-motion` gets static scenes; visible navy focus rings everywhere; decorative SVGs `aria-hidden`.

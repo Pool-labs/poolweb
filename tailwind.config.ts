@@ -52,16 +52,22 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        "pool-blue": "#4FC3F7",
-        "pool-pink": "#FF69B4",
-        "pool-yellow": "#FFD54F",
+        // Brand tokens — sticker-pop system (see REDESIGN_PLAN.md)
+        "pool-blue": "#4EC3F5",
+        "pool-yellow": "#FFCE3E",
+        "pool-pink": "#FF77B0",
+        "pool-green": "#63C666",
+        "pool-gold": "#F5B63C",
+        navy: "#14224A",
+        cloud: "#FDFCF9",
+        "sky-tint": "#EAF7FE",
+        // Legacy names kept for untouched routes (admin, app-like pages)
         "pool-orange": "#FF9800",
         "pool-purple": "#9C27B0",
-        "pool-green": "#4CAF50",
-        "pool-navy": "#1A237E",
+        "pool-navy": "#14224A",
         "money-green": "#2E7D32",
-        "coin-gold": "#FFB300",
-        "splash-blue": "#03A9F4",
+        "coin-gold": "#F5B63C",
+        "splash-blue": "#4EC3F5",
         "droplet-cyan": "#00BCD4",
       },
       borderRadius: {
@@ -73,6 +79,8 @@ const config: Config = {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
       },
       fontFamily: {
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "system-ui", "sans-serif"],
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",

@@ -1,4 +1,6 @@
-import Image from "next/image"
+import Link from "next/link"
+import type { CSSProperties } from "react"
+import { PoolMark, Wordmark } from "@/components/brand/marks"
 
 const socials = [
   {
@@ -23,35 +25,83 @@ const socials = [
   },
 ]
 
+const exploreLinks = [
+  { href: "/#how-it-works", label: "How it works" },
+  { href: "/faq", label: "FAQ" },
+  { href: "/contact", label: "Contact" },
+]
+
+const moreLinks = [
+  { href: "/preregister", label: "Pre-register" },
+  { href: "/questionnaire", label: "Questionnaire" },
+  { href: "/download", label: "Download" },
+  { href: "/privacy", label: "Privacy" },
+]
+
 export default function Footer() {
   return (
-    <footer className="relative overflow-hidden py-12 border-t border-white/10">
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="text-center">
-          <div className="flex items-center justify-center space-x-3 mb-6">
-            <Image src="/images/pool-logo-new.png" alt="POOL Logo" width={50} height={50} />
-            <span className="text-4xl font-bold text-pool-navy">POOL</span>
+    <footer
+      className="bg-navy text-cloud"
+      style={{ "--focus-ring": "var(--cloud)" } as CSSProperties}
+    >
+      <div className="container mx-auto px-4 py-14">
+        <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr] items-start">
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <PoolMark className="h-12 w-auto" />
+              <Wordmark outline="cloud" className="h-9 w-auto" />
+            </div>
+            <p className="text-cloud/90 max-w-sm leading-relaxed">
+              {"A social network for people who spend time — and money — together. Your people, your pools, your moments."}
+            </p>
+            <div className="flex items-center gap-2 mt-6">
+              {socials.map((social) => (
+                <a
+                  key={social.name}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={social.name}
+                  className="inline-flex items-center justify-center w-11 h-11 rounded-full border-2 border-cloud/25 text-cloud hover:border-pool-blue hover:text-pool-blue transition-colors"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true">
+                    <path d={social.path} />
+                  </svg>
+                </a>
+              ))}
+            </div>
           </div>
-          <p className="text-pool-navy text-xl mb-6 max-w-2xl mx-auto">
-            {"A social network for people who spend time — and money — together. Your people, your pools, your moments."}
-          </p>
-          <div className="flex items-center justify-center gap-3 mb-6">
-            {socials.map((social) => (
-              <a
-                key={social.name}
-                href={social.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={social.name}
-                className="inline-flex items-center justify-center w-11 h-11 rounded-full text-pool-navy hover:text-pool-pink hover:bg-pool-navy/5 transform hover:scale-110 transition-all"
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24" aria-hidden="true">
-                  <path d={social.path} />
-                </svg>
-              </a>
-            ))}
-          </div>
-          <p className="text-sm text-pool-navy/70">{"© 2025 POOL App. All rights reserved."}</p>
+
+          <nav aria-label="Explore">
+            <h3 className="font-display font-bold text-pool-blue text-lg mb-3">Explore</h3>
+            <ul className="space-y-2">
+              {exploreLinks.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-cloud/85 hover:text-pool-yellow font-medium transition-colors">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <nav aria-label="More">
+            <h3 className="font-display font-bold text-pool-pink text-lg mb-3">More</h3>
+            <ul className="space-y-2">
+              {moreLinks.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-cloud/85 hover:text-pool-yellow font-medium transition-colors">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+
+        <div className="mt-12 pt-6 border-t-2 border-cloud/15 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-cloud/75">
+          <p>{"Made with 🌊 in St. Louis."}</p>
+          <p>{`© ${new Date().getFullYear()} POOL App. All rights reserved.`}</p>
         </div>
       </div>
     </footer>
