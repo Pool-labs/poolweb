@@ -13,7 +13,7 @@ import { Analytics } from "@vercel/analytics/next"
 // Two families max: chunky rounded display (H1/H2/wordmark only) + friendly body sans.
 const baloo = Baloo_2({
   subsets: ["latin"],
-  weight: ["700", "800"],
+  weight: ["800"],
   variable: "--font-display",
   display: "swap",
 })

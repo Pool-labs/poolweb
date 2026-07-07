@@ -319,7 +319,10 @@ export default function HeroPool() {
             <span className="text-sticker text-pool-yellow">Tap.</span>{" "}
             <span className="text-sticker text-pool-pink">Done.</span>
           </h1>
-          {/* Approved line — keep verbatim. */}
+          {/* Approved line — keep verbatim.
+              Alternates for Hussam to consider (not shipped):
+              "Your crew. One pool. Everyone's card."
+              "Fund the things you actually do together." */}
           <p className="mt-6 text-lg sm:text-xl lg:text-2xl text-navy font-medium max-w-xl mx-auto lg:mx-0 text-balance">
             A social network for people who spend time — and money — together.
           </p>

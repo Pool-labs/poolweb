@@ -17,6 +17,7 @@ export default function BetaCta() {
           <p className="font-display font-bold text-2xl sm:text-3xl text-navy mt-5">
             The pool&rsquo;s not open yet.
           </p>
+          {/* Alternate for Hussam (not shipped): "Get on the list — first ones in get the floaties." */}
           <p className="text-lg text-navy/80 mt-2 max-w-md mx-auto">
             Pre-register and you&rsquo;re first in when it fills.
           </p>
