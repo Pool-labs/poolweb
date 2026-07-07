@@ -83,27 +83,27 @@ export function InviteFriendsModal({
           content the way iOS Safari does. */}
       <div className="min-h-full flex items-start sm:items-center justify-center p-4 py-6 sm:py-8">
         <div
-          className="relative w-full max-w-lg rounded-3xl shadow-2xl border-2 border-white/40 bg-gradient-to-br from-white/95 to-white/80 backdrop-blur-md p-5 sm:p-8"
+          className="relative w-full max-w-lg rounded-3xl border-[2.5px] border-navy bg-white shadow-[6px_6px_0_#14224A] p-5 sm:p-8"
           onClick={(e) => e.stopPropagation()}
         >
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 rounded-full hover:bg-pool-navy/10 transition-colors z-10"
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 rounded-full border-2 border-navy bg-white hover:bg-sky-tint transition-colors z-10"
             aria-label="Close"
           >
-            <X className="w-5 h-5 text-pool-navy" />
+            <X className="w-5 h-5 text-navy" />
           </button>
 
           <div className="mb-5 pr-10">
             <h2
               id="invite-friends-modal-title"
-              className="text-xl sm:text-3xl font-bold text-pool-navy text-shadow"
+              className="font-display font-bold text-xl sm:text-3xl text-navy"
             >
               {title}
             </h2>
             {description && (
-              <p className="text-sm sm:text-base text-pool-navy/80 mt-1">{description}</p>
+              <p className="text-sm sm:text-base text-navy/80 mt-1">{description}</p>
             )}
           </div>
 

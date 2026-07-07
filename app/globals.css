@@ -264,6 +264,37 @@
     transform 0.5s ease-out;
 }
 
+/* Feed demo items (phone frame loop) */
+.feed-item {
+  opacity: 0;
+  transform: translateY(14px) scale(0.97);
+  transition:
+    opacity 0.45s ease-out,
+    transform 0.45s ease-out;
+}
+.feed-item.is-shown {
+  opacity: 1;
+  transform: none;
+}
+.feed-pop {
+  opacity: 0;
+  transform: scale(0);
+  transition:
+    opacity 0.3s ease-out,
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.feed-pop.is-shown {
+  opacity: 1;
+  transform: scale(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .feed-item,
+  .feed-pop {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Droplet burst on primary CTA clicks */
 @keyframes droplet-burst {
   from {

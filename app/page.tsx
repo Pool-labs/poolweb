@@ -1,9 +1,11 @@
-import Link from "next/link"
-import { ClipboardList, Sparkles } from "lucide-react"
-import FeaturesCarousel from "@/components/features-carousel"
-import HowItWorksCarousel from "@/components/how-it-works-carousel"
 import HeroPool from "@/components/hero-pool"
 import Ticker from "@/components/ticker"
+import PoolCards from "@/components/pool-cards"
+import FeedDemo from "@/components/feed-demo"
+import HowItWorks from "@/components/how-it-works"
+import BetaCta from "@/components/beta-cta"
+import Reveal from "@/components/reveal"
+import { CloudMark } from "@/components/brand/marks"
 
 export default function HomePage() {
   return (
@@ -11,52 +13,70 @@ export default function HomePage() {
       <HeroPool />
       <Ticker />
 
-      {/* Features Section */}
-      <section className="py-20">
+      {/* WTF Is Pool?! — three pools, slapped on like stickers */}
+      <section className="py-16 sm:py-24" id="wtf">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-center mb-8 sm:mb-12 md:mb-16 text-pool-navy flex w-full items-baseline justify-center gap-1 sm:gap-2 tracking-tight">
-            <span className="bg-gradient-to-br from-blue-600 to-purple-600 bg-clip-text text-transparent whitespace-nowrap">WTF</span>
-            <span className="text-pool-navy leading-none">Is Pool?!</span>
-          </h2>
-
-          <FeaturesCarousel />
-        </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-center text-pool-navy mb-8 sm:mb-12 md:mb-16">{"How It Works"}</h2>
-
-          <HowItWorksCarousel />
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20">
-        <div className="container mx-auto px-4 text-center">
-          <div className="max-w-3xl mx-auto bg-white/20 backdrop-blur-sm rounded-3xl p-6 sm:p-8 md:p-12 shadow-2xl border border-white/30">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-pool-navy mb-4 sm:mb-6">{"Ready to Jump In?"}</h2>
-            <p className="text-xl text-pool-navy mb-8">
-              {"Your friends, your routines, your moments—bring your people into one place and make every outing feel like part of something bigger."}
+          <Reveal>
+            <h2 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl text-center text-navy">
+              <span className="text-sticker text-pool-yellow">WTF</span> Is Pool?!
+            </h2>
+            <p className="text-lg sm:text-xl text-navy/80 text-center mt-5 mb-12 max-w-2xl mx-auto text-balance">
+              Create pools around the things you actually do together—roommates, brunch crew,
+              travel group, or your everyday coffee run.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link
-                href="/preregister"
-                className="bg-gradient-to-r from-pool-pink to-pool-purple hover:from-pool-purple hover:to-pool-pink text-white font-bold py-4 px-8 sm:py-6 sm:px-12 rounded-full text-xl sm:text-2xl transform hover:scale-105 active:scale-95 transition-all shadow-lg hover:shadow-xl inline-flex items-center gap-3"
-              >
-                <Sparkles size={28} />
-                {"Pre-register for Beta"}
-              </Link>
-              <Link
-                href="/questionnaire"
-                className="bg-gradient-to-r from-pool-green to-pool-blue hover:from-pool-blue hover:to-pool-green text-white font-bold py-4 px-8 sm:py-6 sm:px-12 rounded-full text-xl sm:text-2xl transform hover:scale-105 active:scale-95 transition-all shadow-lg hover:shadow-xl inline-flex items-center gap-3"
-              >
-                <ClipboardList size={28} />
-                {"Questionnaire"}
-              </Link>
-            </div>
+          </Reveal>
+          <Reveal delay={120}>
+            <PoolCards />
+          </Reveal>
+          <Reveal delay={180}>
+            <p className="text-center text-navy/80 text-lg mt-12 max-w-2xl mx-auto text-balance">
+              When it&rsquo;s time to pay, Pool handles it. Tap-to-pay for the whole
+              crew—no IOUs, no awkward math, no receipts to chase.
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Shared Moments — the feed demo on the sky band */}
+      <section className="bg-sky-tint border-y-2 border-navy py-16 sm:py-24 relative overflow-hidden" id="shared-moments">
+        <CloudMark className="cloud-drift absolute top-10 left-[6%] h-10 w-auto opacity-80" />
+        <CloudMark className="cloud-drift-slow absolute top-24 right-[8%] h-14 w-auto opacity-70" />
+        <CloudMark className="cloud-drift absolute bottom-12 left-[12%] h-8 w-auto opacity-60 hidden lg:block" />
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="grid lg:grid-cols-2 gap-12 items-center max-w-5xl mx-auto">
+            <Reveal className="order-2 lg:order-1">
+              <FeedDemo />
+            </Reveal>
+            <Reveal className="order-1 lg:order-2 text-center lg:text-left" delay={100}>
+              <h2 className="font-display font-extrabold text-4xl sm:text-5xl text-navy">Shared Moments</h2>
+              <p className="text-lg sm:text-xl text-navy/80 mt-5 max-w-md mx-auto lg:mx-0">
+                Stay connected through shared activity. See what your group is up to and make
+                every outing feel like part of something bigger.
+              </p>
+              <p className="text-lg text-navy/80 mt-4 max-w-md mx-auto lg:mx-0">
+                Spending shows up in the pool&rsquo;s feed—react to it, comment on it, relive it.
+              </p>
+            </Reveal>
           </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="py-16 sm:py-24" id="how-it-works">
+        <div className="container mx-auto px-4">
+          <Reveal>
+            <h2 className="font-display font-extrabold text-4xl sm:text-5xl text-center text-navy mb-14">
+              How It Works
+            </h2>
+          </Reveal>
+          <HowItWorks />
+        </div>
+      </section>
+
+      {/* Beta CTA — the velvet rope */}
+      <section className="py-16 sm:py-24 pb-24">
+        <div className="container mx-auto px-4">
+          <BetaCta />
         </div>
       </section>
     </div>

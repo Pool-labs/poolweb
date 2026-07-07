@@ -155,36 +155,32 @@ export default function PreregisterPage() {
         <div className="max-w-2xl mx-auto">
           {/* Header */}
           <div className="text-center mb-12">
-            <h1 className="text-5xl font-bold text-pool-navy mb-4 text-shadow">
+            <h1 className="font-display font-extrabold text-4xl sm:text-5xl text-navy mb-4">
               Preregister for Pool
             </h1>
-            <p className="text-xl text-pool-navy/80 text-shadow">
+            <p className="text-lg sm:text-xl text-navy/80">
               Be the first to know when our mobile app launches!
             </p>
           </div>
 
           {/* Form Card */}
-          <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/30">
+          <div className="sticker rounded-3xl bg-white p-6 sm:p-8">
             {/* Success Message */}
             {submitStatus === "success" && (
-              <div className="bg-gradient-to-r from-pool-pink/20 to-pool-yellow/20 backdrop-blur-sm rounded-3xl p-8 shadow-2xl border-2 border-white/40 mb-8 relative overflow-hidden">
-                {/* Decorative elements */}
-                <div className="absolute top-0 right-0 w-24 h-24 bg-pool-yellow/10 rounded-full blur-2xl" />
-                <div className="absolute bottom-0 left-0 w-32 h-32 bg-pool-pink/10 rounded-full blur-2xl" />
-
-                <div className="relative z-10 text-center">
+              <div className="rounded-3xl border-2 border-navy bg-sky-tint p-8 mb-8 shadow-[4px_4px_0_#14224A]">
+                <div className="text-center">
                   <div className="flex justify-center mb-4">
-                    <div className="bg-gradient-to-r from-pool-green to-pool-blue p-4 rounded-full">
-                      <CheckCircle className="w-12 h-12 text-white" />
+                    <div className="bg-pool-green border-2 border-navy p-4 rounded-full">
+                      <CheckCircle className="w-12 h-12 text-navy" />
                     </div>
                   </div>
-                  <h3 className="text-3xl font-bold text-pool-navy mb-4 text-shadow">
+                  <h3 className="font-display font-bold text-3xl text-navy mb-4">
                     You're on the VIP List!
                   </h3>
-                  <p className="text-xl font-semibold text-pool-navy mb-2 text-shadow">
+                  <p className="text-xl font-semibold text-navy mb-2">
                     Get ready for exclusive early access to POOL.
                   </p>
-                  <p className="text-lg text-pool-navy/80">
+                  <p className="text-lg text-navy/80">
                     We'll notify you first when our mobile app launches!
                   </p>
                 </div>
@@ -193,13 +189,13 @@ export default function PreregisterPage() {
 
             {/* Error Message */}
             {submitStatus === "error" && (
-              <div className="mb-8 p-6 bg-red-100 border-2 border-red-300 rounded-2xl flex items-center gap-3">
-                <AlertCircle className="w-8 h-8 text-red-600 flex-shrink-0" />
+              <div className="mb-8 p-6 bg-pool-pink/15 border-2 border-navy rounded-2xl flex items-center gap-3">
+                <AlertCircle className="w-8 h-8 text-pool-pink flex-shrink-0" />
                 <div>
-                  <p className="text-lg font-bold text-red-800">
+                  <p className="text-lg font-bold text-navy">
                     Something went wrong. Please try again.
                   </p>
-                  <p className="text-red-700 mt-1">
+                  <p className="text-navy/80 mt-1">
                     If the problem persists, please contact support.
                   </p>
                 </div>
@@ -208,13 +204,13 @@ export default function PreregisterPage() {
 
             {/* Duplicate Message */}
             {submitStatus === "duplicate" && (
-              <div className="mb-8 p-6 bg-yellow-100 border-2 border-yellow-400 rounded-2xl flex items-center gap-3">
-                <AlertCircle className="w-8 h-8 text-yellow-600 flex-shrink-0" />
+              <div className="mb-8 p-6 bg-pool-yellow/20 border-2 border-navy rounded-2xl flex items-center gap-3">
+                <AlertCircle className="w-8 h-8 text-pool-gold flex-shrink-0" />
                 <div>
-                  <p className="text-lg font-bold text-yellow-800">
+                  <p className="text-lg font-bold text-navy">
                     You have already preregistered.
                   </p>
-                  <p className="text-yellow-700 mt-1">
+                  <p className="text-navy/80 mt-1">
                     We'll notify you as soon as the mobile app is available!
                   </p>
                 </div>
@@ -225,7 +221,7 @@ export default function PreregisterPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* First Name */}
               <div>
-                <label className="block text-pool-navy font-bold mb-2 text-shadow">
+                <label className="block text-navy font-bold mb-2">
                   First Name
                 </label>
                 <input
@@ -234,7 +230,7 @@ export default function PreregisterPage() {
                   onChange={(e) => handleInputChange("firstName", e.target.value)}
                   className={`w-full px-4 py-3 rounded-full border-2 ${errors.firstName
                     ? "border-red-400 focus:border-red-500"
-                    : "border-pool-blue focus:border-pool-pink"
+                    : "border-navy focus:border-pool-blue"
                     } outline-none transition-colors`}
                   placeholder="Enter your first name"
                   disabled={isSubmitting}
@@ -246,7 +242,7 @@ export default function PreregisterPage() {
 
               {/* Last Name */}
               <div>
-                <label className="block text-pool-navy font-bold mb-2 text-shadow">
+                <label className="block text-navy font-bold mb-2">
                   Last Name
                 </label>
                 <input
@@ -255,7 +251,7 @@ export default function PreregisterPage() {
                   onChange={(e) => handleInputChange("lastName", e.target.value)}
                   className={`w-full px-4 py-3 rounded-full border-2 ${errors.lastName
                     ? "border-red-400 focus:border-red-500"
-                    : "border-pool-blue focus:border-pool-pink"
+                    : "border-navy focus:border-pool-blue"
                     } outline-none transition-colors`}
                   placeholder="Enter your last name"
                   disabled={isSubmitting}
@@ -267,7 +263,7 @@ export default function PreregisterPage() {
 
               {/* Email */}
               <div>
-                <label className="block text-pool-navy font-bold mb-2 text-shadow">
+                <label className="block text-navy font-bold mb-2">
                   Email
                 </label>
                 <input
@@ -276,7 +272,7 @@ export default function PreregisterPage() {
                   onChange={(e) => handleInputChange("email", e.target.value)}
                   className={`w-full px-4 py-3 rounded-full border-2 ${errors.email
                     ? "border-red-400 focus:border-red-500"
-                    : "border-pool-blue focus:border-pool-pink"
+                    : "border-navy focus:border-pool-blue"
                     } outline-none transition-colors`}
                   placeholder="your@email.com"
                   disabled={isSubmitting}
@@ -287,7 +283,7 @@ export default function PreregisterPage() {
               </div>
 
               {/* Add a friend (optional) */}
-              <div className="rounded-2xl border-2 border-dashed border-pool-blue/50 bg-white/20 p-4 sm:p-5">
+              <div className="rounded-2xl border-2 border-dashed border-navy/50 bg-sky-tint/50 p-4 sm:p-5">
                 <button
                   type="button"
                   onClick={() => setFriendOpen((o) => !o)}
@@ -296,17 +292,17 @@ export default function PreregisterPage() {
                   aria-expanded={friendOpen}
                   aria-controls="friend-fields"
                 >
-                  <span className="flex items-center gap-2 text-pool-navy font-bold">
+                  <span className="flex items-center gap-2 text-navy font-bold">
                     <UserPlus className="w-5 h-5" />
                     Add a friend
                   </span>
                   {friendOpen ? (
-                    <ChevronUp className="w-5 h-5 text-pool-navy" />
+                    <ChevronUp className="w-5 h-5 text-navy" />
                   ) : (
-                    <ChevronDown className="w-5 h-5 text-pool-navy" />
+                    <ChevronDown className="w-5 h-5 text-navy" />
                   )}
                 </button>
-                <p className="text-xs text-pool-navy/70 mt-1">
+                <p className="text-xs text-navy/70 mt-1">
                   Pre-register a friend at the same time — they’ll be on the list with you.
                 </p>
 
@@ -323,7 +319,7 @@ export default function PreregisterPage() {
                           }}
                           placeholder="Friend's first name"
                           disabled={isSubmitting}
-                          className={`w-full px-4 py-3 rounded-full border-2 ${errors.friendFirstName ? "border-red-400 focus:border-red-500" : "border-pool-blue focus:border-pool-pink"} outline-none transition-colors text-sm`}
+                          className={`w-full px-4 py-3 rounded-full border-2 ${errors.friendFirstName ? "border-red-400 focus:border-red-500" : "border-navy focus:border-pool-blue"} outline-none transition-colors text-sm`}
                         />
                         {errors.friendFirstName && (
                           <p className="text-red-500 text-xs mt-1 ml-4">{errors.friendFirstName}</p>
@@ -339,7 +335,7 @@ export default function PreregisterPage() {
                           }}
                           placeholder="Friend's last name"
                           disabled={isSubmitting}
-                          className={`w-full px-4 py-3 rounded-full border-2 ${errors.friendLastName ? "border-red-400 focus:border-red-500" : "border-pool-blue focus:border-pool-pink"} outline-none transition-colors text-sm`}
+                          className={`w-full px-4 py-3 rounded-full border-2 ${errors.friendLastName ? "border-red-400 focus:border-red-500" : "border-navy focus:border-pool-blue"} outline-none transition-colors text-sm`}
                         />
                         {errors.friendLastName && (
                           <p className="text-red-500 text-xs mt-1 ml-4">{errors.friendLastName}</p>
@@ -356,7 +352,7 @@ export default function PreregisterPage() {
                         }}
                         placeholder="friend@email.com"
                         disabled={isSubmitting}
-                        className={`w-full px-4 py-3 rounded-full border-2 ${errors.friendEmail ? "border-red-400 focus:border-red-500" : "border-pool-blue focus:border-pool-pink"} outline-none transition-colors text-sm`}
+                        className={`w-full px-4 py-3 rounded-full border-2 ${errors.friendEmail ? "border-red-400 focus:border-red-500" : "border-navy focus:border-pool-blue"} outline-none transition-colors text-sm`}
                       />
                       {errors.friendEmail && (
                         <p className="text-red-500 text-xs mt-1 ml-4">{errors.friendEmail}</p>
@@ -370,7 +366,7 @@ export default function PreregisterPage() {
                           setErrors({ ...errors, friendFirstName: undefined, friendLastName: undefined, friendEmail: undefined })
                         }}
                         disabled={isSubmitting}
-                        className="text-xs text-pool-navy/70 hover:text-pool-navy underline inline-flex items-center gap-1"
+                        className="text-xs text-navy/70 hover:text-navy underline inline-flex items-center gap-1"
                       >
                         <X className="w-3 h-3" />
                         Clear friend
@@ -406,11 +402,11 @@ export default function PreregisterPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-gradient-to-r from-pool-pink to-pool-purple hover:from-pool-purple hover:to-pool-pink text-white font-bold py-4 px-8 rounded-full text-lg transform hover:scale-105 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
+                className="btn-sticker btn-pink w-full py-4 px-8 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-navy"></div>
                     Processing...
                   </>
                 ) : (
@@ -423,8 +419,8 @@ export default function PreregisterPage() {
             </form>
 
             {/* Additional Info */}
-            <div className="mt-8 p-6 bg-gradient-to-br from-pool-blue/10 to-pool-pink/10 rounded-2xl">
-              <p className="text-pool-navy text-center text-sm">
+            <div className="mt-8 p-6 bg-sky-tint border-2 border-navy/15 rounded-2xl">
+              <p className="text-navy text-center text-sm">
                 By preregistering, you'll be among the first to experience Pool—the social network
                 for the things you actually do together. We'll send you exclusive early access!
               </p>
