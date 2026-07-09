@@ -1,93 +1,63 @@
-import HeroPool from "@/components/hero-pool"
-import Ticker from "@/components/ticker"
-import PoolCards from "@/components/pool-cards"
-import FeedDemo from "@/components/feed-demo"
-import HowItWorks from "@/components/how-it-works"
-import BetaCta from "@/components/beta-cta"
-import Reveal from "@/components/reveal"
-import ScallopDivider from "@/components/scallop-divider"
-import BrandPattern from "@/components/brand/pattern"
-import { CloudMark } from "@/components/brand/marks"
+import Link from "next/link"
+import BrandDefs from "@/components/home/defs"
+import HomeEffects from "@/components/home/effects"
+import Hero from "@/components/home/hero"
+import HomeTicker from "@/components/home/ticker"
+import Wtf from "@/components/home/wtf"
+import SocialStory from "@/components/home/social-story"
+import CardStage from "@/components/home/card-stage"
+import HowSteps from "@/components/home/how-steps"
+import Jump from "@/components/home/jump"
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen">
-      <HeroPool />
-      <Ticker />
+    <div className="hp">
+      {/* the wash + color blobs: the site's signature background, fixed under everything */}
+      <div className="hp-wash" aria-hidden="true" />
+      <div className="hp-blob hp-blob-pink" aria-hidden="true" />
+      <div className="hp-blob hp-blob-orange" aria-hidden="true" />
+      <div className="hp-blob hp-blob-teal" aria-hidden="true" />
+      <div className="hp-blob hp-blob-blue" aria-hidden="true" />
+      <div className="hp-blob hp-blob-yellow" aria-hidden="true" />
 
-      {/* WTF Is Pool?! — three pools, slapped on like stickers */}
-      <section className="py-16 sm:py-24 bg-tint-yellow relative overflow-hidden" id="wtf">
-        <BrandPattern variant="money" opacity={0.35} />
-        <div className="container mx-auto px-4 relative z-10">
-          <Reveal>
-            <h2 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl text-center text-navy">
-              <span className="text-sticker text-pool-yellow">WTF</span> Is Pool?!
-            </h2>
-            <p className="text-lg sm:text-xl text-navy/80 text-center mt-5 mb-12 max-w-2xl mx-auto text-balance">
-              Create pools around the things you actually do together—roommates, brunch crew,
-              travel group, or your everyday coffee run.
-            </p>
-          </Reveal>
-          <Reveal delay={120}>
-            <PoolCards />
-          </Reveal>
-          <Reveal delay={180}>
-            <p className="text-center text-navy/80 text-lg mt-12 max-w-2xl mx-auto text-balance">
-              When it&rsquo;s time to pay, Pool handles it. Tap-to-pay for the whole
-              crew—no IOUs, no awkward math, no receipts to chase.
-            </p>
-          </Reveal>
-        </div>
-      </section>
+      <BrandDefs />
+      <HomeEffects />
 
-      {/* Shared Moments — the feed demo on the sky band */}
-      <ScallopDivider color="#C9EAFB" bg="#FFF1C9" />
-      <section className="bg-pool-sky py-14 sm:py-20 relative overflow-hidden" id="shared-moments">
-        <BrandPattern variant="clouds" opacity={0.3} />
-        <CloudMark className="cloud-drift absolute top-10 left-[6%] h-10 w-auto opacity-80" />
-        <CloudMark className="cloud-drift-slow absolute top-24 right-[8%] h-14 w-auto opacity-70" />
-        <CloudMark className="cloud-drift absolute bottom-12 left-[12%] h-8 w-auto opacity-60 hidden lg:block" />
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-12 items-center max-w-5xl mx-auto">
-            <Reveal className="order-2 lg:order-1">
-              <FeedDemo />
-            </Reveal>
-            <Reveal className="order-1 lg:order-2 text-center lg:text-left" delay={100}>
-              <h2 className="font-display font-extrabold text-4xl sm:text-5xl text-navy">Shared Moments</h2>
-              <p className="text-lg sm:text-xl text-navy/80 mt-5 max-w-md mx-auto lg:mx-0">
-                Stay connected through shared activity. See what your group is up to and make
-                every outing feel like part of something bigger.
-              </p>
-              <p className="text-lg text-navy/80 mt-4 max-w-md mx-auto lg:mx-0">
-                Spending shows up in the pool&rsquo;s feed—react to it, comment on it, relive it.
-              </p>
-            </Reveal>
+      <Hero />
+
+      <section className="beta">
+        <div className="hp-wrap">
+          <span className="beta-pill">PRIVATE BETA</span>
+          <p className="lead">Pool is in private beta right now—pre-register to help us shape it.</p>
+          <p className="follow">Follow the journey on YouTube and keep up with us on Instagram.</p>
+          <div className="beta-row">
+            <Link className="hp-pill hp-pill-pink" href="/preregister">
+              Pre-register for Beta
+            </Link>
+            <a className="hp-pill" href="https://www.youtube.com/@Pool_App" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" fill="#14224A" aria-hidden="true">
+                <path d="M21.6 7.2a2.8 2.8 0 0 0-2-2C17.9 4.8 12 4.8 12 4.8s-5.9 0-7.6.4a2.8 2.8 0 0 0-2 2A29 29 0 0 0 2 12a29 29 0 0 0 .4 4.8 2.8 2.8 0 0 0 2 2c1.7.4 7.6.4 7.6.4s5.9 0 7.6-.4a2.8 2.8 0 0 0 2-2A29 29 0 0 0 22 12a29 29 0 0 0-.4-4.8ZM10 15.2V8.8l5.2 3.2Z" />
+              </svg>
+              YouTube
+            </a>
+            <a className="hp-pill" href="https://instagram.com/_poolapp" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#14224A" strokeWidth="2" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="5" />
+                <circle cx="12" cy="12" r="4.2" />
+                <circle cx="17.2" cy="6.8" r="1.3" fill="#14224A" stroke="none" />
+              </svg>
+              Instagram
+            </a>
           </div>
         </div>
       </section>
-      <ScallopDivider color="#C9EAFB" bg="#FFE3F0" flip />
 
-      {/* How It Works */}
-      <section className="py-16 sm:py-24 bg-tint-pink relative overflow-hidden" id="how-it-works">
-        <BrandPattern variant="droplets" opacity={0.3} />
-        <div className="container mx-auto px-4 relative z-10">
-          <Reveal>
-            <h2 className="font-display font-extrabold text-4xl sm:text-5xl text-center text-navy mb-14">
-              How It Works
-            </h2>
-          </Reveal>
-          <HowItWorks />
-        </div>
-      </section>
-
-      {/* Beta CTA — the velvet rope */}
-      <ScallopDivider color="#DFF4DF" bg="#FFE3F0" />
-      <section className="py-16 sm:py-24 pb-24 bg-tint-green relative overflow-hidden">
-        <BrandPattern variant="money" opacity={0.3} />
-        <div className="container mx-auto px-4 relative z-10">
-          <BetaCta />
-        </div>
-      </section>
+      <HomeTicker />
+      <Wtf />
+      <SocialStory />
+      <CardStage />
+      <HowSteps />
+      <Jump />
     </div>
   )
 }
