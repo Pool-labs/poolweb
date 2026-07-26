@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, Users, Layers, ClipboardList, LogOut } from 'lucide-react';
+import { BarChart3, Users, Layers, ClipboardList, ShieldCheck, LogOut } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: '/admin/overview', label: 'Overview', icon: BarChart3 },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/pools', label: 'Pools', icon: Layers },
+  { href: '/admin/admins', label: 'Admins', icon: ShieldCheck },
   { href: '/admin/dashboard', label: 'Waitlist', icon: ClipboardList },
 ] as const;
 
