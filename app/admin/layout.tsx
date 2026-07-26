@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 
 import { ADMIN_COOKIE } from '@/lib/admin/authCookies';
+import { getApiEnv } from '@/lib/admin/serverApi';
 import { AdminNav } from '@/components/admin/AdminNav';
 
 /**
@@ -24,7 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen bg-background">
-      <AdminNav />
+      <AdminNav env={getApiEnv()} />
       <main className="container mx-auto px-4 py-6">{children}</main>
     </div>
   );
