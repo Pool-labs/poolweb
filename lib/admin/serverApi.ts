@@ -23,6 +23,30 @@ export function apiUrl(path: string): string {
   return `${getApiBaseUrl()}/api/v1${suffix}`;
 }
 
+/**
+ * Extract a human-readable error string from a Pool API response body,
+ * whatever shape it took. The API's error middleware returns
+ * `{ error: { message, statusCode } }` (an OBJECT), while some paths use a
+ * string `error` or a top-level `message`. Never return the object — rendering
+ * it as a React child crashes the page (the "object with keys {message,
+ * statusCode}" error).
+ */
+export function apiErrorMessage(body: unknown, fallback: string): string {
+  if (body && typeof body === 'object') {
+    const b = body as Record<string, unknown>;
+    if (typeof b.error === 'string') return b.error;
+    if (
+      b.error &&
+      typeof b.error === 'object' &&
+      typeof (b.error as Record<string, unknown>).message === 'string'
+    ) {
+      return (b.error as Record<string, unknown>).message as string;
+    }
+    if (typeof b.message === 'string') return b.message;
+  }
+  return fallback;
+}
+
 export type ApiEnv = 'production' | 'staging' | 'local';
 
 /**
