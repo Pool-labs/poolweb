@@ -28,3 +28,17 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+
+## Platform Admin (`/admin`)
+
+The `/admin` surface is a **pure REST client of the Pool API** (issue #85) — it does not use Firebase for data.
+
+- **Auth:** Email-OTP + httpOnly cookies behind a Next server-side proxy. Tokens never touch client JS; browser calls stay same-origin, and the Next server calls the Pool API server-to-server. Login also verifies platform-admin status before setting any cookie (a non-admin account is rejected).
+- **Screens:** Overview (usage metrics + funnels), Users (search / suspend-restore / feature flags), Pools (search / suspend-restore / read-only ledger). The legacy Firestore-backed waitlist dashboard/stats live under the same gate (linked as "Waitlist").
+- **Package manager:** **pnpm** (`pnpm-lock.yaml`).
+
+### Environment
+
+Set `POOL_API_BASE_URL` (server-only — not `NEXT_PUBLIC_*`) to the Pool API base URL. Defaults to `https://api-staging.poolapp.co`. Copy `.env.local.example` to `.env.local` and fill in the Firebase (`NEXT_PUBLIC_FIREBASE_*`) values for the marketing site.
+
+On Vercel, add `POOL_API_BASE_URL` as an environment variable (Production → `https://api.poolapp.co`, Preview/staging → `https://api-staging.poolapp.co`).

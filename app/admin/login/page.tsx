@@ -2,114 +2,191 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn } from '@/app/firebase/services';
+import { Loader2, Lock, ArrowLeft } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Lock } from 'lucide-react';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
+const OTP_LENGTH = 6;
+
+type Step = 'email' | 'code';
+
+/**
+ * Two-step platform-admin login: email → OTP.
+ *
+ * All auth traffic goes through the same-origin Next Route Handlers
+ * (/admin/api/auth/*). The verify step also confirms platform-admin status
+ * server-side before any cookie is set; a non-admin account is rejected here.
+ * On success the server has set the httpOnly session cookies and we navigate to
+ * the overview.
+ */
 export default function AdminLoginPage() {
   const router = useRouter();
+  const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const sendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-
     try {
-      const admin = await signIn(email, password);
-      if (admin) {
-        router.push('/admin/dashboard');
-      } else {
-        // Non-admin user or invalid credentials
-        setError('Invalid email or password');
+      const res = await fetch('/admin/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body?.success === false) {
+        setError(body?.error || 'Could not send the code. Try again.');
+        return;
       }
-    } catch (err: any) {
-      if (err.code === 'auth/user-not-found') {
-        setError('Invalid email or password');
-      } else if (err.code === 'auth/wrong-password') {
-        setError('Invalid email or password');
-      } else if (err.code === 'auth/invalid-email') {
-        setError('Please enter a valid email address');
-      } else if (err.code === 'auth/too-many-requests') {
-        setError('Too many failed attempts. Please try again later.');
-      } else {
-        setError('Invalid email or password');
-      }
+      setStep('code');
+      setCode('');
+    } catch {
+      setError('Network error. Try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const verifyOtp = async (submittedCode: string) => {
+    setError('');
+    setIsLoading(true);
+    try {
+      const res = await fetch('/admin/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), code: submittedCode }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body?.success === false) {
+        setError(body?.error || 'Invalid or expired code.');
+        setCode('');
+        return;
+      }
+      router.replace('/admin/overview');
+      router.refresh();
+    } catch {
+      setError('Network error. Try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onCodeComplete = (value: string) => {
+    setCode(value);
+    if (value.length === OTP_LENGTH) void verifyOtp(value);
+  };
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <Card>
           <CardHeader className="space-y-1">
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-                <Lock className="w-6 h-6 text-primary-foreground" />
+            <div className="mb-4 flex items-center justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary">
+                <Lock className="h-6 w-6 text-primary-foreground" />
               </div>
             </div>
-            <CardTitle className="text-2xl text-center">Admin Login</CardTitle>
+            <CardTitle className="text-center text-2xl">Platform Admin</CardTitle>
             <CardDescription className="text-center">
-              Enter your credentials to access the admin dashboard
+              {step === 'email'
+                ? 'Enter your admin email to receive a one-time code'
+                : `Enter the 6-digit code sent to ${email}`}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  className="w-full"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  className="w-full"
-                />
-              </div>
-
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  'Sign In'
+            {step === 'email' ? (
+              <form onSubmit={sendOtp} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
                 )}
-              </Button>
-            </form>
+                <Button type="submit" className="w-full" disabled={isLoading || !email.trim()}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending code...
+                    </>
+                  ) : (
+                    'Send code'
+                  )}
+                </Button>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={OTP_LENGTH}
+                    value={code}
+                    onChange={onCodeComplete}
+                    disabled={isLoading}
+                  >
+                    <InputOTPGroup>
+                      {Array.from({ length: OTP_LENGTH }).map((_, i) => (
+                        <InputOTPSlot key={i} index={i} />
+                      ))}
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                {isLoading && (
+                  <div className="flex items-center justify-center text-sm text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying...
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={isLoading}
+                    onClick={() => {
+                      setStep('email');
+                      setError('');
+                      setCode('');
+                    }}
+                  >
+                    <ArrowLeft className="mr-1 h-4 w-4" />
+                    Change email
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={isLoading}
+                    onClick={() => void sendOtp(new Event('submit') as unknown as React.FormEvent)}
+                  >
+                    Resend code
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
