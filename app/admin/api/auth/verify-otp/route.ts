@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { ADMIN_COOKIE, adminCookieBaseOptions } from '@/lib/admin/authCookies';
-import { apiUrl, ApiEnvelope } from '@/lib/admin/serverApi';
+import { apiUrl, apiErrorMessage, ApiEnvelope } from '@/lib/admin/serverApi';
 import type { VerifyOtpResult } from '@/lib/admin/types';
 
 /**
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     const body = (await res.json().catch(() => ({}))) as ApiEnvelope<VerifyOtpResult>;
     if (!res.ok || !body?.data?.accessToken) {
       return NextResponse.json(
-        { success: false, error: body?.error || body?.message || 'Invalid or expired code' },
+        { success: false, error: apiErrorMessage(body, 'Invalid or expired code') },
         { status: res.status === 200 ? 401 : res.status },
       );
     }

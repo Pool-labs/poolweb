@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { apiUrl } from '@/lib/admin/serverApi';
+import { apiUrl, apiErrorMessage } from '@/lib/admin/serverApi';
 
 /**
  * POST /admin/api/auth/send-otp — proxy the admin email OTP request to the Pool
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       return NextResponse.json(
-        { success: false, error: body?.error || body?.message || 'Failed to send code' },
+        { success: false, error: apiErrorMessage(body, 'Failed to send code') },
         { status: res.status },
       );
     }
