@@ -13,6 +13,9 @@
  */
 
 import type {
+  AdminAllowlistAddResponse,
+  AdminAllowlistListResponse,
+  AdminAllowlistRemoveResponse,
   AdminActiveUsersMetrics,
   AdminEngagementMetrics,
   AdminFeatureFlagUpdateResponse,
@@ -173,6 +176,26 @@ export const poolsApi = {
   ledgerSettlements: (id: string, cursor?: string, limit?: number) =>
     request<AdminLedgerSettlementsResponse>(
       `/pools/${id}/ledger/settlements${query({ cursor, limit })}`,
+    ),
+};
+
+// ─── Admin allowlist (the "Admins" page) ─────────────────────────────────────
+// The DB-backed allowlist that controls who may log in: add an email → that
+// person can request an admin code and becomes an admin on first login; remove
+// → their access is revoked. All calls go through the same-origin proxy, which
+// injects the Bearer and forwards `allowlist/*` to `${API}/api/v1/admin/...`.
+
+export const adminsApi = {
+  list: () => request<AdminAllowlistListResponse>('/allowlist'),
+  add: (email: string) =>
+    request<AdminAllowlistAddResponse>('/allowlist', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  remove: (email: string) =>
+    request<AdminAllowlistRemoveResponse>(
+      `/allowlist/${encodeURIComponent(email)}`,
+      { method: 'DELETE' },
     ),
 };
 

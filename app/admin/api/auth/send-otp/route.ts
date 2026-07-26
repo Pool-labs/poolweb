@@ -3,8 +3,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { apiUrl } from '@/lib/admin/serverApi';
 
 /**
- * POST /admin/api/auth/send-otp — proxy the email OTP request to the Pool API
- * (server→server). No cookies are set here; step 1 of the two-step login.
+ * POST /admin/api/auth/send-otp — proxy the admin email OTP request to the Pool
+ * API (server→server). No cookies are set here; step 1 of the two-step login.
+ *
+ * Targets the GATED `/admin/auth/send-otp` endpoint (NOT the public
+ * `/auth/send-otp`), so a one-time code is only ever sent to an email on the DB
+ * admin allowlist. The gated endpoint self-gates and returns an identical
+ * neutral `{ success: true }` whether or not the email is allowlisted (no
+ * admin-email enumeration oracle) — a non-allowlisted email simply gets no code.
+ * The client UX is unchanged ("if this email is authorized, a code was sent").
  */
 export async function POST(req: NextRequest) {
   let email: string | undefined;
@@ -19,7 +26,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(apiUrl('/auth/send-otp'), {
+    const res = await fetch(apiUrl('/admin/auth/send-otp'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),

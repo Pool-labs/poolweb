@@ -65,6 +65,50 @@ export interface VerifyOtpResult {
   deviceToken: string;
 }
 
+// ─── Admin allowlist (source: admin.types.ts AdminAllowlistEntrySummary) ─────
+
+/**
+ * One admin-allowlist entry, as returned by GET /admin/allowlist. The DB-backed
+ * allowlist is the source of truth for who may become a platform admin: adding
+ * an email lets that person request an admin code and become an admin on first
+ * login; removing it revokes access.
+ *
+ * Mirrors `AdminAllowlistEntrySummary` in
+ * packages/shared/src/types/admin.types.ts (keep in sync).
+ */
+export interface AdminAllowlistEntry {
+  /** Normalized (lowercased) email. */
+  email: string;
+  /** User id of the admin who added it; null = system seed (migration). */
+  addedById: string | null;
+  /** ISO-8601 timestamp. */
+  createdAt: string;
+  /**
+   * True when a non-deleted user with this email currently holds an ACTIVE
+   * platform_admins row — i.e. the entry has materialized into an active admin
+   * (logged in), vs. invited-but-not-yet-logged-in.
+   */
+  isActiveAdmin: boolean;
+}
+
+/** GET /admin/allowlist — inner `data`. */
+export interface AdminAllowlistListResponse {
+  entries: AdminAllowlistEntry[];
+}
+
+/** POST /admin/allowlist — inner `data`. */
+export interface AdminAllowlistAddResponse {
+  entry: AdminAllowlistEntry;
+}
+
+/** DELETE /admin/allowlist/:email — inner `data`. */
+export interface AdminAllowlistRemoveResponse {
+  /** The removed (normalized) email. */
+  email: string;
+  /** True when an active platform_admins row was revoked in the same tx. */
+  revokedAdmin: boolean;
+}
+
 // ─── #80 metrics (source: admin-metrics.types.ts) ────────────────────────────
 
 export interface MetricBucket {
