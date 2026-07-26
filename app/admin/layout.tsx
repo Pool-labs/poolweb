@@ -1,46 +1,31 @@
-'use client';
+import { cookies } from 'next/headers';
 
-import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { onAuthChange, AdminUser } from '@/app/firebase/services';
-import { Loader2 } from 'lucide-react';
+import { ADMIN_COOKIE } from '@/lib/admin/authCookies';
+import { AdminNav } from '@/components/admin/AdminNav';
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<AdminUser | null>(null);
+/**
+ * Admin shell (server component).
+ *
+ * Reads the httpOnly session cookie server-side. When a session is present the
+ * page is wrapped in the admin nav chrome; otherwise (the login page — the only
+ * route middleware lets through without a cookie) children render bare.
+ *
+ * The redirect-when-unauthenticated gate lives in `middleware.ts` (loop-safe,
+ * runs before render). This layout only decides whether to paint the chrome —
+ * it never holds a token in client JS.
+ */
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies();
+  const hasSession = Boolean(cookieStore.get(ADMIN_COOKIE.accessToken)?.value);
 
-  useEffect(() => {
-    const unsubscribe = onAuthChange((admin) => {
-      setUser(admin);
-      setLoading(false);
-
-      // If not authenticated and not on login page, redirect to login
-      if (!admin && pathname !== '/admin/login') {
-        router.push('/admin/login');
-      }
-      
-      // If authenticated and on login page, redirect to dashboard
-      if (admin && pathname === '/admin/login') {
-        router.push('/admin/dashboard');
-      }
-    });
-
-    return () => unsubscribe();
-  }, [router, pathname]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+  if (!hasSession) {
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  return (
+    <div className="min-h-screen bg-background">
+      <AdminNav />
+      <main className="container mx-auto px-4 py-6">{children}</main>
+    </div>
+  );
 }

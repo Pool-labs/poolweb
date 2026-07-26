@@ -1,14 +1,6 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-
-export default function AdminPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.push('/admin/dashboard');
-  }, [router]);
-
-  return null;
+/** /admin → the platform-admin overview (middleware enforces the session gate). */
+export default function AdminIndexPage() {
+  redirect('/admin/overview');
 }
