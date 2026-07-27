@@ -38,6 +38,35 @@ import type {
   PoolFunnelReport,
   PoolStatus,
   PoolVisibility,
+  QaBroadcastBody,
+  QaCustomNotificationBody,
+  QaDepositBody,
+  QaDepositResult,
+  QaFanoutResult,
+  QaFriendAcceptBody,
+  QaFriendRequestBody,
+  QaInspectResponse,
+  QaJobRunResult,
+  QaJobsResponse,
+  QaLogExpenseBody,
+  QaNotificationPreview,
+  QaNotificationPreviewBody,
+  QaNotificationSendBody,
+  QaPoolInviteBody,
+  QaPoolStatusBody,
+  QaPoolStatusResult,
+  QaSeedDemoBody,
+  QaSeedDemoResult,
+  QaSettlementActionBody,
+  QaSettlementBody,
+  QaStatus,
+  QaSyntheticUsersBody,
+  QaSyntheticUsersResult,
+  QaWorkflowFriendRequestResult,
+  QaWorkflowMemberResult,
+  QaWorkflowOkResult,
+  QaWorkflowSettlementResult,
+  QaWorkflowTransactionResult,
   UserFeatureFlagKey,
 } from './types';
 
@@ -55,8 +84,31 @@ export class AdminApiError extends Error {
 interface Envelope<T> {
   success: boolean;
   data?: T;
-  error?: string;
+  /** The API error middleware sends an OBJECT here; the proxy sends a string. */
+  error?: string | { message?: string; statusCode?: number; requestId?: string };
   message?: string;
+}
+
+/**
+ * Pull a plain string out of whatever error shape came back.
+ *
+ * The Pool API's error middleware returns `{ error: { message, statusCode,
+ * requestId } }` (an OBJECT), while the Next proxy returns a string `error`.
+ * `AdminApiError.message` must ALWAYS be a string — rendering an object as a
+ * React child crashes the page (fixed in dea072b; this keeps it fixed for the
+ * object-shaped case too, which QA-console errors like the 409 broadcast cap
+ * and the 504 job timeout rely on).
+ *
+ * Client-side twin of `apiErrorMessage` in serverApi.ts, duplicated on purpose:
+ * serverApi is server-only and must not be pulled into a client bundle.
+ */
+function errorMessage(body: Envelope<unknown>, fallback: string): string {
+  if (typeof body.error === 'string' && body.error) return body.error;
+  if (body.error && typeof body.error === 'object' && typeof body.error.message === 'string') {
+    return body.error.message;
+  }
+  if (typeof body.message === 'string' && body.message) return body.message;
+  return fallback;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -72,7 +124,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   const body = (await res.json().catch(() => ({}))) as Envelope<T>;
   if (!res.ok || body.success === false) {
-    throw new AdminApiError(body.error || body.message || `Request failed (${res.status})`, res.status);
+    throw new AdminApiError(errorMessage(body, `Request failed (${res.status})`), res.status);
   }
   return body.data as T;
 }
@@ -197,6 +249,76 @@ export const adminsApi = {
       `/allowlist/${encodeURIComponent(email)}`,
       { method: 'DELETE' },
     ),
+};
+
+// ─── QA console, STAGING-ONLY (poolmobile #132) ──────────────────────────────
+// Every call is namespaced under `/qa/...`, which the existing catch-all proxy
+// forwards to `${API}/api/v1/admin/qa/...` — NO proxy change was needed.
+//
+// A **404 from any of these means the console is disabled server-side** (the
+// API gates it on a killswitch AND an environment assertion). Callers must
+// treat 404 as "disabled", not as "missing record".
+
+const post = <T>(path: string, body?: unknown) =>
+  request<T>(path, { method: 'POST', body: JSON.stringify(body ?? {}) });
+
+export const qaApi = {
+  /** Authoritative enabled-check. Throws AdminApiError(404) when disabled. */
+  status: () => request<QaStatus>('/qa/status'),
+
+  notifications: {
+    preview: (body: QaNotificationPreviewBody) =>
+      post<QaNotificationPreview>('/qa/notifications/preview', body),
+    send: (body: QaNotificationSendBody) => post<QaFanoutResult>('/qa/notifications/send', body),
+    custom: (body: QaCustomNotificationBody) =>
+      post<QaFanoutResult>('/qa/notifications/custom', body),
+    /** 409 when the audience exceeds the server's broadcast cap. */
+    broadcast: (body: QaBroadcastBody) => post<QaFanoutResult>('/qa/notifications/broadcast', body),
+  },
+
+  jobs: {
+    list: () => request<QaJobsResponse>('/qa/jobs'),
+    /** 504 means the job is STILL RUNNING server-side, not that it failed. */
+    run: (jobName: string) => post<QaJobRunResult>(`/qa/jobs/${encodeURIComponent(jobName)}/run`),
+  },
+
+  workflows: {
+    poolInvite: (body: QaPoolInviteBody) => post<QaWorkflowMemberResult>('/qa/workflows/pool-invite', body),
+    friendRequest: (body: QaFriendRequestBody) =>
+      post<QaWorkflowFriendRequestResult>('/qa/workflows/friend-request', body),
+    friendAccept: (body: QaFriendAcceptBody) =>
+      post<QaWorkflowOkResult>('/qa/workflows/friend-accept', body),
+    logExpense: (body: QaLogExpenseBody) =>
+      post<QaWorkflowTransactionResult>('/qa/workflows/log-expense', body),
+    /** A PENDING settlement requires `actingUserId === fromUserId` (the debtor). */
+    settlement: (body: QaSettlementBody) =>
+      post<QaWorkflowSettlementResult>('/qa/workflows/settlement', body),
+    confirmSettlement: (id: string, body: QaSettlementActionBody) =>
+      post<QaWorkflowSettlementResult>(
+        `/qa/workflows/settlement/${encodeURIComponent(id)}/confirm`,
+        body,
+      ),
+    /** 409 when the settlement was already confirmed/rejected (a race). */
+    rejectSettlement: (id: string, body: QaSettlementActionBody) =>
+      post<QaWorkflowSettlementResult>(
+        `/qa/workflows/settlement/${encodeURIComponent(id)}/reject`,
+        body,
+      ),
+  },
+
+  state: {
+    syntheticUsers: (body: QaSyntheticUsersBody) =>
+      post<QaSyntheticUsersResult>('/qa/state/synthetic-users', body),
+    deposit: (body: QaDepositBody) => post<QaDepositResult>('/qa/state/deposit', body),
+    poolStatus: (body: QaPoolStatusBody) => post<QaPoolStatusResult>('/qa/state/pool-status', body),
+    /** DESTRUCTIVE — wipes all non-admin staging data before reseeding. */
+    seedDemo: (body: QaSeedDemoBody) => post<QaSeedDemoResult>('/qa/state/seed-demo', body),
+  },
+
+  inspect: {
+    user: (userId: string) =>
+      request<QaInspectResponse>(`/qa/inspect/users/${encodeURIComponent(userId)}`),
+  },
 };
 
 /** Client-side logout: clears cookies server-side, then bounces to login. */

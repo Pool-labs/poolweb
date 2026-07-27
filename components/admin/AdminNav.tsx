@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, Users, Layers, ClipboardList, ShieldCheck, LogOut } from 'lucide-react';
+import {
+  BarChart3,
+  Users,
+  Layers,
+  ClipboardList,
+  ShieldCheck,
+  FlaskConical,
+  LogOut,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -39,9 +47,17 @@ const NAV_ITEMS = [
   { href: '/admin/dashboard', label: 'Waitlist', icon: ClipboardList },
 ] as const;
 
+/**
+ * Non-production-only entries. Hiding the link is a CONVENIENCE, never the
+ * gate: `/admin/qa` 404s server-side against a production API, and the page
+ * itself re-checks with the API (`GET /qa/status` → 404 = disabled).
+ */
+const NON_PROD_NAV_ITEMS = [{ href: '/admin/qa', label: 'QA', icon: FlaskConical }] as const;
+
 export function AdminNav({ env }: { env: ApiEnv }) {
   const pathname = usePathname();
   const badge = ENV_BADGE[env];
+  const items = env === 'production' ? NAV_ITEMS : [...NAV_ITEMS, ...NON_PROD_NAV_ITEMS];
 
   return (
     <header className="border-b bg-card">
@@ -57,7 +73,7 @@ export function AdminNav({ env }: { env: ApiEnv }) {
           >
             {badge.label}
           </span>
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+          {items.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
               <Link
