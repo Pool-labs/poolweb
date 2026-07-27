@@ -4,18 +4,12 @@ import { useCallback, useState, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AdminApiError } from '@/lib/admin/adminApi';
-import { formatDateTime, formatMoney, parseDollarsToCents } from '@/lib/admin/format';
-import type { QaFanoutResult } from '@/lib/admin/types';
+import { formatMoney, parseDollarsToCents } from '@/lib/admin/format';
+import { QA_MONEY_FREE_COPY_MESSAGE, QA_MONEY_LIKE_PATTERNS } from '@/lib/admin/types';
 
 /**
  * Shared building blocks for the staging QA console.
@@ -23,10 +17,12 @@ import type { QaFanoutResult } from '@/lib/admin/types';
  * Two jobs:
  *  1. `useQaAction` — the house `runAction(fn)` closure pattern (see
  *     app/admin/users/[id]/page.tsx) generalized into a hook, so every one of
- *     the console's ~15 triggers gets identical busy/error/result semantics.
- *  2. Drift-proof rendering — the #132 contract is provisional, so results are
- *     rendered generically (`KeyValueRows` / `JsonBlock`) rather than against
- *     field lists that a server-side rename would break.
+ *     the console's triggers gets identical busy/error/result semantics, plus
+ *     a `mapError` seam for the status codes the contract calls out (409 over
+ *     the broadcast cap, 504 job-still-running).
+ *  2. The shared result/input vocabulary — money in, ids out, and the two
+ *     guards that stand between a click and an irreversible action
+ *     (`ConfirmPhraseInput`, `checkPushCopy`).
  */
 
 // ─── Action state ─────────────────────────────────────────────────────────────
@@ -202,118 +198,95 @@ export function WarningAlert({ title, children }: { title: string; children?: Re
 }
 
 /**
- * The result of a notification fan-out. Partial success is the COMMON case, so
- * this always shows the concrete numbers and every per-recipient reason rather
- * than collapsing to a binary success/fail.
+ * The result of a notification fan-out.
+ *
+ * The API reports how many recipients `notify()` was invoked for plus the ids
+ * it acted on — there is deliberately NO per-recipient failure list, so absence
+ * from `recipientIds` is the only failure signal. When fewer ids come back than
+ * were selected, that gap is called out rather than left for the eye to spot.
  */
-export function FanoutResultAlert({ result }: { result: QaFanoutResult }) {
-  const failed = result.failed ?? [];
-  const partial = failed.length > 0;
+export function SentResultAlert({
+  sentCount,
+  recipientIds,
+  selectedCount,
+  title = 'Sent',
+}: {
+  sentCount: number;
+  recipientIds: string[];
+  /** How many the operator picked, when that is known (not for broadcast). */
+  selectedCount?: number;
+  title?: string;
+}) {
+  const ids = recipientIds ?? [];
+  const short = selectedCount !== undefined && sentCount < selectedCount;
 
   return (
     <Alert
       className={
-        partial
-          ? 'border-amber-400/60 bg-amber-400/5'
-          : 'border-emerald-500/40 bg-emerald-500/5'
+        short ? 'border-amber-400/60 bg-amber-400/5' : 'border-emerald-500/40 bg-emerald-500/5'
       }
     >
-      {partial ? (
+      {short ? (
         <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
       ) : (
         <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
       )}
       <AlertTitle className="flex flex-wrap items-center gap-2">
         <span>
-          Delivered {result.delivered} of {result.targeted}
+          {title}: {sentCount} recipient{sentCount === 1 ? '' : 's'}
         </span>
-        <Badge variant={partial ? 'secondary' : 'default'}>
-          {partial ? `${failed.length} failed` : 'All delivered'}
-        </Badge>
+        {short && <Badge variant="secondary">{selectedCount! - sentCount} not reached</Badge>}
       </AlertTitle>
-      {partial && (
-        <AlertDescription className="mt-2">
-          <ul className="space-y-1">
-            {failed.map((f) => (
-              <li key={f.userId} className="flex flex-wrap gap-2 text-xs">
-                <span className="font-mono text-muted-foreground">{f.userId}</span>
-                <span>{f.reason}</span>
-              </li>
-            ))}
-          </ul>
-        </AlertDescription>
-      )}
+      <AlertDescription className="mt-2 space-y-2">
+        {short && (
+          <p>
+            {selectedCount} were selected but only {sentCount} were notified. The API returns no
+            per-recipient reason — inspect a missing user to see why (no push token, opted out, or
+            deleted).
+          </p>
+        )}
+        {ids.length > 0 && <IdList label="Recipient ids" ids={ids} />}
+      </AlertDescription>
     </Alert>
   );
 }
 
-// ─── Drift-proof value rendering ──────────────────────────────────────────────
-
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}T/;
+/** A compact, scrollable list of ids returned by an action. */
+export function IdList({ label, ids }: { label: string; ids: string[] }) {
+  return (
+    <div>
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide">
+        {label} ({ids.length})
+      </div>
+      <ul className="max-h-40 space-y-0.5 overflow-auto rounded-md bg-muted p-2">
+        {ids.map((id) => (
+          <li key={id} className="font-mono text-xs">
+            {id}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 /**
- * Render one arbitrary value from an API payload. Money is INTEGER CENTS on the
- * wire, so any key ending in `Cents` goes through `formatMoney` — never raw.
+ * MONEY-FREE PUSH COPY — client mirror of the API's `moneyFreeCopy` refinement.
+ *
+ * Push/broadcast copy is the one free text in Pool that lands on a lock screen,
+ * so the server rejects currency symbols, decimal amounts and `@handles` with a
+ * 400. Checking here too turns that into inline feedback while typing. The
+ * SERVER check is the one that counts; this is a heuristic, never a proof.
+ *
+ * Returns an error string, or null when the copy looks acceptable.
  */
-export function formatUnknown(key: string, value: unknown): ReactNode {
-  if (value === null || value === undefined) return <span className="text-muted-foreground">—</span>;
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'number') {
-    return key.endsWith('Cents') ? formatMoney(value) : String(value);
+export function checkPushCopy(value: string, maxChars: number): string | null {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  if (trimmed.length > maxChars) return `Too long — ${trimmed.length}/${maxChars} characters`;
+  if (QA_MONEY_LIKE_PATTERNS.some((pattern) => pattern.test(trimmed))) {
+    return QA_MONEY_FREE_COPY_MESSAGE;
   }
-  if (typeof value === 'string') {
-    if (ISO_DATE.test(value)) return formatDateTime(value);
-    return value;
-  }
-  return <JsonBlock value={value} />;
-}
-
-/** Pretty-printed JSON, horizontally scrollable so it never widens the page. */
-export function JsonBlock({ value }: { value: unknown }) {
-  return (
-    <pre className="max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs leading-relaxed">
-      {JSON.stringify(value, null, 2)}
-    </pre>
-  );
-}
-
-/** Label/value rows for any record, with money + timestamp keys formatted. */
-export function KeyValueRows({ data }: { data: Record<string, unknown> }) {
-  const entries = Object.entries(data);
-  if (entries.length === 0) {
-    return <p className="text-sm text-muted-foreground">No fields</p>;
-  }
-  return (
-    <dl className="space-y-1.5 text-sm">
-      {entries.map(([key, value]) => (
-        <div key={key} className="flex flex-wrap items-start justify-between gap-3">
-          <dt className="text-muted-foreground">{key}</dt>
-          <dd className="max-w-[70%] break-words text-right font-mono text-xs">
-            {formatUnknown(key, value)}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-/** Collapsible raw payload — the escape hatch when a shape is unrecognized. */
-export function RawSection({ label, value }: { label: string; value: unknown }) {
-  return (
-    <Accordion type="single" collapsible>
-      <AccordionItem value="raw" className="border-b-0">
-        <AccordionTrigger className="py-2 text-xs text-muted-foreground">{label}</AccordionTrigger>
-        <AccordionContent>
-          <JsonBlock value={value} />
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
-  );
-}
-
-/** True when `value` is a plain object safe to feed to `KeyValueRows`. */
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  return null;
 }
 
 // ─── Typed confirmation ───────────────────────────────────────────────────────

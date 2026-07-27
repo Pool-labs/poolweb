@@ -407,288 +407,372 @@ export interface AdminLedgerSettlementsResponse {
   nextCursor: string | null;
 }
 
-// ─── QA console, STAGING-ONLY (source: poolmobile issue #132, /admin/qa/*) ────
+
+// ─── QA console, STAGING-ONLY (poolmobile #132) ───────────────────────────────
 
 /**
  * DTOs for the staging QA console.
  *
- * SOURCE OF TRUTH (poolmobile): the `/api/v1/admin/qa/*` routes + their shared
- * Zod schemas. These were written against the issue-#132 contract, so anything
- * tagged `ASSUMED` below is a guess that must be reconciled with the server.
- * Everything the console sends/receives is isolated in this block and in
- * `qaApi` (adminApi.ts) so reconciling stays a small diff.
+ * SOURCE OF TRUTH (poolmobile, mirrored at the shipped contract):
+ *   - packages/shared/src/types/qa.types.ts        (enums + every response)
+ *   - packages/shared/src/validation/qa.schema.ts  (every request body)
+ *   - packages/shared/src/constants/qa.constants.ts (limits, phrases, copy rules)
+ *   - packages/shared/src/types/pool.types.ts      (ExpenseCategory)
+ *   - packages/shared/src/validation/settlement.schema.ts (SettlementMethod)
+ *   - packages/shared/src/types/notification.types.ts (PushTokenSummary, prefs)
  *
- * The console is invisible off-staging: `GET /qa/status` returns **404 whenever
- * the console is disabled server-side**, which the client treats as "disabled".
+ * ALL PATHS ARE STATIC — ids travel in the body or the query string, never in
+ * the path. Every recipient/target array is UUIDs, min 1, max 25.
+ *
+ * The console is invisible off-staging: every route (including `/qa/status`)
+ * returns **404 whenever the console is disabled server-side**, because there
+ * is deliberately no always-mounted capability endpoint to leak that QA tools
+ * exist. The client treats any 404 as "disabled".
  */
 
-/** Max recipients per fan-out call (server-enforced; mirrored client-side). */
-export const QA_MAX_RECIPIENTS = 25;
+/** Client-side fallbacks; the live values come from `QaStatus.limits`. */
+export const QA_DEFAULT_LIMITS = {
+  maxSelectedUsers: 25,
+  maxBroadcastRecipients: 200,
+  maxSyntheticUsers: 25,
+} as const;
 
-/** Max synthetic users creatable per call. */
-export const QA_MAX_SYNTHETIC_USERS = 25;
-
-/** Server cap on a broadcast audience — over this the API answers 409. */
-export const QA_BROADCAST_CAP = 200;
-
-/** Exact phrase a broadcast body must carry (from the #132 contract). */
+/** Exact literals the operator must type (source: QA_TOOLS in qa.constants). */
 export const QA_BROADCAST_CONFIRMATION = 'SEND TO ALL STAGING USERS';
+export const QA_SEED_CONFIRMATION = 'RESEED STAGING';
+export const QA_WIPE_CONFIRMATION = 'WIPE STAGING DATA';
 
-/** ASSUMED — the #132 contract says `{ confirmation }` but not its value. */
-export const QA_SEED_DEMO_CONFIRMATION = 'WIPE AND SEED STAGING';
+/** Push copy budgets (source: PUSH_LIMITS in notification.constants). */
+export const QA_PUSH_TITLE_MAX_CHARS = 100;
+export const QA_PUSH_BODY_MAX_CHARS = 240;
 
 /**
- * ASSUMED delivery-channel wire values for the custom/broadcast notification
- * forms. The contract names a `channel` field without enumerating it.
+ * MONEY-FREE PUSH COPY — mirrors `MONEY_LIKE_PATTERNS` in qa.constants.
+ *
+ * The push/broadcast endpoints are the one place a human types free text that
+ * lands on a lock screen, so the API rejects currency symbols, decimal amounts
+ * and `@handles` with a 400. Mirrored here purely to fail EARLY with the real
+ * reason instead of a bare validation error — the server check is the one that
+ * counts, and this is a heuristic, never a proof.
  */
-export enum QaNotificationChannel {
-  Push = 'PUSH',
-  InApp = 'IN_APP',
-  Both = 'BOTH',
+export const QA_MONEY_LIKE_PATTERNS: readonly RegExp[] = [
+  /[$£€¥₹¢]/,
+  /\d[\d,]*\.\d/,
+  /@/,
+];
+
+export const QA_MONEY_FREE_COPY_MESSAGE =
+  'Push copy renders on a locked phone: no currency symbols, decimal amounts, or @handles';
+
+/** Runnable scheduled jobs (source: QaJobName). */
+export enum QaJobName {
+  PurgeAnalytics = 'purge_analytics',
+  PurgeAudit = 'purge_audit',
 }
+
+/** The four real transactional templates (source: QaNotificationTemplate). */
+export enum QaNotificationTemplate {
+  PoolInvite = 'pool_invite',
+  FriendRequest = 'friend_request',
+  FriendAccepted = 'friend_accepted',
+  ExpenseLogged = 'expense_logged',
+}
+
+/** Production workflows the console can trigger (source: QaWorkflowName). */
+export enum QaWorkflowName {
+  PoolInvite = 'pool_invite',
+  FriendRequest = 'friend_request',
+  LogExpense = 'log_expense',
+  Settlement = 'settlement',
+  ClosePool = 'close_pool',
+}
+
+/** Expense categories (source: ExpenseCategory — note the lowercase wire values). */
+export enum ExpenseCategory {
+  Dining = 'dining',
+  Groceries = 'groceries',
+  Transport = 'transport',
+  Entertainment = 'entertainment',
+  Housing = 'housing',
+  MusicEvents = 'music_events',
+  Sports = 'sports',
+  Activities = 'activities',
+  Health = 'health',
+  Shopping = 'shopping',
+  Travel = 'travel',
+  Other = 'other',
+}
+
+/** Display labels (source: CATEGORY_LABELS in categories.constants). */
+export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+  [ExpenseCategory.Dining]: 'Dining',
+  [ExpenseCategory.Groceries]: 'Groceries',
+  [ExpenseCategory.Transport]: 'Transport',
+  [ExpenseCategory.Entertainment]: 'Entertainment',
+  [ExpenseCategory.Housing]: 'Housing',
+  [ExpenseCategory.MusicEvents]: 'Music & Events',
+  [ExpenseCategory.Sports]: 'Sports',
+  [ExpenseCategory.Activities]: 'Activities',
+  [ExpenseCategory.Health]: 'Health',
+  [ExpenseCategory.Shopping]: 'Shopping',
+  [ExpenseCategory.Travel]: 'Travel',
+  [ExpenseCategory.Other]: 'Other',
+};
 
 /** GET /qa/status — inner `data`. A 404 instead means "console disabled". */
 export interface QaStatus {
+  /** Always true when this response is reachable at all. */
   enabled: boolean;
-  /** Server-reported environment, e.g. "staging". */
+  /** AppEnvironment wire value, e.g. "staging" | "local". */
   environment: string;
-  /** Runnable scheduled-job names. */
-  jobs: string[];
-  /** Notification-type keys accepted by preview/send/broadcast. */
-  notificationTypes: string[];
+  jobs: QaJobName[];
+  notificationTemplates: QaNotificationTemplate[];
+  workflows: QaWorkflowName[];
+  limits: {
+    maxSelectedUsers: number;
+    maxBroadcastRecipients: number;
+    maxSyntheticUsers: number;
+  };
 }
 
 // Notifications ---------------------------------------------------------------
 
-export interface QaNotificationPreviewBody {
-  type: string;
-  userId: string;
-  context?: Record<string, unknown>;
-}
-
-/** POST /qa/notifications/preview — inner `data`. */
-export interface QaNotificationPreview {
-  title: string;
-  body: string;
-  pushTitle: string;
-  pushBody: string;
-  /** False when the recipient has no live push token / has opted out. */
-  willPush: boolean;
-}
-
-export interface QaNotificationSendBody {
-  type: string;
-  userIds: string[];
-  context?: Record<string, unknown>;
-}
-
-export interface QaCustomNotificationBody {
-  userIds: string[];
-  title: string;
-  body: string;
-  pushTitle?: string;
-  pushBody?: string;
-  channel: QaNotificationChannel;
-}
-
-/** Either a templated type OR custom copy, plus the typed confirmation. */
-export type QaBroadcastBody = { confirmation: string } & (
-  | { type: string; context?: Record<string, unknown> }
+/**
+ * Preview and send share ONE body, discriminated on `template`, so each
+ * template demands exactly the context its builder needs — a `friend_request`
+ * body structurally cannot carry a `poolId`.
+ */
+export type QaNotificationTriggerBody =
   | {
-      title: string;
-      body: string;
-      pushTitle?: string;
-      pushBody?: string;
-      channel: QaNotificationChannel;
+      template: QaNotificationTemplate.PoolInvite;
+      recipientUserIds: string[];
+      poolId: string;
     }
-);
+  | {
+      template: QaNotificationTemplate.FriendRequest;
+      recipientUserIds: string[];
+      actorUserId: string;
+    }
+  | {
+      template: QaNotificationTemplate.FriendAccepted;
+      recipientUserIds: string[];
+      actorUserId: string;
+    }
+  | {
+      template: QaNotificationTemplate.ExpenseLogged;
+      recipientUserIds: string[];
+      actorUserId: string;
+      poolId: string;
+      /** Integer cents, passed through verbatim — the QA layer never divides. */
+      amountCents: number;
+      merchantName?: string | null;
+      transactionId?: string | null;
+    };
 
-/** One recipient a fan-out could not reach. */
-export interface QaFanoutFailure {
+/** One built payload. `pushTitle`/`pushBody` are null when the template won't push. */
+export interface QaNotificationPreview {
   userId: string;
-  reason: string;
+  type: string;
+  title: string;
+  body: string;
+  pushTitle: string | null;
+  pushBody: string | null;
+  poolId: string | null;
+  transactionId: string | null;
+  targetUserId: string | null;
+}
+
+/** POST /qa/notifications/preview — one entry per recipient. */
+export interface QaNotificationPreviewResponse {
+  template: QaNotificationTemplate;
+  previews: QaNotificationPreview[];
 }
 
 /**
- * Shared result of every notification fan-out (send / custom / broadcast).
- * Partial success is the NORMAL case — `delivered < targeted` with per-user
- * reasons in `failed` is not an error.
+ * POST /qa/notifications/send.
+ *
+ * NOTE: there is no per-recipient failure list — the API reports how many
+ * recipients `notify()` was invoked for, and which ids. Absence from
+ * `recipientIds` is the only failure signal available.
  */
-export interface QaFanoutResult {
-  targeted: number;
-  delivered: number;
-  failed: QaFanoutFailure[];
+export interface QaNotificationSendResponse {
+  template: QaNotificationTemplate;
+  sentCount: number;
+  recipientIds: string[];
+}
+
+/** POST /qa/notifications/push — arbitrary copy to explicitly selected users. */
+export interface QaPushSendBody {
+  recipientUserIds: string[];
+  title: string;
+  body: string;
+}
+
+/** POST /qa/notifications/broadcast — custom copy ONLY; no template variant. */
+export interface QaBroadcastBody {
+  title: string;
+  body: string;
+  confirmation: string;
+}
+
+/** Shared response of push + broadcast. */
+export interface QaPushSendResponse {
+  sentCount: number;
+  recipientIds: string[];
 }
 
 // Jobs ------------------------------------------------------------------------
 
-export interface QaJob {
-  name: string;
-  description: string;
-  /** ISO-8601, or null when never run. */
-  lastRunAt: string | null;
+/** POST /qa/jobs/run — the job is an ENUM MEMBER in the BODY, never a path. */
+export interface QaJobRunBody {
+  job: QaJobName;
 }
 
-/** GET /qa/jobs — inner `data`. */
-export interface QaJobsResponse {
-  jobs: QaJob[];
-}
-
-/** POST /qa/jobs/:jobName/run — inner `data`. 504 = still running server-side. */
-export interface QaJobRunResult {
-  job: string;
-  deletedCount: number;
+export interface QaJobRunResponse {
+  job: QaJobName;
+  /** Rows the real job function deleted/processed. */
+  affectedCount: number;
   durationMs: number;
 }
 
 // Workflows -------------------------------------------------------------------
 
-export interface QaPoolInviteBody {
+export interface QaWorkflowPoolInviteBody {
+  actorUserId: string;
   poolId: string;
-  actingUserId: string;
-  /** Email or username of the invitee. */
-  identifier: string;
+  inviteeUserIds: string[];
 }
 
-export interface QaFriendRequestBody {
-  requesterId: string;
-  identifier: string;
+export interface QaWorkflowFriendRequestBody {
+  actorUserId: string;
+  targetUserIds: string[];
 }
 
-export interface QaFriendAcceptBody {
-  responderId: string;
-  friendshipId: string;
-}
-
-/**
- * ASSUMED optional fields: the contract spells this `{ actingUserId, poolId,
- * amountCents, ... }`. `merchantName`/`note` mirror the ledger transaction row.
- */
-export interface QaLogExpenseBody {
-  actingUserId: string;
+export interface QaWorkflowLogExpenseBody {
+  actorUserId: string;
   poolId: string;
   amountCents: number;
-  merchantName?: string;
-  note?: string;
+  /** Required — min 1 char, max 100. */
+  merchantName: string;
+  category: ExpenseCategory;
 }
 
-export interface QaSettlementBody {
-  actingUserId: string;
+export interface QaWorkflowSettlementBody {
+  actorUserId: string;
   poolId: string;
   fromUserId: string;
   toUserId: string;
   amountCents: number;
+  method: SettlementMethod;
 }
 
-export interface QaSettlementActionBody {
-  actingUserId: string;
+export interface QaWorkflowClosePoolBody {
+  actorUserId: string;
+  poolId: string;
 }
 
-/**
- * Workflow results are echoed back as whole records whose exact field sets the
- * contract does not pin down. Only the fields the console needs are declared;
- * the rest is rendered generically, so extra/renamed fields never break a page.
- */
-export interface QaWorkflowMemberResult {
-  member: Record<string, unknown>;
-}
-
-export interface QaWorkflowFriendRequestResult {
-  friendshipId: string;
-}
-
-export interface QaWorkflowOkResult {
-  ok: boolean;
-}
-
-export interface QaWorkflowTransactionResult {
-  transaction: Record<string, unknown> & { id?: string; amountCents?: number };
-}
-
-export interface QaWorkflowSettlementResult {
-  settlement: Record<string, unknown> & {
-    id?: string;
-    status?: string;
-    amountCents?: number;
-  };
+/** Every workflow answers with the SAME shape. */
+export interface QaWorkflowResponse {
+  workflow: QaWorkflowName;
+  /** Ids the delegated production function produced (member, txn, settlement…). */
+  resultIds: string[];
 }
 
 // State setup -----------------------------------------------------------------
+
+export interface QaConfirmationBody {
+  confirmation: string;
+}
+
+/** Shared response of seed-demo AND wipe-demo. */
+export interface QaSeedResponse {
+  userCount: number;
+  poolCount: number;
+  transactionCount: number;
+  /** Accounts the wipe deliberately KEPT (platform admins + allowlisted). */
+  preservedUserCount: number;
+}
 
 export interface QaSyntheticUsersBody {
   count: number;
 }
 
-export interface QaSyntheticUser {
-  id: string;
-  email: string;
-}
-
-export interface QaSyntheticUsersResult {
-  users: QaSyntheticUser[];
-}
-
-export interface QaDepositBody {
-  poolId: string;
-  userId: string;
-  amountCents: number;
-}
-
-export interface QaDepositResult {
-  pool: Record<string, unknown> & { id?: string; balanceCents?: number };
-  deposit: Record<string, unknown> & { id?: string; amountCents?: number };
-}
-
-export interface QaPoolStatusBody {
-  poolId: string;
-  actingUserId: string;
-  status: PoolStatus;
-}
-
-export interface QaPoolStatusResult {
-  pool: Record<string, unknown> & { id?: string; status?: string };
-}
-
-export interface QaSeedDemoBody {
-  confirmation: string;
-}
-
-/** Counts may come back as a total or a per-entity breakdown — handle both. */
-export type QaSeedCounts = number | Record<string, number>;
-
-export interface QaSeedDemoResult {
-  wiped: QaSeedCounts;
-  created: QaSeedCounts;
+export interface QaSyntheticUsersResponse {
+  createdCount: number;
+  userIds: string[];
+  emails: string[];
 }
 
 // Inspect ---------------------------------------------------------------------
 
-/** A push token as returned by the console — ALREADY masked server-side. */
+/** Push-token platform (source: PushPlatform). */
+export enum QaPushPlatform {
+  Ios = 'ios',
+  Android = 'android',
+}
+
+/** A push token summary — ALREADY masked server-side; never the raw token. */
 export interface QaPushTokenSummary {
   id: string;
-  platform: string;
+  platform: QaPushPlatform;
   deviceName: string | null;
+  appVersion: string | null;
   lastUsedAt: string | null;
-  /** Null when still enabled. */
+  /** Non-null = soft-revoked. */
   disabledAt: string | null;
-  /** Truncated/masked — the full token is never sent to the client. */
+  /** A short, non-sendable suffix. */
   maskedToken: string;
 }
 
+/** Source: NotificationPreferences in notification.types.ts. */
+export interface QaNotificationPreferences {
+  /** Master switch. False = no pushes at all, whatever the category set says. */
+  pushEnabled: boolean;
+  /** Categories the user has opted OUT of. */
+  disabledCategories: string[];
+  /** True opt-in (defaults false) for proactive discovery nudges. */
+  discoveryNudgesEnabled: boolean;
+}
+
+export interface QaMembershipSummary {
+  poolId: string;
+  poolName: string;
+  role: string;
+  status: string;
+}
+
 /**
- * GET /qa/inspect/users/:userId — inner `data`.
- *
- * Every field is optional and loosely typed on purpose: this is a debugging
- * dump whose shape the API may extend, and the console renders it generically
- * (money keys ending in `Cents` are formatted, `*At` keys as timestamps).
+ * Mirrors `MyBalancesSummary` verbatim — integer cents, straight through from
+ * `computeMyBalances`. The QA layer computes nothing.
  */
-export interface QaInspectResponse {
-  user?: Record<string, unknown> | null;
-  memberships?: Array<Record<string, unknown>> | null;
-  balances?: unknown;
-  pointBalance?: number | null;
-  streak?: unknown;
-  featureFlags?: Record<string, unknown> | null;
-  notificationPreferences?: Record<string, unknown> | null;
-  pushTokens?: QaPushTokenSummary[] | null;
+export interface QaUserBalances {
+  totalOwedToYouCents: number;
+  totalYouOweCents: number;
+  netCents: number;
+  perPool: Array<{ poolId: string; poolName: string; netCents: number }>;
+}
+
+export interface QaRecentNotification {
+  id: string;
+  type: string;
+  title: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+/** GET /qa/inspect/user?userId=… — inner `data`. */
+export interface QaUserInspection {
+  userId: string;
+  email: string | null;
+  displayName: string | null;
+  username: string | null;
+  isDiscoverable: boolean;
+  deletedAt: string | null;
+  isPlatformAdmin: boolean;
+  featureFlags: Record<string, boolean>;
+  memberships: QaMembershipSummary[];
+  balances: QaUserBalances;
+  notificationPreferences: QaNotificationPreferences;
+  pushTokens: QaPushTokenSummary[];
+  recentNotifications: QaRecentNotification[];
 }

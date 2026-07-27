@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usersApi } from '@/lib/admin/adminApi';
-import { QA_MAX_RECIPIENTS, type AdminUserSummary } from '@/lib/admin/types';
+import { QA_DEFAULT_LIMITS, type AdminUserSummary } from '@/lib/admin/types';
 
 /**
  * The QA console's user picker — one component, reused by every tab.
@@ -52,7 +52,10 @@ interface UserPickerProps {
   hint?: ReactNode;
   selected: PickedUser[];
   onChange: (next: PickedUser[]) => void;
-  /** Selection cap. 1 = single-select. Defaults to the API's 25-recipient cap. */
+  /**
+   * Selection cap. 1 = single-select. Callers pass the LIVE value from
+   * `QaStatus.limits.maxSelectedUsers`; this default is only a fallback.
+   */
   max?: number;
   disabled?: boolean;
   placeholder?: string;
@@ -65,7 +68,7 @@ export function UserPicker({
   hint,
   selected,
   onChange,
-  max = QA_MAX_RECIPIENTS,
+  max = QA_DEFAULT_LIMITS.maxSelectedUsers,
   disabled,
   placeholder = 'Search by email, username, or name...',
   allowAddAll = false,

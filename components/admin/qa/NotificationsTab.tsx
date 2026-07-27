@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Megaphone, Radio, Send } from 'lucide-react';
+import { BellRing, Megaphone, Radio } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,249 +16,394 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { qaApi } from '@/lib/admin/adminApi';
+import { parseDollarsToCents } from '@/lib/admin/format';
 import {
-  QA_BROADCAST_CAP,
   QA_BROADCAST_CONFIRMATION,
-  QA_MAX_RECIPIENTS,
-  QaNotificationChannel,
-  type QaFanoutResult,
-  type QaNotificationPreview,
+  QA_PUSH_BODY_MAX_CHARS,
+  QA_PUSH_TITLE_MAX_CHARS,
+  QaNotificationTemplate,
+  type QaNotificationPreviewResponse,
+  type QaNotificationSendResponse,
+  type QaNotificationTriggerBody,
+  type QaPushSendResponse,
   type QaStatus,
 } from '@/lib/admin/types';
+import { PoolPicker, type PickedPool } from './PoolPicker';
 import { UserPicker, type PickedUser } from './UserPicker';
 import {
+  ActingUserFrame,
   BusySpinner,
   ConfirmPhraseInput,
   ErrorAlert,
-  FanoutResultAlert,
   FormField,
-  KeyValueRows,
-  SuccessAlert,
+  MoneyField,
+  SentResultAlert,
+  checkPushCopy,
   useQaAction,
 } from './primitives';
 
 /**
- * Notifications tab: fire any templated notification at chosen recipients,
- * preview the exact copy first, send arbitrary custom copy, and (loudly
- * separated) broadcast to every staging user behind a typed confirmation.
+ * Notifications tab.
+ *
+ * Two very different things live here, kept apart on purpose:
+ *  - the four REAL transactional templates, whose bodies are a discriminated
+ *    union on `template` (each demands exactly the context its builder needs),
+ *    previewable per-recipient before sending;
+ *  - arbitrary free-text push + the separate broadcast fan-out, the only place
+ *    a human types copy that renders on a lock screen — hence the money-free
+ *    copy rule, mirrored client-side so it fails while typing, not on submit.
  */
 
-const CHANNEL_LABELS: Record<QaNotificationChannel, string> = {
-  [QaNotificationChannel.Push]: 'Push only',
-  [QaNotificationChannel.InApp]: 'In-app only',
-  [QaNotificationChannel.Both]: 'Push + in-app',
+const TEMPLATE_LABELS: Record<QaNotificationTemplate, string> = {
+  [QaNotificationTemplate.PoolInvite]: 'Pool invite',
+  [QaNotificationTemplate.FriendRequest]: 'Friend request',
+  [QaNotificationTemplate.FriendAccepted]: 'Friend accepted',
+  [QaNotificationTemplate.ExpenseLogged]: 'Expense logged',
 };
 
-/** Optional JSON context blob for templated notifications. */
-function useJsonContext() {
-  const [raw, setRaw] = useState('');
-  const trimmed = raw.trim();
-  let parsed: Record<string, unknown> | undefined;
-  let error: string | null = null;
-  if (trimmed.length > 0) {
-    try {
-      const value: unknown = JSON.parse(trimmed);
-      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-        error = 'Context must be a JSON object';
-      } else {
-        parsed = value as Record<string, unknown>;
-      }
-    } catch {
-      error = 'Invalid JSON';
-    }
-  }
-  return { raw, setRaw, parsed, error };
-}
+const TEMPLATE_HINTS: Record<QaNotificationTemplate, string> = {
+  [QaNotificationTemplate.PoolInvite]: 'Needs the pool being invited to.',
+  [QaNotificationTemplate.FriendRequest]:
+    'Needs the actor whose name appears in the copy — resolved server-side, never sent as text.',
+  [QaNotificationTemplate.FriendAccepted]: 'Needs the actor who accepted.',
+  [QaNotificationTemplate.ExpenseLogged]: 'Needs the spender, the pool and the amount.',
+};
 
 export function NotificationsTab({ status }: { status: QaStatus }) {
-  const types = status.notificationTypes ?? [];
-
   return (
     <div className="space-y-6">
-      <TemplatedSection types={types} />
-      <CustomSection />
-      <BroadcastSection types={types} />
+      <TemplateSection status={status} />
+      <PushSection status={status} />
+      <BroadcastSection status={status} />
     </div>
   );
 }
 
-// ─── Templated: preview → send ────────────────────────────────────────────────
+// ─── Real templates: preview → send ───────────────────────────────────────────
 
-function TemplatedSection({ types }: { types: string[] }) {
-  const [type, setType] = useState(types[0] ?? '');
+function TemplateSection({ status }: { status: QaStatus }) {
+  const templates = status.notificationTemplates ?? [];
+  const [template, setTemplate] = useState<QaNotificationTemplate>(
+    templates[0] ?? QaNotificationTemplate.PoolInvite,
+  );
   const [recipients, setRecipients] = useState<PickedUser[]>([]);
-  const context = useJsonContext();
-  const preview = useQaAction<QaNotificationPreview>();
-  const send = useQaAction<QaFanoutResult>();
+  const [actor, setActor] = useState<PickedUser[]>([]);
+  const [pool, setPool] = useState<PickedPool | null>(null);
+  const [amount, setAmount] = useState('');
+  const [merchantName, setMerchantName] = useState('');
+  const [transactionId, setTransactionId] = useState('');
 
-  const previewTarget = recipients[0] ?? null;
-  const ready = type.trim().length > 0 && !context.error;
+  const preview = useQaAction<QaNotificationPreviewResponse>();
+  const send = useQaAction<QaNotificationSendResponse>();
+
+  const needsActor =
+    template === QaNotificationTemplate.FriendRequest ||
+    template === QaNotificationTemplate.FriendAccepted ||
+    template === QaNotificationTemplate.ExpenseLogged;
+  const needsPool =
+    template === QaNotificationTemplate.PoolInvite ||
+    template === QaNotificationTemplate.ExpenseLogged;
+  const needsAmount = template === QaNotificationTemplate.ExpenseLogged;
+
+  const cents = parseDollarsToCents(amount);
+
+  /**
+   * Build the body FROM the discriminator, so a field the chosen template does
+   * not take can never be attached — a `friend_request` body structurally
+   * cannot carry a `poolId` here, mirroring the server's discriminated union.
+   * Returns null while the required context for the chosen template is missing.
+   */
+  const buildBody = (): QaNotificationTriggerBody | null => {
+    const recipientUserIds = recipients.map((r) => r.id);
+    if (recipientUserIds.length === 0) return null;
+    const actorUserId = actor[0]?.id;
+
+    switch (template) {
+      case QaNotificationTemplate.PoolInvite:
+        return pool ? { template, recipientUserIds, poolId: pool.id } : null;
+      case QaNotificationTemplate.FriendRequest:
+      case QaNotificationTemplate.FriendAccepted:
+        return actorUserId ? { template, recipientUserIds, actorUserId } : null;
+      case QaNotificationTemplate.ExpenseLogged:
+        return actorUserId && pool && cents !== null && cents > 0
+          ? {
+              template,
+              recipientUserIds,
+              actorUserId,
+              poolId: pool.id,
+              amountCents: cents,
+              merchantName: merchantName.trim() || undefined,
+              transactionId: transactionId.trim() || undefined,
+            }
+          : null;
+      default:
+        return null;
+    }
+  };
+
+  const body = buildBody();
+  const previews = preview.result?.previews ?? [];
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Send className="h-4 w-4" />
-          Templated notification
+          <BellRing className="h-4 w-4" />
+          Transactional template
         </CardTitle>
         <CardDescription>
-          Render a real notification type against real recipients. Preview shows the exact copy the
-          device will get — including whether a push will actually fire.
+          Fires one of the four real notification templates. Preview returns the actual
+          builder&apos;s output and send hands that identical payload to the production notifier —
+          so what you see is what ships.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <FormField
-          label="Notification type"
-          htmlFor="qa-notif-type"
-          hint={
-            types.length === 0
-              ? 'The API reported no notification types; enter one manually.'
-              : undefined
-          }
-        >
-          {types.length === 0 ? (
-            <Input
-              id="qa-notif-type"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              placeholder="e.g. POOL_INVITE"
-            />
-          ) : (
-            <Select value={type} onValueChange={setType}>
-              <SelectTrigger id="qa-notif-type">
-                <SelectValue placeholder="Choose a type" />
-              </SelectTrigger>
-              <SelectContent>
-                {types.map((t) => (
+        <FormField label="Template" htmlFor="qa-template" hint={TEMPLATE_HINTS[template]}>
+          <Select
+            value={template}
+            onValueChange={(v) => {
+              setTemplate(v as QaNotificationTemplate);
+              preview.reset();
+              send.reset();
+            }}
+          >
+            <SelectTrigger id="qa-template">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(templates.length > 0 ? templates : Object.values(QaNotificationTemplate)).map(
+                (t) => (
                   <SelectItem key={t} value={t}>
-                    {t}
+                    {TEMPLATE_LABELS[t] ?? t}
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+                ),
+              )}
+            </SelectContent>
+          </Select>
         </FormField>
 
         <UserPicker
-          label="Recipients"
+          label="Recipients (who receives the notification)"
           selected={recipients}
           onChange={setRecipients}
-          max={QA_MAX_RECIPIENTS}
+          max={status.limits.maxSelectedUsers}
           allowAddAll
-          hint={
-            previewTarget
-              ? `Preview renders for the first selected recipient (${previewTarget.name}).`
-              : 'Pick at least one recipient — preview uses the first one.'
-          }
         />
 
-        <FormField
-          label="Context (optional JSON)"
-          htmlFor="qa-notif-context"
-          hint={
-            context.error ? (
-              <span className="text-destructive">{context.error}</span>
-            ) : (
-              'Template variables, e.g. {"poolName":"Ski Trip"}. Left empty when not needed.'
-            )
-          }
-        >
-          <Textarea
-            id="qa-notif-context"
-            value={context.raw}
-            onChange={(e) => context.setRaw(e.target.value)}
-            placeholder='{"poolName":"Ski Trip"}'
-            className="font-mono text-xs"
-          />
-        </FormField>
+        {needsActor && (
+          <ActingUserFrame>
+            <UserPicker
+              label="Actor (whose name appears in the copy)"
+              selected={actor}
+              onChange={setActor}
+              max={1}
+              hint="Resolved server-side from this id — the console never sends a name as text."
+            />
+          </ActingUserFrame>
+        )}
+
+        {needsPool && <PoolPicker selected={pool} onChange={setPool} />}
+
+        {needsAmount && (
+          <>
+            <MoneyField
+              id="qa-template-amount"
+              label="Amount"
+              value={amount}
+              onChange={setAmount}
+              hint="Passed to the real builder verbatim — the QA layer performs no math on it."
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Merchant (optional)" htmlFor="qa-template-merchant">
+                <Input
+                  id="qa-template-merchant"
+                  value={merchantName}
+                  onChange={(e) => setMerchantName(e.target.value)}
+                  placeholder="Trader Joe's"
+                />
+              </FormField>
+              <FormField
+                label="Transaction id (optional)"
+                htmlFor="qa-template-txn"
+                hint="Links the notification to an existing transaction."
+              >
+                <Input
+                  id="qa-template-txn"
+                  value={transactionId}
+                  onChange={(e) => setTransactionId(e.target.value)}
+                  className="font-mono text-xs"
+                />
+              </FormField>
+            </div>
+          </>
+        )}
 
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
-            disabled={!ready || !previewTarget || preview.busy}
+            disabled={!body || preview.busy}
             onClick={() => {
-              if (!previewTarget) return;
-              void preview.run(() =>
-                qaApi.notifications.preview({
-                  type,
-                  userId: previewTarget.id,
-                  context: context.parsed,
-                }),
-              );
+              if (!body) return;
+              void preview.run(() => qaApi.notifications.preview(body));
             }}
           >
             {preview.busy && <BusySpinner />}
-            Preview
+            Preview for {recipients.length} recipient{recipients.length === 1 ? '' : 's'}
           </Button>
           <Button
             type="button"
-            disabled={!ready || recipients.length === 0 || send.busy}
-            onClick={() =>
-              void send.run(() =>
-                qaApi.notifications.send({
-                  type,
-                  userIds: recipients.map((r) => r.id),
-                  context: context.parsed,
-                }),
-              )
-            }
+            disabled={!body || send.busy}
+            onClick={() => {
+              if (!body) return;
+              void send.run(() => qaApi.notifications.send(body));
+            }}
           >
             {send.busy && <BusySpinner />}
-            Send to {recipients.length} recipient{recipients.length === 1 ? '' : 's'}
+            Send
           </Button>
         </div>
 
         <ErrorAlert message={preview.error} />
-        {preview.result && (
-          <SuccessAlert title="Preview">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Badge variant={preview.result.willPush ? 'default' : 'secondary'}>
-                  {preview.result.willPush ? 'Will push' : 'No push (in-app only)'}
-                </Badge>
-              </div>
-              <KeyValueRows
-                data={{
-                  title: preview.result.title,
-                  body: preview.result.body,
-                  pushTitle: preview.result.pushTitle,
-                  pushBody: preview.result.pushBody,
-                }}
-              />
+        {previews.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-sm font-medium">
+              Preview — {previews.length} payload{previews.length === 1 ? '' : 's'}
             </div>
-          </SuccessAlert>
+            {previews.map((p) => {
+              const willPush = p.pushTitle !== null && p.pushBody !== null;
+              const name = recipients.find((r) => r.id === p.userId)?.name ?? p.userId;
+              return (
+                <div key={p.userId} className="space-y-2 rounded-md border p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-medium">{name}</span>
+                    <Badge variant={willPush ? 'default' : 'secondary'}>
+                      {willPush ? 'Will push' : 'In-app only (no push copy)'}
+                    </Badge>
+                  </div>
+                  <dl className="space-y-1 text-sm">
+                    <PreviewRow label="Title" value={p.title} />
+                    <PreviewRow label="Body" value={p.body} />
+                    <PreviewRow label="Push title" value={p.pushTitle} />
+                    <PreviewRow label="Push body" value={p.pushBody} />
+                  </dl>
+                </div>
+              );
+            })}
+          </div>
         )}
 
         <ErrorAlert message={send.error} />
-        {send.result && <FanoutResultAlert result={send.result} />}
+        {send.result && (
+          <SentResultAlert
+            title={`Sent "${send.result.template}"`}
+            sentCount={send.result.sentCount}
+            recipientIds={send.result.recipientIds}
+            selectedCount={recipients.length}
+          />
+        )}
       </CardContent>
     </Card>
   );
 }
 
-// ─── Custom free-text ─────────────────────────────────────────────────────────
+function PreviewRow({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="max-w-[75%] break-words text-right">
+        {value ?? <span className="text-muted-foreground">—</span>}
+      </dd>
+    </div>
+  );
+}
 
-function CustomSection() {
+// ─── Arbitrary push ───────────────────────────────────────────────────────────
+
+/** Title + body inputs sharing the money-free copy rule. */
+function PushCopyFields({
+  idPrefix,
+  title,
+  body,
+  onTitle,
+  onBody,
+  disabled,
+}: {
+  idPrefix: string;
+  title: string;
+  body: string;
+  onTitle: (v: string) => void;
+  onBody: (v: string) => void;
+  disabled?: boolean;
+}) {
+  const titleError = checkPushCopy(title, QA_PUSH_TITLE_MAX_CHARS);
+  const bodyError = checkPushCopy(body, QA_PUSH_BODY_MAX_CHARS);
+
+  return (
+    <>
+      <FormField
+        label="Title"
+        htmlFor={`${idPrefix}-title`}
+        hint={
+          titleError ? (
+            <span className="text-destructive">{titleError}</span>
+          ) : (
+            `${title.trim().length}/${QA_PUSH_TITLE_MAX_CHARS}`
+          )
+        }
+      >
+        <Input
+          id={`${idPrefix}-title`}
+          value={title}
+          disabled={disabled}
+          onChange={(e) => onTitle(e.target.value)}
+        />
+      </FormField>
+      <FormField
+        label="Body"
+        htmlFor={`${idPrefix}-body`}
+        hint={
+          bodyError ? (
+            <span className="text-destructive">{bodyError}</span>
+          ) : (
+            `${body.trim().length}/${QA_PUSH_BODY_MAX_CHARS}`
+          )
+        }
+      >
+        <Textarea
+          id={`${idPrefix}-body`}
+          value={body}
+          disabled={disabled}
+          onChange={(e) => onBody(e.target.value)}
+        />
+      </FormField>
+    </>
+  );
+}
+
+function PushSection({ status }: { status: QaStatus }) {
   const [recipients, setRecipients] = useState<PickedUser[]>([]);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [pushTitle, setPushTitle] = useState('');
-  const [pushBody, setPushBody] = useState('');
-  const [channel, setChannel] = useState<QaNotificationChannel>(QaNotificationChannel.Both);
-  const action = useQaAction<QaFanoutResult>();
+  const action = useQaAction<QaPushSendResponse>();
 
-  const ready = title.trim().length > 0 && body.trim().length > 0 && recipients.length > 0;
+  const copyOk =
+    title.trim().length > 0 &&
+    body.trim().length > 0 &&
+    !checkPushCopy(title, QA_PUSH_TITLE_MAX_CHARS) &&
+    !checkPushCopy(body, QA_PUSH_BODY_MAX_CHARS);
+  const ready = copyOk && recipients.length > 0;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Megaphone className="h-4 w-4" />
-          Custom notification
+          Arbitrary push
         </CardTitle>
         <CardDescription>
-          Free-text copy, no template. Push title/body fall back to the in-app copy when left blank.
+          Free-text push to the users you pick. This copy renders on a locked phone, so the API
+          rejects currency symbols, decimal amounts and @handles.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -266,72 +411,46 @@ function CustomSection() {
           label="Recipients"
           selected={recipients}
           onChange={setRecipients}
-          max={QA_MAX_RECIPIENTS}
+          max={status.limits.maxSelectedUsers}
           allowAddAll
+          disabled={action.busy}
         />
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Title" htmlFor="qa-custom-title">
-            <Input id="qa-custom-title" value={title} onChange={(e) => setTitle(e.target.value)} />
-          </FormField>
-          <FormField label="Push title (optional)" htmlFor="qa-custom-push-title">
-            <Input
-              id="qa-custom-push-title"
-              value={pushTitle}
-              onChange={(e) => setPushTitle(e.target.value)}
-            />
-          </FormField>
-        </div>
-
-        <FormField label="Body" htmlFor="qa-custom-body">
-          <Textarea id="qa-custom-body" value={body} onChange={(e) => setBody(e.target.value)} />
-        </FormField>
-
-        <FormField label="Push body (optional)" htmlFor="qa-custom-push-body">
-          <Textarea
-            id="qa-custom-push-body"
-            value={pushBody}
-            onChange={(e) => setPushBody(e.target.value)}
-          />
-        </FormField>
-
-        <FormField label="Channel" htmlFor="qa-custom-channel">
-          <Select value={channel} onValueChange={(v) => setChannel(v as QaNotificationChannel)}>
-            <SelectTrigger id="qa-custom-channel" className="sm:w-64">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.values(QaNotificationChannel).map((c) => (
-                <SelectItem key={c} value={c}>
-                  {CHANNEL_LABELS[c]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </FormField>
+        <PushCopyFields
+          idPrefix="qa-push"
+          title={title}
+          body={body}
+          onTitle={setTitle}
+          onBody={setBody}
+          disabled={action.busy}
+        />
 
         <Button
           type="button"
           disabled={!ready || action.busy}
           onClick={() =>
             void action.run(() =>
-              qaApi.notifications.custom({
-                userIds: recipients.map((r) => r.id),
+              qaApi.notifications.push({
+                recipientUserIds: recipients.map((r) => r.id),
                 title: title.trim(),
                 body: body.trim(),
-                pushTitle: pushTitle.trim() || undefined,
-                pushBody: pushBody.trim() || undefined,
-                channel,
               }),
             )
           }
         >
           {action.busy && <BusySpinner />}
-          Send custom notification
+          Push to {recipients.length} recipient{recipients.length === 1 ? '' : 's'}
         </Button>
 
         <ErrorAlert message={action.error} />
-        {action.result && <FanoutResultAlert result={action.result} />}
+        {action.result && (
+          <SentResultAlert
+            title="Pushed"
+            sentCount={action.result.sentCount}
+            recipientIds={action.result.recipientIds}
+            selectedCount={recipients.length}
+          />
+        )}
       </CardContent>
     </Card>
   );
@@ -339,32 +458,19 @@ function CustomSection() {
 
 // ─── Broadcast (guarded) ──────────────────────────────────────────────────────
 
-function BroadcastSection({ types }: { types: string[] }) {
-  const [mode, setMode] = useState<'template' | 'custom'>('template');
-  const [type, setType] = useState(types[0] ?? '');
+function BroadcastSection({ status }: { status: QaStatus }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [channel, setChannel] = useState<QaNotificationChannel>(QaNotificationChannel.Both);
   const [confirmation, setConfirmation] = useState('');
-  const action = useQaAction<QaFanoutResult>();
+  const action = useQaAction<QaPushSendResponse>();
 
+  const cap = status.limits.maxBroadcastRecipients;
   const phraseMatches = confirmation === QA_BROADCAST_CONFIRMATION;
-  const copyReady =
-    mode === 'template' ? type.trim().length > 0 : title.trim().length > 0 && body.trim().length > 0;
-
-  const submit = () =>
-    void action.run(
-      () =>
-        qaApi.notifications.broadcast(
-          mode === 'template'
-            ? { type: type.trim(), confirmation }
-            : { title: title.trim(), body: body.trim(), channel, confirmation },
-        ),
-      (err, statusCode) =>
-        statusCode === 409
-          ? `Broadcast refused — the audience is over the ${QA_BROADCAST_CAP}-user cap. (${err.message})`
-          : null,
-    );
+  const copyOk =
+    title.trim().length > 0 &&
+    body.trim().length > 0 &&
+    !checkPushCopy(title, QA_PUSH_TITLE_MAX_CHARS) &&
+    !checkPushCopy(body, QA_PUSH_BODY_MAX_CHARS);
 
   return (
     <Card className="border-destructive/50">
@@ -374,79 +480,20 @@ function BroadcastSection({ types }: { types: string[] }) {
           Broadcast to ALL staging users
         </CardTitle>
         <CardDescription>
-          Fans out to every user in the staging environment. The API refuses with a 409 if the
-          audience exceeds {QA_BROADCAST_CAP} users.
+          A separate fan-out with its own body, so a targeted push can never widen into a broadcast
+          by omitting a field. If the resolved audience exceeds {cap} users the API refuses with a
+          409 — it never silently notifies the first {cap}.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <FormField label="Copy source" htmlFor="qa-broadcast-mode">
-          <Select value={mode} onValueChange={(v) => setMode(v as 'template' | 'custom')}>
-            <SelectTrigger id="qa-broadcast-mode" className="sm:w-64">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="template">Templated type</SelectItem>
-              <SelectItem value="custom">Custom copy</SelectItem>
-            </SelectContent>
-          </Select>
-        </FormField>
-
-        {mode === 'template' ? (
-          <FormField label="Notification type" htmlFor="qa-broadcast-type">
-            {types.length === 0 ? (
-              <Input
-                id="qa-broadcast-type"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                placeholder="e.g. ANNOUNCEMENT"
-              />
-            ) : (
-              <Select value={type} onValueChange={setType}>
-                <SelectTrigger id="qa-broadcast-type">
-                  <SelectValue placeholder="Choose a type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {types.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </FormField>
-        ) : (
-          <>
-            <FormField label="Title" htmlFor="qa-broadcast-title">
-              <Input
-                id="qa-broadcast-title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </FormField>
-            <FormField label="Body" htmlFor="qa-broadcast-body">
-              <Textarea
-                id="qa-broadcast-body"
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-              />
-            </FormField>
-            <FormField label="Channel" htmlFor="qa-broadcast-channel">
-              <Select value={channel} onValueChange={(v) => setChannel(v as QaNotificationChannel)}>
-                <SelectTrigger id="qa-broadcast-channel" className="sm:w-64">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(QaNotificationChannel).map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {CHANNEL_LABELS[c]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormField>
-          </>
-        )}
+        <PushCopyFields
+          idPrefix="qa-broadcast"
+          title={title}
+          body={body}
+          onTitle={setTitle}
+          onBody={setBody}
+          disabled={action.busy}
+        />
 
         <ConfirmPhraseInput
           id="qa-broadcast-confirm"
@@ -459,10 +506,21 @@ function BroadcastSection({ types }: { types: string[] }) {
         <Button
           type="button"
           variant="destructive"
-          disabled={!phraseMatches || !copyReady || action.busy}
+          disabled={!phraseMatches || !copyOk || action.busy}
           onClick={() => {
-            if (!window.confirm('Send this notification to EVERY staging user?')) return;
-            submit();
+            if (!window.confirm('Push this to EVERY user in the staging environment?')) return;
+            void action.run(
+              () =>
+                qaApi.notifications.broadcast({
+                  title: title.trim(),
+                  body: body.trim(),
+                  confirmation,
+                }),
+              (err, statusCode) =>
+                statusCode === 409
+                  ? `Broadcast refused — the resolved audience is over the ${cap}-user cap, and the API will not truncate it. (${err.message})`
+                  : null,
+            );
           }}
         >
           {action.busy && <BusySpinner />}
@@ -470,7 +528,13 @@ function BroadcastSection({ types }: { types: string[] }) {
         </Button>
 
         <ErrorAlert message={action.error} />
-        {action.result && <FanoutResultAlert result={action.result} />}
+        {action.result && (
+          <SentResultAlert
+            title="Broadcast"
+            sentCount={action.result.sentCount}
+            recipientIds={action.result.recipientIds}
+          />
+        )}
       </CardContent>
     </Card>
   );

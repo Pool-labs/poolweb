@@ -20,10 +20,15 @@ import { WorkflowsTab } from './WorkflowsTab';
  *
  * VISIBILITY GATE — the API is the source of truth. `GET /qa/status` returns
  * **404 whenever the console is disabled server-side** (it is gated by both a
- * killswitch and an environment assertion), so a 404 is treated as "this does
- * not exist here": nothing is rendered and the browser is sent back to the
- * overview. The server-side `getApiEnv()` check in the page is only a first
- * pass; this is the authoritative one, and neither is the nav entry.
+ * killswitch and an environment allowlist, and there is deliberately no
+ * always-mounted capability endpoint that would leak "QA tools exist here but
+ * are off"). A 404 is therefore treated as "this does not exist here": nothing
+ * is rendered and the browser is sent back to the overview. The server-side
+ * `getApiEnv()` check in the page is only a first pass; this is the
+ * authoritative one, and neither is the nav entry.
+ *
+ * `status` also carries the live blast-radius limits, which are threaded into
+ * every picker instead of being hard-coded in the UI.
  */
 export function QaConsole() {
   const router = useRouter();
@@ -118,10 +123,10 @@ export function QaConsole() {
           <JobsTab status={status} />
         </TabsContent>
         <TabsContent value="workflows" className="mt-4">
-          <WorkflowsTab />
+          <WorkflowsTab status={status} />
         </TabsContent>
         <TabsContent value="state" className="mt-4">
-          <StateTab />
+          <StateTab status={status} />
         </TabsContent>
         <TabsContent value="inspect" className="mt-4">
           <InspectTab />

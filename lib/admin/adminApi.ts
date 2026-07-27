@@ -39,34 +39,25 @@ import type {
   PoolStatus,
   PoolVisibility,
   QaBroadcastBody,
-  QaCustomNotificationBody,
-  QaDepositBody,
-  QaDepositResult,
-  QaFanoutResult,
-  QaFriendAcceptBody,
-  QaFriendRequestBody,
-  QaInspectResponse,
-  QaJobRunResult,
-  QaJobsResponse,
-  QaLogExpenseBody,
-  QaNotificationPreview,
-  QaNotificationPreviewBody,
-  QaNotificationSendBody,
-  QaPoolInviteBody,
-  QaPoolStatusBody,
-  QaPoolStatusResult,
-  QaSeedDemoBody,
-  QaSeedDemoResult,
-  QaSettlementActionBody,
-  QaSettlementBody,
+  QaConfirmationBody,
+  QaJobRunBody,
+  QaJobRunResponse,
+  QaNotificationPreviewResponse,
+  QaNotificationSendResponse,
+  QaNotificationTriggerBody,
+  QaPushSendBody,
+  QaPushSendResponse,
+  QaSeedResponse,
   QaStatus,
   QaSyntheticUsersBody,
-  QaSyntheticUsersResult,
-  QaWorkflowFriendRequestResult,
-  QaWorkflowMemberResult,
-  QaWorkflowOkResult,
-  QaWorkflowSettlementResult,
-  QaWorkflowTransactionResult,
+  QaSyntheticUsersResponse,
+  QaUserInspection,
+  QaWorkflowClosePoolBody,
+  QaWorkflowFriendRequestBody,
+  QaWorkflowLogExpenseBody,
+  QaWorkflowPoolInviteBody,
+  QaWorkflowResponse,
+  QaWorkflowSettlementBody,
   UserFeatureFlagKey,
 } from './types';
 
@@ -256,8 +247,12 @@ export const adminsApi = {
 // forwards to `${API}/api/v1/admin/qa/...` — NO proxy change was needed.
 //
 // A **404 from any of these means the console is disabled server-side** (the
-// API gates it on a killswitch AND an environment assertion). Callers must
-// treat 404 as "disabled", not as "missing record".
+// API gates it on a killswitch AND an environment allowlist, and deliberately
+// exposes no always-mounted capability endpoint). Callers must treat 404 as
+// "disabled", never as "missing record".
+//
+// ALL PATHS ARE STATIC — ids travel in the body or the query string, so nothing
+// here interpolates a user-supplied value into a URL path.
 
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: 'POST', body: JSON.stringify(body ?? {}) });
@@ -267,57 +262,50 @@ export const qaApi = {
   status: () => request<QaStatus>('/qa/status'),
 
   notifications: {
-    preview: (body: QaNotificationPreviewBody) =>
-      post<QaNotificationPreview>('/qa/notifications/preview', body),
-    send: (body: QaNotificationSendBody) => post<QaFanoutResult>('/qa/notifications/send', body),
-    custom: (body: QaCustomNotificationBody) =>
-      post<QaFanoutResult>('/qa/notifications/custom', body),
-    /** 409 when the audience exceeds the server's broadcast cap. */
-    broadcast: (body: QaBroadcastBody) => post<QaFanoutResult>('/qa/notifications/broadcast', body),
+    /** Renders the real builder's output — one preview per recipient. */
+    preview: (body: QaNotificationTriggerBody) =>
+      post<QaNotificationPreviewResponse>('/qa/notifications/preview', body),
+    /** Same body as preview; hands the identical payload to `notify()`. */
+    send: (body: QaNotificationTriggerBody) =>
+      post<QaNotificationSendResponse>('/qa/notifications/send', body),
+    /** Arbitrary copy to explicitly selected users. Copy must be money-free. */
+    push: (body: QaPushSendBody) => post<QaPushSendResponse>('/qa/notifications/push', body),
+    /** 409 when the RESOLVED audience exceeds the broadcast cap (never truncated). */
+    broadcast: (body: QaBroadcastBody) =>
+      post<QaPushSendResponse>('/qa/notifications/broadcast', body),
   },
 
   jobs: {
-    list: () => request<QaJobsResponse>('/qa/jobs'),
-    /** 504 means the job is STILL RUNNING server-side, not that it failed. */
-    run: (jobName: string) => post<QaJobRunResult>(`/qa/jobs/${encodeURIComponent(jobName)}/run`),
+    /** The job is an enum member in the BODY — there is no `GET /qa/jobs`; the
+     *  runnable list comes from `GET /qa/status` → `jobs[]`. */
+    run: (body: QaJobRunBody) => post<QaJobRunResponse>('/qa/jobs/run', body),
   },
 
   workflows: {
-    poolInvite: (body: QaPoolInviteBody) => post<QaWorkflowMemberResult>('/qa/workflows/pool-invite', body),
-    friendRequest: (body: QaFriendRequestBody) =>
-      post<QaWorkflowFriendRequestResult>('/qa/workflows/friend-request', body),
-    friendAccept: (body: QaFriendAcceptBody) =>
-      post<QaWorkflowOkResult>('/qa/workflows/friend-accept', body),
-    logExpense: (body: QaLogExpenseBody) =>
-      post<QaWorkflowTransactionResult>('/qa/workflows/log-expense', body),
-    /** A PENDING settlement requires `actingUserId === fromUserId` (the debtor). */
-    settlement: (body: QaSettlementBody) =>
-      post<QaWorkflowSettlementResult>('/qa/workflows/settlement', body),
-    confirmSettlement: (id: string, body: QaSettlementActionBody) =>
-      post<QaWorkflowSettlementResult>(
-        `/qa/workflows/settlement/${encodeURIComponent(id)}/confirm`,
-        body,
-      ),
-    /** 409 when the settlement was already confirmed/rejected (a race). */
-    rejectSettlement: (id: string, body: QaSettlementActionBody) =>
-      post<QaWorkflowSettlementResult>(
-        `/qa/workflows/settlement/${encodeURIComponent(id)}/reject`,
-        body,
-      ),
+    poolInvite: (body: QaWorkflowPoolInviteBody) =>
+      post<QaWorkflowResponse>('/qa/workflows/pool-invite', body),
+    friendRequest: (body: QaWorkflowFriendRequestBody) =>
+      post<QaWorkflowResponse>('/qa/workflows/friend-request', body),
+    logExpense: (body: QaWorkflowLogExpenseBody) =>
+      post<QaWorkflowResponse>('/qa/workflows/log-expense', body),
+    settlement: (body: QaWorkflowSettlementBody) =>
+      post<QaWorkflowResponse>('/qa/workflows/settlement', body),
+    closePool: (body: QaWorkflowClosePoolBody) =>
+      post<QaWorkflowResponse>('/qa/workflows/close-pool', body),
   },
 
   state: {
     syntheticUsers: (body: QaSyntheticUsersBody) =>
-      post<QaSyntheticUsersResult>('/qa/state/synthetic-users', body),
-    deposit: (body: QaDepositBody) => post<QaDepositResult>('/qa/state/deposit', body),
-    poolStatus: (body: QaPoolStatusBody) => post<QaPoolStatusResult>('/qa/state/pool-status', body),
-    /** DESTRUCTIVE — wipes all non-admin staging data before reseeding. */
-    seedDemo: (body: QaSeedDemoBody) => post<QaSeedDemoResult>('/qa/state/seed-demo', body),
+      post<QaSyntheticUsersResponse>('/qa/state/synthetic-users', body),
+    /** DESTRUCTIVE — wipes first, then reseeds. */
+    seedDemo: (body: QaConfirmationBody) => post<QaSeedResponse>('/qa/state/seed-demo', body),
+    /** DESTRUCTIVE — wipes demo data, preserving admin/allowlisted accounts. */
+    wipeDemo: (body: QaConfirmationBody) => post<QaSeedResponse>('/qa/state/wipe-demo', body),
   },
 
   inspect: {
-    user: (userId: string) =>
-      request<QaInspectResponse>(`/qa/inspect/users/${encodeURIComponent(userId)}`),
+    /** userId travels as a QUERY param — the path is static. */
+    user: (userId: string) => request<QaUserInspection>(`/qa/inspect/user${query({ userId })}`),
   },
 };
 
