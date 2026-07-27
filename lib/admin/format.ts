@@ -14,6 +14,22 @@ export function formatMoney(cents: number): string {
   return `${negative ? '-' : ''}$${dollars}`;
 }
 
+/**
+ * Parse a dollar string ("12.34", "$1,200", "7") into INTEGER CENTS, or null
+ * when it isn't a valid non-negative amount.
+ *
+ * Deliberately string-based: `parseFloat(x) * 100` is float math and can land
+ * on 1233.9999999999998 for real inputs. Whole dollars and the fractional part
+ * are combined as integers instead, so the result is exact by construction.
+ */
+export function parseDollarsToCents(input: string): number | null {
+  const cleaned = input.trim().replace(/^\$/, '').replace(/,/g, '');
+  if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
+  const [whole, frac = ''] = cleaned.split('.');
+  const cents = Number(whole) * 100 + Number(frac.padEnd(2, '0'));
+  return Number.isSafeInteger(cents) ? cents : null;
+}
+
 /** Short date, e.g. "Jul 26, 2026". Returns "—" for null/invalid input. */
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
