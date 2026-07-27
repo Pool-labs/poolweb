@@ -35,6 +35,7 @@ import { qaApi } from '@/lib/admin/adminApi';
 import { formatMoney, humanizeEnum, parseDollarsToCents } from '@/lib/admin/format';
 import {
   PoolStatus,
+  QA_FORCE_POOL_STATUS_CONFIRMATION,
   QA_MAX_DEPOSIT_CENTS,
   QA_RESET_ACCOUNT_CONFIRMATION,
   QA_SEED_CONFIRMATION,
@@ -65,10 +66,14 @@ import {
 /**
  * State tab: manufacture the preconditions a test needs.
  *
- * Seed and wipe are SEPARATE endpoints with SEPARATE confirmation phrases, so
- * neither can be reached by a typo in the other's box. Both report
- * `preservedUserCount` — the admin/allowlisted accounts a wipe deliberately
- * keeps — which is the number that answers "did I just lock us out?".
+ * Cards are ordered by blast radius, and the four guarded ones — reset, forced
+ * status, seed, wipe — each carry a DISTINCT typed confirmation phrase, so no
+ * action can be reached by a typo in another's box. Every phrase is compared
+ * with strict equality (no trim, no case-folding), exactly as the server does.
+ *
+ * Seed and wipe both report `preservedUserCount` — the admin/allowlisted
+ * accounts deliberately kept — which is the number that answers "did I just
+ * lock us out?".
  */
 
 export function StateTab({ status }: { status: QaStatus }) {
@@ -352,9 +357,13 @@ function ResetAccountCard() {
 function ForcePoolStatusCard() {
   const [pool, setPool] = useState<PickedPool | null>(null);
   const [status, setStatus] = useState<PoolStatus>(PoolStatus.Closed);
+  const [confirmation, setConfirmation] = useState('');
   const action = useQaAction<QaPoolStatusResponse>();
 
-  const ready = Boolean(pool);
+  // Strict equality, no trim or case-folding — the server compares the same way
+  // and 400s on anything else.
+  const phraseMatches = confirmation === QA_FORCE_POOL_STATUS_CONFIRMATION;
+  const ready = Boolean(pool) && phraseMatches;
 
   return (
     <Card className="border-2 border-destructive">
@@ -368,7 +377,10 @@ function ForcePoolStatusCard() {
           runs real product code; this one writes the status column directly, so it can reach states
           the product cannot — no production function performs CLOSED → ACTIVE — and it does{' '}
           <strong>not reconcile derived state</strong>. Force a funded pool to CLOSED and its
-          balance stays put, where a real close would have zeroed it.
+          balance stays put, where a real close would have zeroed it. It deletes nothing — it is
+          destructive to <strong>truth</strong> rather than to data, which is why it is confirmed
+          like the destructive controls: the cost of a careless click is not a lost row, it is
+          hours spent chasing a bug that was never real.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -393,6 +405,14 @@ function ForcePoolStatusCard() {
           </Select>
         </FormField>
 
+        <ConfirmPhraseInput
+          id="qa-force-status-confirm"
+          phrase={QA_FORCE_POOL_STATUS_CONFIRMATION}
+          value={confirmation}
+          onChange={setConfirmation}
+          disabled={action.busy}
+        />
+
         <Button
           type="button"
           variant="destructive"
@@ -407,7 +427,7 @@ function ForcePoolStatusCard() {
               return;
             }
             void action.run(
-              () => qaApi.state.poolStatus({ poolId: pool.id, status }),
+              () => qaApi.state.poolStatus({ poolId: pool.id, status, confirmation }),
               (err, statusCode) => (statusCode === 404 ? `No such pool. (${err.message})` : null),
             );
           }}

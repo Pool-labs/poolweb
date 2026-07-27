@@ -863,12 +863,24 @@ export interface QaResetAccountResponse {
 }
 
 /**
+ * Exact literal for forcing a pool status.
+ *
+ * This control earns a typed confirmation despite deleting nothing: unlike wipe
+ * or reset it is not destructive to DATA, it is destructive to TRUTH. It
+ * manufactures states the product itself cannot produce, so a careless click
+ * costs nobody a row — it costs someone hours chasing a bug that was never
+ * real.
+ */
+export const QA_FORCE_POOL_STATUS_CONFIRMATION = 'FORCE POOL STATUS';
+
+/**
  * POST /qa/state/pool-status — note there is NO actor: this endpoint does not
  * execute as anybody, because it does not delegate to a production function.
  */
 export interface QaPoolStatusBody {
   poolId: string;
   status: PoolStatus;
+  confirmation: string;
 }
 
 /**
