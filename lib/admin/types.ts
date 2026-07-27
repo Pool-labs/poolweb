@@ -776,3 +776,118 @@ export interface QaUserInspection {
   pushTokens: QaPushTokenSummary[];
   recentNotifications: QaRecentNotification[];
 }
+
+// State setup: deposit, account reset, forced pool status ----------------------
+
+/** Exact literal for an account reset (source: QA_TOOLS.RESET_ACCOUNT_CONFIRMATION). */
+export const QA_RESET_ACCOUNT_CONFIRMATION = 'RESET THIS ACCOUNT';
+
+/**
+ * Deposit ceiling in integer cents (source: PAYMENT_LIMITS.MAX_DEPOSIT_CENTS =
+ * 10_000_00). The console deliberately gets no wider range than the app.
+ */
+export const QA_MAX_DEPOSIT_CENTS = 1_000_000;
+
+/** POST /qa/state/deposit — funds a pool via the REAL `payment.processDeposit`. */
+export interface QaDepositBody {
+  /** The depositing member; `processDeposit` enforces active membership. */
+  actorUserId: string;
+  poolId: string;
+  amountCents: number;
+}
+
+/**
+ * 201. NOTE: `cardNumber` from the underlying `DepositResult` is deliberately
+ * NOT surfaced by the API — the same reasoning that masks push tokens. Do not
+ * add a field for it.
+ */
+export interface QaDepositResponse {
+  depositId: string;
+  poolId: string;
+  userId: string;
+  amountCents: number;
+  status: string;
+  /** Server-authoritative pool balance AFTER the deposit, in integer cents. */
+  newBalanceCents: number;
+}
+
+/** One step of a composed account reset (source: QaResetStep). */
+export enum QaResetStep {
+  LeavePool = 'leave_pool',
+  DeleteAccount = 'delete_account',
+  Recreate = 'recreate',
+}
+
+export enum QaResetStepStatus {
+  Succeeded = 'succeeded',
+  /** Not applicable — e.g. `recreate` when it wasn't requested. */
+  Skipped = 'skipped',
+  /**
+   * Attempted and REFUSED by the production function. The commonest case is a
+   * pool OWNER, whom `leavePool` correctly refuses; the reset records that and
+   * moves on, and the subsequent `deleteMe` marks the membership LEFT anyway.
+   */
+  Failed = 'failed',
+}
+
+export interface QaResetStepResult {
+  step: QaResetStep;
+  status: QaResetStepStatus;
+  /** Pool id for `leave_pool`; new user id for `recreate`; else the user id. */
+  targetId: string | null;
+  /** Why it was skipped or refused. A message, never a stack trace. */
+  detail: string | null;
+}
+
+export interface QaResetAccountBody {
+  userId: string;
+  /** Mint a replacement synthetic account afterwards. Defaults to false. */
+  recreate?: boolean;
+  confirmation: string;
+}
+
+/**
+ * 200 — but **NOT ATOMIC**, which is exactly why `steps` exists. Each delegated
+ * production function opens its own transaction, so individual steps can be
+ * `failed` while the overall call succeeds. Rendering this as a flat success
+ * would be actively misleading; always show the per-step outcomes.
+ *
+ * 409 when the target is a platform admin; 404 when the user is unknown.
+ */
+export interface QaResetAccountResponse {
+  userId: string;
+  steps: QaResetStepResult[];
+  /** Non-null only when `recreate` was requested AND succeeded. */
+  replacementUserId: string | null;
+  replacementEmail: string | null;
+}
+
+/**
+ * POST /qa/state/pool-status — note there is NO actor: this endpoint does not
+ * execute as anybody, because it does not delegate to a production function.
+ */
+export interface QaPoolStatusBody {
+  poolId: string;
+  status: PoolStatus;
+}
+
+/**
+ * 200. ⚠️ THE ONE ENDPOINT THAT BYPASSES THE DELEGATE-TO-PRODUCTION-CODE RULE.
+ *
+ * No production function performs `CLOSED → ACTIVE`, so this can produce states
+ * the app itself cannot reach, and it deliberately does NOT reconcile derived
+ * state — forcing a funded pool to CLOSED leaves its balance untouched, where
+ * the real `closePool` would have zeroed it. `warning` is returned in the
+ * payload on purpose so the caveat travels with the response; render it
+ * VERBATIM and prominently.
+ *
+ * 404 when the pool is unknown.
+ */
+export interface QaPoolStatusResponse {
+  poolId: string;
+  previousStatus: string;
+  status: string;
+  /** Always true — a marker that this state was reached by fiat, not by the app. */
+  forced: true;
+  warning: string;
+}

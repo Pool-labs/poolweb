@@ -40,13 +40,19 @@ import type {
   PoolVisibility,
   QaBroadcastBody,
   QaConfirmationBody,
+  QaDepositBody,
+  QaDepositResponse,
   QaJobRunBody,
   QaJobRunResponse,
   QaNotificationPreviewResponse,
   QaNotificationSendResponse,
   QaNotificationTriggerBody,
+  QaPoolStatusBody,
+  QaPoolStatusResponse,
   QaPushSendBody,
   QaPushSendResponse,
+  QaResetAccountBody,
+  QaResetAccountResponse,
   QaSeedResponse,
   QaStatus,
   QaSyntheticUsersBody,
@@ -301,6 +307,18 @@ export const qaApi = {
     seedDemo: (body: QaConfirmationBody) => post<QaSeedResponse>('/qa/state/seed-demo', body),
     /** DESTRUCTIVE — wipes demo data, preserving admin/allowlisted accounts. */
     wipeDemo: (body: QaConfirmationBody) => post<QaSeedResponse>('/qa/state/wipe-demo', body),
+    /** 201. Funds a pool through the real `payment.processDeposit`. */
+    deposit: (body: QaDepositBody) => post<QaDepositResponse>('/qa/state/deposit', body),
+    /**
+     * DESTRUCTIVE and NOT ATOMIC — resolves 200 even when individual `steps`
+     * failed, so callers MUST render the per-step outcomes. 409 for a platform
+     * admin, 404 for an unknown user.
+     */
+    resetAccount: (body: QaResetAccountBody) =>
+      post<QaResetAccountResponse>('/qa/state/reset-account', body),
+    /** The one non-delegating endpoint — see QaPoolStatusResponse.warning. */
+    poolStatus: (body: QaPoolStatusBody) =>
+      post<QaPoolStatusResponse>('/qa/state/pool-status', body),
   },
 
   inspect: {
