@@ -33,6 +33,7 @@ Continue building your app on:
 
 The `/admin` surface is a **pure REST client of the Pool API** (issue #85) — it does not use Firebase for data.
 
+- **Environments:** a **Staging ⇄ Production toggle** in the admin nav (#112). Sessions are **per environment** — a Pool JWT is only valid for the API that issued it, so cookies are namespaced (`pool_admin_at__staging` / `__production`), you sign into each environment separately, and no token is ever reused across them. Switching to an environment you are not signed into lands on that environment's login. **PRODUCTION is visually loud** (red badge, red header rule) so staging numbers are never read as production ones.
 - **Auth:** Email-OTP + httpOnly cookies behind a Next server-side proxy. Tokens never touch client JS; browser calls stay same-origin, and the Next server calls the Pool API server-to-server. Login also verifies platform-admin status before setting any cookie (a non-admin account is rejected).
 - **Screens:** Overview (usage metrics + funnels), Users (search / suspend-restore / feature flags), Pools (search / suspend-restore / read-only ledger), Errors & Health (recent API failures + Sentry issues, with an explicit per-source "why is this empty" status). The legacy Firestore-backed waitlist dashboard/stats live under the same gate (linked as "Waitlist").
 - **Package manager:** **pnpm** (`pnpm-lock.yaml`).
@@ -40,5 +41,7 @@ The `/admin` surface is a **pure REST client of the Pool API** (issue #85) — i
 ### Environment
 
 Set `POOL_API_BASE_URL` (server-only — not `NEXT_PUBLIC_*`) to the Pool API base URL. Defaults to `https://api-staging.poolapp.co`. Copy `.env.local.example` to `.env.local` and fill in the Firebase (`NEXT_PUBLIC_FIREBASE_*`) values for the marketing site.
+
+`POOL_API_BASE_URL` now sets the **default environment** the dashboard opens on; the switcher can move to the other one at runtime with no redeploy. Staging and production have built-in base URLs, so the toggle needs no extra config — set `POOL_API_BASE_URL_STAGING` / `POOL_API_BASE_URL_PRODUCTION` only to point an environment somewhere else.
 
 On Vercel, add `POOL_API_BASE_URL` as an environment variable (Production → `https://api.poolapp.co`, Preview/staging → `https://api-staging.poolapp.co`).

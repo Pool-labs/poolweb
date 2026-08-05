@@ -344,10 +344,18 @@ export const qaApi = {
   },
 };
 
-/** Client-side logout: clears cookies server-side, then bounces to login. */
-export async function adminLogout(): Promise<void> {
+/**
+ * Client-side logout: clears cookies server-side, then bounces to login.
+ *
+ * Scoped to the SELECTED environment by default (#112) — the server reads the
+ * env cookie and ends only that session, leaving any other environment signed
+ * in. Pass `'all'` to end every environment's session at once.
+ */
+export async function adminLogout(scope: 'current' | 'all' = 'current'): Promise<void> {
   try {
-    await fetch(`${PROXY_BASE}/auth/logout`, { method: 'POST' });
+    await fetch(`${PROXY_BASE}/auth/logout${scope === 'all' ? '?scope=all' : ''}`, {
+      method: 'POST',
+    });
   } finally {
     if (typeof window !== 'undefined') window.location.href = '/admin/login';
   }

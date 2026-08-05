@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Lock, ArrowLeft } from 'lucide-react';
 
@@ -10,8 +10,17 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import { EnvSwitcher } from '@/components/admin/EnvSwitcher';
+import { cn } from '@/lib/utils';
+import { ENV_BADGE, ENV_DESCRIPTIONS, ENV_LABELS, type ApiEnv } from '@/lib/admin/adminEnv';
 
 const OTP_LENGTH = 6;
+
+interface EnvState {
+  env: ApiEnv;
+  availableEnvs: ApiEnv[];
+  authenticatedEnvs: ApiEnv[];
+}
 
 type Step = 'email' | 'code';
 
@@ -23,6 +32,15 @@ type Step = 'email' | 'code';
  * server-side before any cookie is set; a non-admin account is rejected here.
  * On success the server has set the httpOnly session cookies and we navigate to
  * the overview.
+ *
+ * ⚠️ THE ENVIRONMENT IS SHOWN AND CHANGEABLE HERE (poolmobile #112), because
+ * this screen renders OUTSIDE the admin shell and would otherwise be the one
+ * place in the dashboard that does not say which Pool environment you are
+ * talking to. Admin allowlists and OTPs are per-environment, so a code minted
+ * by staging simply will not verify against production — without this, "the
+ * code didn't work" is indistinguishable from "you are logging into the wrong
+ * environment". It is fetched from the server (`GET /admin/api/env`) rather
+ * than guessed client-side.
  */
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -31,6 +49,17 @@ export default function AdminLoginPage() {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [envState, setEnvState] = useState<EnvState | null>(null);
+
+  useEffect(() => {
+    // Best-effort: a failure here leaves the badge absent rather than blocking
+    // login. The server still routes the OTP to whichever environment its own
+    // cookie names — this display can never disagree with it, only lag it.
+    void fetch('/admin/api/env')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => setEnvState(body?.data ?? null))
+      .catch(() => setEnvState(null));
+  }, []);
 
   const sendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +125,28 @@ export default function AdminLoginPage() {
               </div>
             </div>
             <CardTitle className="text-center text-2xl">Platform Admin</CardTitle>
+            {envState && (
+              <div className="flex flex-col items-center gap-2 pb-1">
+                <span
+                  title={ENV_DESCRIPTIONS[envState.env]}
+                  className={cn(
+                    'whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold tracking-wide',
+                    ENV_BADGE[envState.env].className,
+                  )}
+                >
+                  {ENV_LABELS[envState.env]}
+                </span>
+                <p className="text-center text-xs text-muted-foreground">
+                  Signing in to the {ENV_LABELS[envState.env].toLowerCase()} environment. Admin
+                  access is granted per environment.
+                </p>
+                <EnvSwitcher
+                  env={envState.env}
+                  availableEnvs={envState.availableEnvs}
+                  authenticatedEnvs={envState.authenticatedEnvs}
+                />
+              </div>
+            )}
             <CardDescription className="text-center">
               {step === 'email'
                 ? 'Enter your admin email to receive a one-time code'
