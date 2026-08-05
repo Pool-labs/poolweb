@@ -34,6 +34,7 @@ import type {
   AdminUserDetailResponse,
   AdminUserListResponse,
   FunnelReport,
+  AdminAlertState,
   MoneyEventCountsReport,
   ObservabilityErrorsFeed,
   ObservabilityErrorsQuery,
@@ -263,6 +264,18 @@ export const adminsApi = {
 export const observabilityApi = {
   errors: (params: ObservabilityErrorsQuery = {}) =>
     request<ObservabilityErrorsFeed>(`/observability/errors${query({ ...params })}`),
+
+  /**
+   * Proactive alerting state (#190) — the persistent banner's trigger plus the
+   * per-alarm summaries and the email posture.
+   *
+   * Takes NO parameters, deliberately: the watched alarm set is a fixed
+   * reviewed list on the server and no caller input may widen it. Like every
+   * call here it rides the same-origin env-aware proxy, so it automatically
+   * reports the CURRENTLY SELECTED environment (#112) — the banner follows the
+   * toggle with no work of its own.
+   */
+  alerts: () => request<AdminAlertState>('/observability/alerts'),
 };
 
 // ─── QA console, STAGING-ONLY (poolmobile #132) ──────────────────────────────
