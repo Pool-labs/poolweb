@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { ADMIN_COOKIE, adminCookieBaseOptions } from '@/lib/admin/authCookies';
-import { apiUrl, apiErrorMessage, ApiEnvelope } from '@/lib/admin/serverApi';
+import { ADMIN_ENV_COOKIE } from '@/lib/admin/adminEnv';
+import {
+  adminCookies,
+  adminCookieBaseOptions,
+  adminEnvCookieOptions,
+} from '@/lib/admin/authCookies';
+import { apiUrl, apiErrorMessage, resolveApiEnv, ApiEnvelope } from '@/lib/admin/serverApi';
 import type { VerifyOtpResult } from '@/lib/admin/types';
 
 /**
@@ -13,6 +18,13 @@ import type { VerifyOtpResult } from '@/lib/admin/types';
  *    (`requirePlatformAdmin`) — so a 403 means "authenticated, but not an admin"
  *    and login is rejected WITHOUT setting any cookie.
  * 3. Only on 200 do we set the httpOnly session cookies (path=/admin).
+ *
+ * ⚠️ ALL THREE STEPS RUN AGAINST THE SELECTED ENVIRONMENT (#112), and the
+ * cookies written in step 3 are namespaced to it. The platform-admin gate in
+ * step 2 is therefore an assertion about THAT environment specifically: being
+ * an admin on staging grants nothing on production, and the fresh Bearer used
+ * for the gate call is the same one about to be stored, so the token can never
+ * be verified against one API and then used against another.
  */
 export async function POST(req: NextRequest) {
   let email: string | undefined;
@@ -30,10 +42,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const env = resolveApiEnv(req.cookies.get(ADMIN_ENV_COOKIE)?.value);
+
   // 1. Verify OTP.
   let tokens: VerifyOtpResult;
   try {
-    const res = await fetch(apiUrl('/auth/verify-otp'), {
+    const res = await fetch(apiUrl(env, '/auth/verify-otp'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, code }),
@@ -56,14 +70,14 @@ export async function POST(req: NextRequest) {
 
   // 2. Platform-admin gate: a cheap identity-gated call. 403 → not an admin.
   try {
-    const gateRes = await fetch(apiUrl('/admin/metrics/signups?days=1'), {
+    const gateRes = await fetch(apiUrl(env, '/admin/metrics/signups?days=1'), {
       method: 'GET',
       headers: { Authorization: `Bearer ${tokens.accessToken}` },
       cache: 'no-store',
     });
     if (gateRes.status === 403) {
       return NextResponse.json(
-        { success: false, error: 'This account is not a platform admin.' },
+        { success: false, error: `This account is not a platform admin on ${env}.` },
         { status: 403 },
       );
     }
@@ -81,9 +95,16 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Success — set httpOnly session cookies. Tokens never touch client JS.
-  const response = NextResponse.json({ success: true });
-  response.cookies.set(ADMIN_COOKIE.accessToken, tokens.accessToken, adminCookieBaseOptions);
-  response.cookies.set(ADMIN_COOKIE.refreshToken, tokens.refreshToken, adminCookieBaseOptions);
-  response.cookies.set(ADMIN_COOKIE.deviceToken, tokens.deviceToken, adminCookieBaseOptions);
+  const cookieNames = adminCookies(env);
+  const response = NextResponse.json({ success: true, env });
+  // Pin the selection alongside the session it belongs to. Until now `env` may
+  // have been an implicit default with no cookie behind it; writing it here
+  // means every later request resolves the SAME environment these tokens were
+  // issued by, rather than re-deriving it and risking a drift if the
+  // deployment's default is ever repointed underneath a live session.
+  response.cookies.set(ADMIN_ENV_COOKIE, env, adminEnvCookieOptions);
+  response.cookies.set(cookieNames.accessToken, tokens.accessToken, adminCookieBaseOptions);
+  response.cookies.set(cookieNames.refreshToken, tokens.refreshToken, adminCookieBaseOptions);
+  response.cookies.set(cookieNames.deviceToken, tokens.deviceToken, adminCookieBaseOptions);
   return response;
 }
