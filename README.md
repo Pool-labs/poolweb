@@ -34,7 +34,7 @@ Continue building your app on:
 The `/admin` surface is a **pure REST client of the Pool API** (issue #85) — it does not use Firebase for data.
 
 - **Auth:** Email-OTP + httpOnly cookies behind a Next server-side proxy. Tokens never touch client JS; browser calls stay same-origin, and the Next server calls the Pool API server-to-server. Login also verifies platform-admin status before setting any cookie (a non-admin account is rejected).
-- **Screens:** Overview (usage metrics + funnels), Users (search / suspend-restore / feature flags), Pools (search / suspend-restore / read-only ledger). The legacy Firestore-backed waitlist dashboard/stats live under the same gate (linked as "Waitlist").
+- **Screens:** Overview (usage metrics + funnels), Users (search / suspend-restore / feature flags), Pools (search / suspend-restore / read-only ledger), Errors & Health (recent API failures + Sentry issues, with an explicit per-source "why is this empty" status). The legacy Firestore-backed waitlist dashboard/stats live under the same gate (linked as "Waitlist").
 - **Package manager:** **pnpm** (`pnpm-lock.yaml`).
 
 ### Environment

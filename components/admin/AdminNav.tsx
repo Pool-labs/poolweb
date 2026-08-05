@@ -7,6 +7,7 @@ import {
   Users,
   Layers,
   ClipboardList,
+  HeartPulse,
   ShieldCheck,
   FlaskConical,
   LogOut,
@@ -43,6 +44,11 @@ const NAV_ITEMS = [
   { href: '/admin/overview', label: 'Overview', icon: BarChart3 },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/pools', label: 'Pools', icon: Layers },
+  // Errors / Health (#192) — the read surface over #116. Available in EVERY
+  // environment, unlike the QA console: knowing what is failing in production
+  // is the whole point, and the API scopes the feed to its own log group, so
+  // this page can only ever show the environment it is pointed at.
+  { href: '/admin/errors', label: 'Errors', icon: HeartPulse },
   { href: '/admin/admins', label: 'Admins', icon: ShieldCheck },
   { href: '/admin/dashboard', label: 'Waitlist', icon: ClipboardList },
 ] as const;

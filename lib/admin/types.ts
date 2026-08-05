@@ -903,3 +903,195 @@ export interface QaPoolStatusResponse {
   forced: true;
   warning: string;
 }
+
+// ─── Errors / Health, READ-ONLY (poolmobile #116, source: @pool/shared
+//     types/observability.types.ts + constants/observability-feed.constants.ts) ─
+//
+// Hand-copied DTOs for `GET /api/v1/admin/observability/errors` — the ONE
+// endpoint this surface has (see `observabilityApi` in adminApi.ts).
+//
+// ⚠️ PRIVACY / SAFETY, carried over from the #116 security review: `path`,
+// `errorMessage`, `message` and `requestId` are attacker-influenceable free
+// text. They are safe to STORE and to render as TEXT; they must never be
+// interpolated into HTML, a URL, or anything else that reinterprets them.
+// The server already applies a strict field ALLOWLIST (no raw log line, no
+// bodies, no headers, no stack traces) — do not widen these interfaces to
+// match "whatever the API happens to send".
+
+/** pino numeric levels — the values written into every structured log line. */
+export enum PinoLevel {
+  Trace = 10,
+  Debug = 20,
+  Info = 30,
+  Warn = 40,
+  Error = 50,
+  Fatal = 60,
+}
+
+/**
+ * Which axis of failures the feed returns.
+ *
+ * `Errors` is the pino level axis, `Requests` is the access-log status axis (a
+ * 4xx/5xx is logged at INFO, so it is NOT reachable via the level filter), and
+ * `Signals` is the third axis: named WARN lines deliberately BELOW the error
+ * threshold and therefore invisible to both of the others. `All` is their
+ * union — the only view in which every failure mode is visible at once, and
+ * the right default for a health tab.
+ */
+export enum ObservabilityFeedKind {
+  All = 'all',
+  Errors = 'errors',
+  Requests = 'requests',
+  Signals = 'signals',
+}
+
+/**
+ * What a log line MEANS, not just how loud it was.
+ *
+ * Three of these are WARN-level by design and so trip no alarm:
+ * `TransactionContention` (Prisma P2028 → settlement-lock tuning) and
+ * `ConnectionPoolTimeout` (P2024 → pool sizing) are split because their
+ * REMEDIATIONS differ; `NotificationFailure` is the ONLY signal that a
+ * systemic post-commit notification outage exists at all (every such failure
+ * is swallowed and returns 200 to the caller).
+ *
+ * Classification is mutually exclusive and precedence-ordered server-side.
+ */
+export enum ObservabilitySignal {
+  TransactionContention = 'transaction_contention',
+  ConnectionPoolTimeout = 'connection_pool_timeout',
+  NotificationFailure = 'notification_failure',
+  Error = 'error',
+  FailedRequest = 'failed_request',
+  Other = 'other',
+}
+
+/**
+ * Per-source availability. Both sources FAIL OPEN — the endpoint never 500s
+ * because one of them is down; the status carries the bad news instead.
+ *
+ * ⚠️ This is the whole reason the tab can be honest: an empty panel is only
+ * "nothing is wrong" when the status is `Ok`. Every other value means the
+ * panel is empty because nobody looked.
+ */
+export enum ObservabilitySourceStatus {
+  /** Queried successfully — an empty result genuinely means "no failures". */
+  Ok = 'ok',
+  /** Deliberately switched off (e.g. `SENTRY_ENABLED=false`). */
+  Disabled = 'disabled',
+  /** Never wired up — no log-group name / no API token. Not an incident. */
+  Unconfigured = 'unconfigured',
+  /** Configured but the call failed (IAM denial, timeout, upstream 5xx). */
+  Unavailable = 'unavailable',
+}
+
+/**
+ * One structured failure line. ALLOWLISTED server-side — notably ABSENT: the
+ * raw log line, request/response bodies, headers and stack traces (stacks
+ * belong in Sentry, which symbolicates them). `userId` is an opaque id.
+ */
+export interface ObservabilityLogEntry {
+  /** ISO-8601 UTC, sourced from the CloudWatch event (not the log body). */
+  timestamp: string;
+  level: number;
+  /** Human label for `level` — the UI needs no numeric map of its own. */
+  levelLabel: string;
+  /** Free text. Render as TEXT only. */
+  message: string | null;
+  /** The correlation key — traces one request across logs, audit and Sentry. */
+  requestId: string | null;
+  method: string | null;
+  /** Free text. Render as TEXT only — never as an href. */
+  path: string | null;
+  status: number | null;
+  durationMs: number | null;
+  userId: string | null;
+  /** Never null. */
+  signal: ObservabilitySignal;
+  /** Fixed vocabulary (an ApiErrorCode, or a Prisma `P2028`/`P2024`). */
+  errorCode: string | null;
+  errorType: string | null;
+  /** Free text. Render as TEXT only. */
+  errorMessage: string | null;
+  /** CloudWatch log stream — identifies WHICH task emitted the line. */
+  logStream: string | null;
+}
+
+/** Counts over the returned page — no client-side aggregation required. */
+export interface ObservabilityFeedSummary {
+  errorCount: number;
+  failedRequestCount: number;
+  /** `status` → count, e.g. `{ "404": 12, "500": 3 }`. */
+  byStatus: Record<string, number>;
+  /** `levelLabel` → count. */
+  byLevel: Record<string, number>;
+  /**
+   * `ObservabilitySignal` → count — the series this tab CHARTS. EVERY key is
+   * present (zeros included), so a series never vanishes between refreshes and
+   * a signal dropping to zero reads as "recovered", not "disappeared". Do not
+   * filter zero-valued keys out of the chart.
+   */
+  bySignal: Record<ObservabilitySignal, number>;
+}
+
+/** One grouped Sentry issue — the dedup/trend view raw logs cannot give. */
+export interface ObservabilitySentryIssue {
+  id: string;
+  shortId: string;
+  title: string;
+  culprit: string | null;
+  level: string | null;
+  count: number;
+  userCount: number;
+  firstSeen: string | null;
+  lastSeen: string | null;
+  /** Deep link into the Sentry UI. Validate before using as an href. */
+  permalink: string | null;
+}
+
+export interface ObservabilitySentrySummary {
+  issues: ObservabilitySentryIssue[];
+  /** The Sentry query these issues answer, echoed so the heading can't drift. */
+  query: string;
+}
+
+/** Where the CloudWatch half came from, so the tab can PROVE which env it read. */
+export interface ObservabilityLogSource {
+  /** The log group actually queried, or null when unconfigured. */
+  logGroup: string | null;
+  /** The API's own `observedEnvironment` — matches the nav's env badge. */
+  environment: string;
+}
+
+export interface ObservabilityErrorsFeed {
+  window: { hours: number; since: string; until: string };
+  source: ObservabilityLogSource;
+  logs: {
+    status: ObservabilitySourceStatus;
+    /** Strictly most-recent-first. */
+    entries: ObservabilityLogEntry[];
+    /** True when the window held more lines than `limit` — narrow the filters. */
+    truncated: boolean;
+    summary: ObservabilityFeedSummary;
+  };
+  sentry: {
+    status: ObservabilitySourceStatus;
+    /**
+     * Link out to the Sentry issue stream. Present whenever the ORG SLUG is
+     * configured — INCLUDING when the API token is not — so an unwired token
+     * degrades to "open Sentry", never to a dead panel.
+     */
+    issuesUrl: string | null;
+    /** null whenever `status !== Ok` — fail-open, never an error response. */
+    summary: ObservabilitySentrySummary | null;
+  };
+}
+
+/** Query contract for the feed (mirrors `observabilityErrorsQuerySchema`). */
+export interface ObservabilityErrorsQuery {
+  hours?: number;
+  kind?: ObservabilityFeedKind;
+  minLevel?: PinoLevel;
+  minStatus?: number;
+  limit?: number;
+}
