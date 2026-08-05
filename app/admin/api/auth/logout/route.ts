@@ -1,18 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { ADMIN_COOKIE, ADMIN_COOKIE_PATH } from '@/lib/admin/authCookies';
-import { apiUrl } from '@/lib/admin/serverApi';
+import { ADMIN_ENV_COOKIE, API_ENVS } from '@/lib/admin/adminEnv';
+import {
+  adminCookies,
+  expiredCookieOptions,
+  LEGACY_ADMIN_COOKIES,
+} from '@/lib/admin/authCookies';
+import { apiUrl, resolveApiEnv } from '@/lib/admin/serverApi';
 
 /**
  * POST /admin/api/auth/logout — best-effort revoke the trusted device token on
- * the API, then clear all admin session cookies regardless of the API result.
+ * the API, then clear the admin session cookies regardless of the API result.
+ *
+ * ⚠️ SCOPED TO THE SELECTED ENVIRONMENT (#112). Signing out of staging leaves a
+ * production session untouched and vice versa — sessions are separate, so
+ * ending them is separate too. `?scope=all` ends every environment's session at
+ * once, which is what the nav's "Sign out everywhere" offers.
+ *
+ * The pre-#112 UNSCOPED cookies are cleared on every logout regardless of
+ * scope: they can never be adopted into an environment (see
+ * `LEGACY_ADMIN_COOKIES`), so sweeping them up is pure cleanup.
  */
 export async function POST(req: NextRequest) {
-  const deviceToken = req.cookies.get(ADMIN_COOKIE.deviceToken)?.value;
+  const env = resolveApiEnv(req.cookies.get(ADMIN_ENV_COOKIE)?.value);
+  const all = req.nextUrl.searchParams.get('scope') === 'all';
+  const cookieNames = adminCookies(env);
+  const deviceToken = req.cookies.get(cookieNames.deviceToken)?.value;
 
   if (deviceToken) {
     try {
-      await fetch(apiUrl('/auth/revoke-device'), {
+      await fetch(apiUrl(env, '/auth/revoke-device'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceToken }),
@@ -23,9 +40,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const response = NextResponse.json({ success: true });
-  for (const name of Object.values(ADMIN_COOKIE)) {
-    response.cookies.set(name, '', { path: ADMIN_COOKIE_PATH, maxAge: 0 });
+  const response = NextResponse.json({ success: true, env, scope: all ? 'all' : env });
+
+  const doomed = all
+    ? API_ENVS.flatMap((e) => Object.values(adminCookies(e)))
+    : Object.values(cookieNames);
+
+  for (const name of [...doomed, ...LEGACY_ADMIN_COOKIES]) {
+    response.cookies.set(name, '', expiredCookieOptions);
   }
   return response;
 }

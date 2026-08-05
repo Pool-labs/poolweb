@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { apiUrl, apiErrorMessage } from '@/lib/admin/serverApi';
+import { ADMIN_ENV_COOKIE } from '@/lib/admin/adminEnv';
+import { apiUrl, apiErrorMessage, resolveApiEnv } from '@/lib/admin/serverApi';
 
 /**
  * POST /admin/api/auth/send-otp — proxy the admin email OTP request to the Pool
@@ -12,6 +13,10 @@ import { apiUrl, apiErrorMessage } from '@/lib/admin/serverApi';
  * neutral `{ success: true }` whether or not the email is allowlisted (no
  * admin-email enumeration oracle) — a non-allowlisted email simply gets no code.
  * The client UX is unchanged ("if this email is authorized, a code was sent").
+ *
+ * ⚠️ Sent to the SELECTED environment's API (#112). Admin allowlists are
+ * per-environment, so a code that works on staging is not a code that works on
+ * production — the OTP is minted by, and only valid against, one of them.
  */
 export async function POST(req: NextRequest) {
   let email: string | undefined;
@@ -25,8 +30,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
   }
 
+  const env = resolveApiEnv(req.cookies.get(ADMIN_ENV_COOKIE)?.value);
+
   try {
-    const res = await fetch(apiUrl('/admin/auth/send-otp'), {
+    const res = await fetch(apiUrl(env, '/admin/auth/send-otp'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
