@@ -35,6 +35,8 @@ import type {
   AdminUserListResponse,
   FunnelReport,
   MoneyEventCountsReport,
+  ObservabilityErrorsFeed,
+  ObservabilityErrorsQuery,
   PoolFunnelReport,
   PoolStatus,
   PoolVisibility,
@@ -246,6 +248,21 @@ export const adminsApi = {
       `/allowlist/${encodeURIComponent(email)}`,
       { method: 'DELETE' },
     ),
+};
+
+// ─── Errors / Health (#116) ──────────────────────────────────────────────────
+// READ-ONLY. ONE endpoint — `GET /admin/observability/errors` — which returns
+// BOTH sources (CloudWatch + Sentry) in a single fail-open payload; there is
+// deliberately no separate `/summary` or `/sentry` route to call.
+//
+// The path is static, and every bound is re-validated server-side by Zod, so an
+// out-of-range filter degrades to a 400 rather than an unbounded log scan. The
+// endpoint is identity-gated (JWT + platform-admin) like every #80–#83 call, so
+// the proxy's Bearer injection is all that is needed here.
+
+export const observabilityApi = {
+  errors: (params: ObservabilityErrorsQuery = {}) =>
+    request<ObservabilityErrorsFeed>(`/observability/errors${query({ ...params })}`),
 };
 
 // ─── QA console, STAGING-ONLY (poolmobile #132) ──────────────────────────────
