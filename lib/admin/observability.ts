@@ -12,7 +12,14 @@
  * a panel that renders nothing must always be able to say why.
  */
 
-import { ObservabilityFeedKind, ObservabilitySignal, ObservabilitySourceStatus, PinoLevel } from './types';
+import {
+  AdminAlarmState,
+  AdminAlertEmailStatus,
+  ObservabilityFeedKind,
+  ObservabilitySignal,
+  ObservabilitySourceStatus,
+  PinoLevel,
+} from './types';
 
 /** Mirror of `OBSERVABILITY_FEED` — only the fields the UI actually needs. */
 export const OBSERVABILITY_FEED = {
@@ -211,3 +218,129 @@ export function formatLogTime(iso: string): string {
     hour12: false,
   });
 }
+
+// ─── Proactive admin alerting (#190) ─────────────────────────────────────────
+
+/**
+ * Per-alarm-state presentation.
+ *
+ * ⚠️ `Unknown` is styled as a WARNING, not as a neutral or positive state. The
+ * server's own type doc calls rendering it as healthy "the single most
+ * misleading thing this surface could do" — an alarm missing from
+ * `DescribeAlarms` means nothing is watching that failure mode, which on
+ * production (whose Terraform has not been applied since #53) is a live
+ * possibility rather than a theoretical one.
+ *
+ * `InsufficientData` is also not OK: a brand-new alarm with no datapoints yet
+ * looks identical to one whose metric has stopped being published.
+ */
+export const ALARM_STATE_COPY: Readonly<
+  Record<AdminAlarmState, { label: string; detail: string; tone: 'ok' | 'warning' | 'danger' }>
+> = {
+  [AdminAlarmState.Ok]: {
+    label: 'OK',
+    detail: 'Reporting, and below its threshold.',
+    tone: 'ok',
+  },
+  [AdminAlarmState.Alarm]: {
+    label: 'IN ALARM',
+    detail: 'Over threshold right now.',
+    tone: 'danger',
+  },
+  [AdminAlarmState.InsufficientData]: {
+    label: 'No data',
+    detail:
+      'The alarm exists but has not had enough datapoints to judge. Normal for a newly created alarm; otherwise the metric may have stopped being published.',
+    tone: 'warning',
+  },
+  [AdminAlarmState.Unknown]: {
+    label: 'Not reporting',
+    detail:
+      'CloudWatch did not return this alarm at all, so nothing is watching this failure mode. It has most likely not been created in this environment yet (production Terraform is pending #53). This is NOT the same as healthy.',
+    tone: 'warning',
+  },
+};
+
+/** Render order: the loudest states first, then the fixed key order. */
+export const ALARM_STATE_SEVERITY: Readonly<Record<AdminAlarmState, number>> = {
+  [AdminAlarmState.Alarm]: 0,
+  [AdminAlarmState.Unknown]: 1,
+  [AdminAlarmState.InsufficientData]: 2,
+  [AdminAlarmState.Ok]: 3,
+};
+
+/**
+ * Why the inbox is quiet.
+ *
+ * Every non-`Sending` status is a reason no email will arrive, and each is
+ * shown verbatim so a founder never has to guess whether alerting is broken or
+ * merely not armed yet. `EnvironmentNotEligible` is the NORMAL, PERMANENT state
+ * on staging — it must not read as a fault.
+ */
+export const ALERT_EMAIL_STATUS_COPY: Readonly<
+  Record<
+    AdminAlertEmailStatus,
+    { label: string; detail: string; tone: 'ok' | 'warning' | 'neutral' }
+  >
+> = {
+  [AdminAlertEmailStatus.Sending]: {
+    label: 'Armed',
+    detail:
+      'A new ALARM transition will email every active platform admin. One message per recipient, at most one per alarm state change.',
+    tone: 'ok',
+  },
+  [AdminAlertEmailStatus.EnvironmentNotEligible]: {
+    label: 'Not eligible',
+    detail:
+      'This deployment is not on the alert-email allowlist, so it cannot email admins whatever the killswitch is set to. On staging this is the normal, permanent state — the banner above still shows live alarm state.',
+    tone: 'neutral',
+  },
+  [AdminAlertEmailStatus.KillswitchOff]: {
+    label: 'Killswitch off',
+    detail:
+      'The environment is eligible but ADMIN_ALERTS_ENABLED is not true, so no alert email will be sent. On production this is the one switch that arms alerting.',
+    tone: 'warning',
+  },
+  [AdminAlertEmailStatus.EmailSuppressed]: {
+    label: 'Email suppressed',
+    detail:
+      'This environment suppresses ALL outbound email, so alerts cannot leave it even though alerting is otherwise armed.',
+    tone: 'warning',
+  },
+};
+
+/** The environment-level read status, phrased for the alerting surface. */
+export const ALERT_SOURCE_COPY: Readonly<
+  Record<ObservabilitySourceStatus, { detail: string; trustworthy: boolean }>
+> = {
+  [ObservabilitySourceStatus.Ok]: {
+    detail: 'CloudWatch alarm state was read successfully.',
+    trustworthy: true,
+  },
+  [ObservabilitySourceStatus.Disabled]: {
+    detail:
+      'Alarm-state reading is switched off for this environment. Nothing below reflects live alarm state.',
+    trustworthy: false,
+  },
+  [ObservabilitySourceStatus.Unconfigured]: {
+    detail:
+      'No alarm prefix is wired for this environment (Terraform supplies it), so alarm state has never been read. Nothing below says whether anything is on fire.',
+    trustworthy: false,
+  },
+  [ObservabilitySourceStatus.Unavailable]: {
+    detail:
+      'Alarm state could not be read (IAM denial, timeout or an AWS error). Alarms may be firing that are not shown here — check the CloudWatch console directly.',
+    trustworthy: false,
+  },
+};
+
+/**
+ * How often the persistent banner re-reads alert state.
+ *
+ * 60 seconds is a deliberate middle. The alarms themselves evaluate on a
+ * 5-minute period and the email dispatcher runs `rate(5 minutes)`, so polling
+ * faster than this cannot make the DATA fresher — it only burns requests. Much
+ * slower and the banner stops being the thing that tells a founder first, which
+ * is its entire job.
+ */
+export const ALERT_POLL_INTERVAL_MS = 60_000;

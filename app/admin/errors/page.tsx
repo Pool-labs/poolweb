@@ -19,6 +19,13 @@
  * Read-only surface: it performs no writes and the API deliberately does not
  * audit these reads (the #80/#81 convention — aggregate ops data, no money and
  * no message content).
+ *
+ * `AlertsPanel` (#190) sits at the top, ABOVE the filters: alarm state answers
+ * "is something on fire right now", which is the question you arrive with, and
+ * unlike everything below it is not scoped by the feed's window/kind filters —
+ * it is live state, not a query result. It also polls on its own interval
+ * rather than joining this page's manual Refresh, because the layout-level
+ * banner does too and the two must not be able to disagree.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -29,6 +36,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SeriesBarChart, type ChartPoint } from '@/components/ui/chart';
+import { AlertsPanel } from '@/components/admin/observability/AlertsPanel';
 import { LogFeedTable } from '@/components/admin/observability/LogFeedTable';
 import { SentryPanel } from '@/components/admin/observability/SentryPanel';
 import {
@@ -127,6 +135,12 @@ export default function AdminErrorsPage() {
           Refresh
         </Button>
       </div>
+
+      {/* Live alarm + email posture (#190). Above the filters deliberately: it
+          answers "is something on fire right now", which is the question you
+          arrive with, and unlike everything below it is live state rather than
+          a query result — none of these filters apply to it. */}
+      <AlertsPanel />
 
       {/* Filters — one row above the charts, mirroring the API's query bounds. */}
       <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">

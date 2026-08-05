@@ -1095,3 +1095,120 @@ export interface ObservabilityErrorsQuery {
   minStatus?: number;
   limit?: number;
 }
+
+// ─── Proactive admin alerting, READ-ONLY (poolmobile #190, source:
+//     @pool/shared types/admin-alerts.types.ts) ───────────────────────────────
+//
+// `GET /api/v1/admin/observability/alerts` — identity-gated, NO query
+// parameters (the watched alarm set is a fixed reviewed list and no caller
+// input may widen it), and the state the dashboard's prod-critical BANNER
+// renders.
+//
+// #116 shipped the observability read surfaces and everything still terminated
+// at a CloudWatch alarm in a console nobody was watching. #190 added the email
+// dispatcher and this shape, both reading the SAME `describeCriticalAlarms`
+// core — so the banner and the inbox can never disagree about what is on fire.
+
+/** The production-critical alarms this surface watches, keyed by MEANING. */
+export enum AdminAlertKey {
+  ServerErrorRate = 'server_error_rate',
+  NotificationFailureRate = 'notification_failure_rate',
+  BalanceDrift = 'balance_drift',
+}
+
+/** CloudWatch's alarm states, plus the one CloudWatch cannot report. */
+export enum AdminAlarmState {
+  Ok = 'ok',
+  Alarm = 'alarm',
+  InsufficientData = 'insufficient_data',
+  /**
+   * ⚠️ NOT a synonym for OK, and the distinction is load-bearing.
+   *
+   * The alarm was not returned by `DescribeAlarms` at all — production's
+   * Terraform has not been applied since the #53 drift, so an alarm this code
+   * knows about may genuinely not exist there yet. Rendering it as "healthy"
+   * would be the single most misleading thing this surface could do, so the UI
+   * renders it as NOT REPORTING (the #116 `ObservabilitySourceStatus`
+   * convention applied one level down).
+   */
+  Unknown = 'unknown',
+}
+
+/**
+ * Why alert email is or is not leaving this environment.
+ *
+ * Mutually exclusive, and precedence is STRUCTURAL-FIRST server-side: the
+ * environment allowlist is evaluated before the killswitch, so
+ * `ADMIN_ALERTS_ENABLED=true` on staging reports `EnvironmentNotEligible` and
+ * never `Sending`. A dashboard that says "no emails are being sent" must always
+ * be able to say WHY, so nobody reads a quiet inbox as "nothing is wrong".
+ */
+export enum AdminAlertEmailStatus {
+  /** Fully armed: a new ALARM transition will email every active admin. */
+  Sending = 'sending',
+  /** Not on the alert-email allowlist. The gate staging can never argue with. */
+  EnvironmentNotEligible = 'environment_not_eligible',
+  /** Eligible environment, but `ADMIN_ALERTS_ENABLED` is not `true`. */
+  KillswitchOff = 'killswitch_off',
+  /** The environment suppresses ALL outbound email (#133 `sendsRealEmail`). */
+  EmailSuppressed = 'email_suppressed',
+}
+
+/** One watched alarm's current state. */
+export interface AdminAlertSummary {
+  key: AdminAlertKey;
+  /** The resolved CloudWatch alarm name, so an admin can find it in the console. */
+  name: string;
+  /**
+   * Frozen human label — the SERVER's copy, never CloudWatch's, and the reason
+   * this dashboard carries no alarm map of its own. A new watched alarm appears
+   * here correctly labelled with no web deploy.
+   */
+  label: string;
+  /** Frozen one-line explanation of what firing means — the server's copy. */
+  description: string;
+  state: AdminAlarmState;
+  stateUpdatedAt: string | null;
+  /**
+   * CloudWatch's own reason string, truncated server-side.
+   *
+   * Safe by construction — generated from metric math ("1 datapoint [12.0] was
+   * greater than the threshold (10.0)"), so it carries counts, never user data.
+   * It exists ONLY in this payload, behind the #79 identity gate: the alert
+   * EMAIL deliberately carries no upstream text at all. Render it as TEXT.
+   */
+  stateReason: string | null;
+  lastNotifiedAt: string | null;
+}
+
+/** The email half's current posture, so the banner can explain itself. */
+export interface AdminAlertEmailDelivery {
+  status: AdminAlertEmailStatus;
+  /** Convenience mirror of `status === Sending`. */
+  enabled: boolean;
+  /**
+   * How many ACTIVE platform admins would be emailed right now — derived from
+   * `platform_admins` at read time, never a configured list. ZERO IS WORTH
+   * SURFACING even when armed: an alerter with no recipients is silently
+   * useless, which is the failure mode nobody notices until an incident.
+   */
+  recipientCount: number;
+}
+
+export interface AdminAlertState {
+  /** `config.observedEnvironment` — matches the dashboard's env badge. */
+  environment: string;
+  /**
+   * Whether the CloudWatch read succeeded at all. `Unconfigured` = no alarm
+   * prefix wired (Terraform supplies it); `Unavailable` = the call failed.
+   * Fail-open both ways — the endpoint never 500s (#116). Neither licenses
+   * rendering "all clear".
+   */
+  status: ObservabilitySourceStatus;
+  /** The `pool-<env>` prefix the alarm names were built from, if configured. */
+  alarmPrefix: string | null;
+  /** How many watched alarms are in ALARM right now — the banner's trigger. */
+  criticalCount: number;
+  alarms: AdminAlertSummary[];
+  email: AdminAlertEmailDelivery;
+}
