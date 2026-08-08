@@ -28,6 +28,9 @@ import type {
   AdminPoolListResponse,
   AdminPoolLedgerSummary,
   AdminPoolMetrics,
+  AdminReportDetail,
+  AdminReportListResponse,
+  AdminReviewReportInput,
   AdminSignupsMetrics,
   AdminTransactionMetrics,
   AdminUserActionResponse,
@@ -41,6 +44,7 @@ import type {
   PoolFunnelReport,
   PoolStatus,
   PoolVisibility,
+  ReportStatus,
   QaBroadcastBody,
   QaConfirmationBody,
   QaDepositBody,
@@ -276,6 +280,43 @@ export const observabilityApi = {
    * toggle with no work of its own.
    */
   alerts: () => request<AdminAlertState>('/observability/alerts'),
+};
+
+// ─── Moderation queue (#158) ─────────────────────────────────────────────────
+// The store-review gate's "demonstrable action on reports". Identity-gated like
+// every #80–#84 call, so the proxy's Bearer injection is all that is needed.
+//
+// The queue is served OLDEST-FIRST by the API and is deliberately NOT re-sorted
+// here: it is a work queue with a published SLA, not a feed, so the row closest
+// to breaching sits at the top. Pagination is a cursor (`nextCursor`) over
+// (createdAt ASC, id ASC) — "load more", never a page number.
+
+export interface ReportListParams {
+  status?: ReportStatus;
+  cursor?: string;
+  limit?: number;
+}
+
+export const reportsApi = {
+  list: (params: ReportListParams = {}) =>
+    request<AdminReportListResponse>(`/reports${query({ ...params })}`),
+  get: (id: string) => request<AdminReportDetail>(`/reports/${encodeURIComponent(id)}`),
+  /**
+   * Record the decision. `status` is required (a review that does not move the
+   * report is not a review); `action` defaults to `None` server-side.
+   *
+   * `ReportAction.ContentRemoved` is the ONLY action this call PERFORMS — it
+   * redacts the reported message (`Message.deletedAt`, founder decision D9) in
+   * the same transaction as the review, and 400s when the target is not a
+   * MESSAGE. `UserSuspended` / `UserWarned` are RECORDED only: suspension is
+   * carried out through `usersApi.suspend` on the user's own page, which the UI
+   * links to rather than duplicating here.
+   */
+  review: (id: string, body: AdminReviewReportInput) =>
+    request<AdminReportDetail>(`/reports/${encodeURIComponent(id)}/review`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 };
 
 // ─── QA console, STAGING-ONLY (poolmobile #132) ──────────────────────────────

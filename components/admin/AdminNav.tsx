@@ -8,6 +8,7 @@ import {
   Layers,
   ClipboardList,
   HeartPulse,
+  ShieldAlert,
   ShieldCheck,
   FlaskConical,
   LogOut,
@@ -23,6 +24,11 @@ const NAV_ITEMS = [
   { href: '/admin/overview', label: 'Overview', icon: BarChart3 },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/pools', label: 'Pools', icon: Layers },
+  // Moderation (#13, over poolmobile #158). Sits beside Users/Pools because it
+  // is the same kind of work — governing accounts and content — and it is
+  // available in EVERY environment: a report queue that only exists on staging
+  // would not be the "demonstrable action on reports" a store review asks for.
+  { href: '/admin/moderation', label: 'Moderation', icon: ShieldAlert },
   // Errors / Health (#192) — the read surface over #116. Available in EVERY
   // environment, unlike the QA console: knowing what is failing in production
   // is the whole point, and the API scopes the feed to its own log group, so
