@@ -8,6 +8,7 @@ import {
   Layers,
   ClipboardList,
   HeartPulse,
+  ScrollText,
   ShieldAlert,
   ShieldCheck,
   FlaskConical,
@@ -18,7 +19,6 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { adminLogout } from '@/lib/admin/adminApi';
 import { ENV_BADGE, ENV_DESCRIPTIONS, ENV_LABELS, type ApiEnv } from '@/lib/admin/adminEnv';
-import { EnvSwitcher } from './EnvSwitcher';
 
 const NAV_ITEMS = [
   { href: '/admin/overview', label: 'Overview', icon: BarChart3 },
@@ -34,6 +34,12 @@ const NAV_ITEMS = [
   // is the whole point, and the API scopes the feed to its own log group, so
   // this page can only ever show the environment it is pointed at.
   { href: '/admin/errors', label: 'Errors', icon: HeartPulse },
+  // Per-user logs (#14, over poolmobile #263). Sits NEXT TO Errors because the
+  // two are the same surface at two zoom levels: Errors answers "is the platform
+  // healthy", this answers "what happened to THIS person" — the question a
+  // support message actually arrives as. Available in every environment, and
+  // deliberately request-driven (nothing is fetched until a user is chosen).
+  { href: '/admin/user-logs', label: 'User logs', icon: ScrollText },
   { href: '/admin/admins', label: 'Admins', icon: ShieldCheck },
   { href: '/admin/dashboard', label: 'Waitlist', icon: ClipboardList },
 ] as const;
@@ -49,27 +55,24 @@ const NON_PROD_NAV_ITEMS = [{ href: '/admin/qa', label: 'QA', icon: FlaskConical
 /**
  * Admin nav chrome.
  *
- * ⚠️ THE BADGE IS THE SAFETY FEATURE (poolmobile #112). Before the environment
+ * ⚠️ ENVIRONMENT IDENTITY IS A SAFETY FEATURE (poolmobile #112). Before the
  * switcher existed, "which environment am I in" was decided once at deploy time
- * and a calm green PRODUCTION badge was enough. Now a single click moves between
- * test data and real users' money, so PRODUCTION renders as the loudest thing on
- * the page — solid red badge, a red header tint and a red rule under the whole
- * nav — and the entire chrome changes, not just a pill. Staging stays amber:
- * clearly "not production", never alarming.
+ * and a calm badge was enough. Now a single click moves between test data and
+ * real users' money, so PRODUCTION tints this whole header and rules it in red —
+ * the chrome changes, not just a pill.
+ *
+ * ⚠️ THE SWITCHER ITSELF NO LONGER LIVES HERE (#14). It moved to the
+ * full-width `EnvBanner` above, which renders on every page INCLUDING login and
+ * carries it under an explicit "Switch to" label. There is now exactly one
+ * switcher in the dashboard; the badge kept here is an echo of the strip, so the
+ * environment is still stated at the point of every action even after the strip
+ * has scrolled away.
  *
  * Everything here is derived from the `env` the SERVER resolved (the layout
  * reads the httpOnly cookie); the client never decides which environment it is
  * in, it only renders it.
  */
-export function AdminNav({
-  env,
-  availableEnvs = [env],
-  authenticatedEnvs = [env],
-}: {
-  env: ApiEnv;
-  availableEnvs?: ApiEnv[];
-  authenticatedEnvs?: ApiEnv[];
-}) {
+export function AdminNav({ env }: { env: ApiEnv }) {
   const pathname = usePathname();
   const isProd = env === 'production';
   const items = isProd ? NAV_ITEMS : [...NAV_ITEMS, ...NON_PROD_NAV_ITEMS];
@@ -115,11 +118,6 @@ export function AdminNav({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <EnvSwitcher
-            env={env}
-            availableEnvs={availableEnvs}
-            authenticatedEnvs={authenticatedEnvs}
-          />
           <Button
             variant="ghost"
             size="sm"

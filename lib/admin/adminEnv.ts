@@ -97,6 +97,59 @@ export const ENV_BADGE: Readonly<
 };
 
 /**
+ * The FULL-WIDTH banner presentation (#14).
+ *
+ * #112 shipped the badge and the segmented switcher, and the Phase-10 walkthrough
+ * found both easy to miss — especially on the LOGIN screen, which renders outside
+ * the admin shell and is the one moment where guessing wrong costs you an OTP and
+ * a confused minute. So the environment is no longer a pill in a nav row: it is a
+ * strip across the top of every admin page, login included, carrying the label,
+ * the consequence, and the switch itself.
+ *
+ * Tone is the message. PRODUCTION is solid red with white text — the same chrome
+ * the #190 critical-alert banner uses, deliberately, so a founder who has learned
+ * that "solid red across the top" means "be careful" reads this the same way
+ * without being taught twice. STAGING is amber: unmistakably not production, but
+ * a colour you can look at all day. LOCAL is muted — nothing there can hurt
+ * anyone.
+ */
+export const ENV_BANNER: Readonly<
+  Record<
+    ApiEnv,
+    {
+      /** The strip itself. */
+      className: string;
+      /** The "YOU ARE ON" eyebrow + label block. */
+      labelClassName: string;
+      /** Body copy sitting next to the label. */
+      detailClassName: string;
+      /** One line naming the stakes, in a founder's words rather than an ops team's. */
+      consequence: string;
+    }
+  >
+> = {
+  production: {
+    className: 'border-b-2 border-red-800 bg-red-600 text-white',
+    labelClassName: 'bg-white/20 text-white',
+    detailClassName: 'text-white/90',
+    consequence: 'Everything you do here affects real users and real money.',
+  },
+  staging: {
+    className:
+      'border-b-2 border-amber-500 bg-amber-400 text-amber-950 dark:bg-amber-500 dark:text-amber-950',
+    labelClassName: 'bg-amber-950/15 text-amber-950',
+    detailClassName: 'text-amber-950/80',
+    consequence: 'Test data only. Nothing here is a real user or real money.',
+  },
+  local: {
+    className: 'border-b bg-muted text-foreground',
+    labelClassName: 'bg-foreground/10 text-foreground',
+    detailClassName: 'text-muted-foreground',
+    consequence: 'A Pool API on this machine. Visible to nobody but you.',
+  },
+};
+
+/**
  * Which environment a Pool API base URL denotes. PURE (takes the URL, reads no
  * `process.env`), so `middleware.ts` on the edge and the server-only
  * `serverApi.ts` can share ONE definition.

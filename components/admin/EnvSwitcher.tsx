@@ -33,14 +33,29 @@ import {
  * used, not a client-side route change, because the environment is resolved
  * server-side in the layout and every screen must re-fetch against the new API.
  */
+/**
+ * Where the control is being drawn.
+ *
+ * `banner` (#14) is the ONLY placement now used by the dashboard: the switcher
+ * sits on the coloured environment strip, whose background is solid red or solid
+ * amber. The page palette (`bg-muted`, `text-muted-foreground`) is illegible on
+ * both, and the active pill's own environment colour would be invisible against
+ * a strip of the same colour — so on the banner the active item inverts to white
+ * and the rest ride the strip's own foreground colour. `page` keeps the original
+ * #112 look for any future in-page placement.
+ */
+type SwitcherSurface = 'page' | 'banner';
+
 export function EnvSwitcher({
   env,
   availableEnvs,
   authenticatedEnvs,
+  surface = 'page',
 }: {
   env: ApiEnv;
   availableEnvs: ApiEnv[];
   authenticatedEnvs: ApiEnv[];
+  surface?: SwitcherSurface;
 }) {
   const [pending, setPending] = useState<ApiEnv | null>(null);
   const [confirming, setConfirming] = useState<ApiEnv | null>(null);
@@ -88,12 +103,19 @@ export function EnvSwitcher({
     void switchTo(target);
   };
 
+  const onBanner = surface === 'banner';
+
   return (
     <div className="flex flex-col items-start gap-1">
       <div
         role="group"
         aria-label="Pool environment"
-        className="inline-flex items-center gap-0.5 rounded-lg border bg-muted/50 p-0.5"
+        className={cn(
+          'inline-flex items-center gap-0.5 rounded-lg border p-0.5',
+          // `bg-black/10` reads as a recessed well on all three banner tones
+          // (solid red, solid amber, muted) without hard-coding any of them.
+          onBanner ? 'border-black/10 bg-black/10' : 'bg-muted/50',
+        )}
       >
         {availableEnvs.map((candidate) => {
           const active = candidate === env;
@@ -110,9 +132,13 @@ export function EnvSwitcher({
               }`}
               className={cn(
                 'flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide transition-colors disabled:opacity-60',
-                active
-                  ? ENV_BADGE[candidate].switcherActiveClassName
-                  : 'text-muted-foreground hover:bg-background hover:text-foreground',
+                onBanner
+                  ? active
+                    ? 'bg-white text-neutral-900 shadow-sm hover:bg-white'
+                    : 'text-current opacity-75 hover:bg-white/20 hover:opacity-100'
+                  : active
+                    ? ENV_BADGE[candidate].switcherActiveClassName
+                    : 'text-muted-foreground hover:bg-background hover:text-foreground',
               )}
             >
               {pending === candidate ? (
@@ -127,7 +153,16 @@ export function EnvSwitcher({
       </div>
 
       {confirming && (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-red-500/50 bg-red-500/10 px-2 py-1.5 text-xs text-red-700 dark:text-red-300">
+        <div
+          className={cn(
+            'flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5 text-xs',
+            // On the coloured strip the confirmation must not be red-on-red; a
+            // white card is the only thing legible against every banner tone.
+            onBanner
+              ? 'border-neutral-300 bg-white text-neutral-900 shadow-md'
+              : 'border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-300',
+          )}
+        >
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
           <span>
             Switch to <strong>{ENV_LABELS[confirming]}</strong>? {ENV_DESCRIPTIONS[confirming]}
@@ -151,7 +186,16 @@ export function EnvSwitcher({
         </div>
       )}
 
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <p
+          className={cn(
+            'text-xs',
+            onBanner ? 'rounded bg-white px-1.5 py-0.5 font-medium text-red-700' : 'text-destructive',
+          )}
+        >
+          {error}
+        </p>
+      )}
     </div>
   );
 }

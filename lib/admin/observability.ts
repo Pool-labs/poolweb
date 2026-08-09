@@ -18,6 +18,7 @@ import {
   ObservabilityFeedKind,
   ObservabilitySignal,
   ObservabilitySourceStatus,
+  ObservabilityUserSource,
   PinoLevel,
 } from './types';
 
@@ -86,7 +87,24 @@ export const FEED_KIND_LABELS: Readonly<Record<ObservabilityFeedKind, string>> =
   [ObservabilityFeedKind.Signals]: 'Named signals (WARN)',
 };
 
-export type SourceKind = 'logs' | 'sentry';
+/**
+ * Every source this dashboard renders a `ObservabilitySourceStatus` for.
+ *
+ * `logs`/`sentry` are the #116 errors feed's two halves; `audit`/`analytics`
+ * are the two Postgres-backed stores the #263 per-user timeline adds. They
+ * share ONE status vocabulary and ONE notice component deliberately: the rule
+ * that an empty panel must say WHY is identical whichever store went quiet, and
+ * a second copy of that rule is a second place for it to be forgotten.
+ */
+export type SourceKind = 'logs' | 'sentry' | 'audit' | 'analytics';
+
+/** Human name for each source, used by the notice and the status pill. */
+export const SOURCE_TITLES: Readonly<Record<SourceKind, string>> = {
+  logs: 'CloudWatch logs',
+  sentry: 'Sentry',
+  audit: 'Audit trail',
+  analytics: 'Analytics events',
+};
 
 export interface SourceStatusCopy {
   /** Short label for the status pill. */
@@ -157,6 +175,63 @@ const SOURCE_STATUS_COPY: Record<SourceKind, Record<ObservabilitySourceStatus, S
       tone: 'danger',
     },
   },
+  // The two Postgres-backed stores behind the #263 per-user timeline. The API
+  // only ever reports `Ok` or `Unavailable` for them today (they are read
+  // directly, so there is nothing to disable or leave unconfigured) — the other
+  // two are still answered, because a status this build cannot explain is worse
+  // than one it can.
+  audit: {
+    [ObservabilitySourceStatus.Ok]: {
+      label: 'Live',
+      detail:
+        'The audit trail was read for this window. An empty result genuinely means this user took no audited action, and none was taken against them.',
+      tone: 'ok',
+    },
+    [ObservabilitySourceStatus.Disabled]: {
+      label: 'Disabled',
+      detail:
+        'Audit reads are switched off for this environment. Nothing is being read — this is NOT a statement that nothing happened.',
+      tone: 'warning',
+    },
+    [ObservabilitySourceStatus.Unconfigured]: {
+      label: 'Not configured',
+      detail:
+        'The audit store is not wired in this environment, so nothing has been queried. This panel says nothing about what this user did.',
+      tone: 'warning',
+    },
+    [ObservabilitySourceStatus.Unavailable]: {
+      label: 'Unavailable',
+      detail:
+        'The audit query failed (a database error or timeout). Money and governance actions may exist for this user that are not shown here — the other sources below are unaffected.',
+      tone: 'danger',
+    },
+  },
+  analytics: {
+    [ObservabilitySourceStatus.Ok]: {
+      label: 'Live',
+      detail:
+        'Behavioural events were read for this window. Note these are reported BY the app on the user’s device, so an empty result can also mean the app never got far enough to send anything.',
+      tone: 'ok',
+    },
+    [ObservabilitySourceStatus.Disabled]: {
+      label: 'Disabled',
+      detail:
+        'Analytics reads are switched off for this environment. Nothing is being read — this is NOT a statement that the user did nothing.',
+      tone: 'warning',
+    },
+    [ObservabilitySourceStatus.Unconfigured]: {
+      label: 'Not configured',
+      detail:
+        'The analytics store is not wired in this environment, so nothing has been queried.',
+      tone: 'warning',
+    },
+    [ObservabilitySourceStatus.Unavailable]: {
+      label: 'Unavailable',
+      detail:
+        'The analytics query failed (a database error or timeout). The user may have been active in ways not shown here — the other sources are unaffected.',
+      tone: 'danger',
+    },
+  },
 };
 
 /**
@@ -218,6 +293,87 @@ export function formatLogTime(iso: string): string {
     hour12: false,
   });
 }
+
+// ─── Per-user logs (#263) ────────────────────────────────────────────────────
+
+/**
+ * Mirror of `OBSERVABILITY_USER_LOGS`. The window bounds are the SAME numbers as
+ * the errors feed (the CloudWatch scan-cost argument does not change because the
+ * filter narrowed to one user), but the page size is its own, smaller value:
+ * this endpoint returns up to `limit` entries from EACH of three stores, so 500
+ * would be a 1,500-row response read by a human rather than charted.
+ *
+ * The API re-validates every bound with Zod, so a drift here degrades to a 400,
+ * never to an unbounded scan.
+ */
+export const OBSERVABILITY_USER_LOGS = {
+  DEFAULT_WINDOW_HOURS: 24,
+  /** 7 days — the #116 ceiling, same reasons. */
+  MAX_WINDOW_HOURS: 168,
+  DEFAULT_LIMIT: 100,
+  /** Applied PER SOURCE — the worst-case response is three times this. */
+  MAX_LIMIT: 200,
+} as const;
+
+/** Window options, all within `MAX_WINDOW_HOURS`. */
+export const USER_LOG_WINDOW_OPTIONS = [1, 6, 24, 72, 168] as const;
+
+/** Page-size options, all within `MAX_LIMIT`. */
+export const USER_LOG_LIMIT_OPTIONS = [25, 50, 100, 200] as const;
+
+/**
+ * Per-source presentation for the merged timeline.
+ *
+ * `authority` is the load-bearing field. The three stores are NOT equally
+ * trustworthy and a support conclusion drawn from the wrong one is how an
+ * investigation goes sideways: `audit` is server-authored inside the mutation's
+ * own transaction (if the row is there, the write committed), `logs` is the
+ * machine's own account of the request, and `analytics` is reported by the app
+ * on the user's device — useful for "what screen were they on", never proof
+ * that anything happened.
+ */
+export const USER_SOURCE_COPY: Readonly<
+  Record<
+    ObservabilityUserSource,
+    { label: string; authority: string; className: string; dotClassName: string }
+  >
+> = {
+  [ObservabilityUserSource.Audit]: {
+    label: 'Audit',
+    authority:
+      'Written by the server inside the same transaction as the change. If a row is here, the change committed — and it keeps the amounts.',
+    className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    dotClassName: 'bg-emerald-500',
+  },
+  [ObservabilityUserSource.Logs]: {
+    label: 'Request log',
+    authority:
+      'The API’s own record of a request it handled, from CloudWatch. Shows failures the user saw, and the request id that ties everything together.',
+    className: 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-400',
+    dotClassName: 'bg-sky-500',
+  },
+  [ObservabilityUserSource.Analytics]: {
+    label: 'App event',
+    authority:
+      'Reported by the app on the user’s device, and already stripped of personal data, money and location. Good for “where were they”, never proof that something happened.',
+    className: 'border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-400',
+    dotClassName: 'bg-violet-500',
+  },
+};
+
+/** Fixed render order for the source filter chips — most authoritative first. */
+export const USER_SOURCE_ORDER: readonly ObservabilityUserSource[] = [
+  ObservabilityUserSource.Audit,
+  ObservabilityUserSource.Logs,
+  ObservabilityUserSource.Analytics,
+];
+
+/** Map a timeline source onto the shared status vocabulary's source kinds. */
+export const USER_SOURCE_KIND: Readonly<Record<ObservabilityUserSource, SourceKind>> = {
+  [ObservabilityUserSource.Logs]: 'logs',
+  [ObservabilityUserSource.Audit]: 'audit',
+  [ObservabilityUserSource.Analytics]: 'analytics',
+};
 
 // ─── Proactive admin alerting (#190) ─────────────────────────────────────────
 

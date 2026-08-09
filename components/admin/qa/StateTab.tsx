@@ -50,7 +50,7 @@ import {
   type QaSyntheticUsersResponse,
 } from '@/lib/admin/types';
 import { PoolPicker, type PickedPool } from './PoolPicker';
-import { UserPicker, type PickedUser } from './UserPicker';
+import { UserPicker, type PickedUser } from '../UserPicker';
 import {
   ActingUserFrame,
   BusySpinner,

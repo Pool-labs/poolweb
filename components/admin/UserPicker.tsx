@@ -10,15 +10,22 @@ import { usersApi } from '@/lib/admin/adminApi';
 import { QA_DEFAULT_LIMITS, type AdminUserSummary } from '@/lib/admin/types';
 
 /**
- * The QA console's user picker — one component, reused by every tab.
+ * The admin surface's user picker — ONE component, reused everywhere a founder
+ * has to name a person.
  *
  * Search-as-you-type over the existing #83 `GET /admin/users` list endpoint,
  * multi-select with removable chips, and a hard client-side cap (default 25,
- * matching the API's per-call recipient limit) with an explicit message rather
- * than a silently-ignored click.
+ * matching the QA console's per-call recipient limit) with an explicit message
+ * rather than a silently-ignored click.
  *
  * `max={1}` turns it into a single-select (picking replaces the selection) —
- * that's the mode used for "acting user" fields.
+ * the mode used for "acting user" fields and for #14's per-user log pull.
+ *
+ * ⚠️ It lived under `components/admin/qa/` until #14 and moved up a level when
+ * the per-user logs screen needed it: a picker shared by every admin screen must
+ * not sit inside the STAGING-ONLY console's folder, or the next reader will
+ * reasonably assume it is QA-gated. Its `max` default still points at the QA
+ * limit purely as a fallback — every caller passes a live value.
  */
 
 export interface PickedUser {
