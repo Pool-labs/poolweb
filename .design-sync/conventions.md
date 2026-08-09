@@ -19,6 +19,24 @@ build, the brand tokens, the sticker component classes, and a font-host `@import
 two brand faces. **Read `_ds/<folder>/styles.css` and the `_ds_bundle.css` it imports before
 styling anything** — they are the authority, and this file is only a summary.
 
+### The one wrapper that IS required: `.hp` for Home sections
+
+The **Home** group — `Hero`, `HowSteps`, `Wtf`, `SocialStory`, `CardStage`, `Jump`,
+`HomeTicker`, `Falls` — is built on a hand-written CSS layer whose rules are scoped under
+an `.hp` ancestor. Put those components inside `<div className="hp">` or they render with
+unsized SVGs: the step coins fill the whole page, icons blow up to full width.
+
+```jsx
+<div className="hp">
+  <Hero />
+  <Wtf />
+  <HowSteps />
+</div>
+```
+
+The **Sections** group (`HeroPool`, `Footer`, `Header`, `PoolCards`, `FeedDemo`, …) does
+**not** need the wrapper — those are Tailwind-styled and stand alone.
+
 ## The styling idiom: Tailwind utilities + sticker component classes
 
 This is a **Tailwind** system. Style layout glue with utility classes; the shipped

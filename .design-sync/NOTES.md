@@ -72,20 +72,45 @@ Drop `--no-render-check` once a browser is available (see "Verification" below).
   `--font-sans` / `--font-display`. Validate reports `[FONT_REMOTE]` — expected, not a
   problem. No font files ship.
 
-## Verification — READ THIS
+## Verification
 
-**No preview has ever been machine-rendered or visually graded.** The user declined the
-Playwright/Chromium install (twice, after the tradeoff was spelled out), so
-`package-validate.mjs` runs with `--no-render-check` and `package-capture.mjs` cannot run at
-all — meaning `.resync-verdict.json` will always report `capture: ok:false, exit 2` and a
-top-level `ok: false`. **That single stage is the only thing failing; build, diff and
-validate all pass.** There are no grades in `.design-sync/.cache/review/`.
+**The real render check runs.** Playwright + Chromium are installed and
+`package-validate.mjs` screenshots all 79 cards. Last run: **79/79 render cleanly, 0 bad,
+2 floor cards, 3 benign thin.** The driver reports `ok: true` on all four stages.
 
-The substitute is **`.design-sync/smoke.mjs`** — loads every card in jsdom, mounts the real
-component from the real bundle, and reports anything that throws or comes up empty. Last
-full run: **79 cards — 78 mounted, 1 floor card, 0 empty/thin.** It is NOT a visual grade:
-jsdom has no layout engine, so it cannot see unstyled text, collapsed spacing, wrong
-colours, or variants that look identical.
+**On macOS the browser cache is `~/Library/Caches/ms-playwright`, NOT `~/.cache/ms-playwright`.**
+The skill's step-1 check looks at the Linux path, so it reports "nothing cached" when
+Chromium is in fact present — `playwright install chromium` then exits silently with
+"already downloaded" and nothing appears to happen. Check the macOS path.
+
+### What the browser caught that jsdom could not
+
+This matters because the first pass shipped with `--no-render-check` and a jsdom substitute
+(`.design-sync/smoke.mjs`) that reported 78/79 "mounted" — while four components were
+visibly broken. jsdom has no layout engine, so it cannot see any of this:
+
+- **Only `app/globals.css` was being compiled.** `app/layout.tsx` imports THREE stylesheets:
+  `globals.css`, `home.css`, `mobile.css`. Missing the latter two left every `components/home/*`
+  section and `Footer` with unsized SVGs — Footer rendered a full-card Instagram glyph,
+  HowSteps a full-card "1", Wtf a full-card icon, Header an unstyled link list. Fixed in
+  `.design-sync/css-entry.css`, which now imports all three in layout order.
+- **113 of the 178 rules in `home.css` are scoped under an `.hp` ancestor** (`app/page.tsx`
+  wraps the page in `<div className="hp">`). Every `home/*` preview wraps in `.hp`; this is
+  also documented in `conventions.md` because the design agent must do the same.
+- **`QaConsole` renders nothing** — it fetches its own `/qa/status` and returns `null` when
+  disabled, and takes no props, so it cannot be driven from a preview. Now a floor card.
+- **Card-mode overrides** were needed for components the grid crops or that escape it:
+  `EnvBanner`, `SentryPanel`, `Header`, `Footer` → `column`; `InviteFriendsModal` → `single`.
+
+`smoke.mjs` is kept — it is much faster than a full render check for iterating (use
+`--only Name,Name`; `--dump` prints a card's DOM) — but it is a crash detector, not a
+verifier. **Trust `package-validate.mjs`.**
+
+Two smoke-harness details that took real debugging; do not undo them: it **inlines every
+`<script src>`** (with jsdom's `resources: 'usable'` the external loads race the card's
+inline mount script, so the same card reports "mounted" then "empty" between runs), and it
+**stubs `getBoundingClientRect`, IntersectionObserver, ResizeObserver, matchMedia and
+`fetch`**.
 
 Two things it took real debugging to get right — do not undo them:
 - It **inlines every `<script src>`** before parsing. With jsdom's `resources: 'usable'`
@@ -102,9 +127,30 @@ A full smoke run takes ~10 minutes (the 1.7 MB bundle is parsed once per card). 
 
 ## Known render warns / deliberate exceptions
 
+**Three `[RENDER_THIN]` warns are benign — confirmed against the screenshots.** A warn that
+is NOT on this list is new; look at its screenshot before accepting it.
+
+- `Droplet`, `Splash` — pure SVG brand marks. The check keys on "no text", and these
+  correctly render 4 and 3 coloured marks respectively.
+- `BusySpinner` — a 16px spinner glyph. 18px tall is its real size.
+
 - **`CriticalAlertBanner` ships the floor card on purpose.** It renders `null` unless a
   CloudWatch alarm is actually firing, and it polls the API — there is no static state to
   preview. Its authored preview was deleted rather than faked.
+- **`QaConsole` ships the floor card on purpose** — same reason: it fetches `/qa/status`
+  itself and returns `null` when that 404s (which is the documented "disabled" signal), and
+  it takes no props. Its five tabs (`NotificationsTab`, `JobsTab`, `WorkflowsTab`,
+  `StateTab`, `InspectTab`) DO take a `status` prop and have proper cards, so the QA surface
+  is still covered.
+- **`InviteFriendsModal` needs a sized stage in its preview.** The overlay is `fixed
+  inset-0`, and the card wrapper carries `transform: translateZ(0)` — a transformed ancestor
+  becomes the containing block for fixed descendants, and with nothing else in the card it
+  has zero height, so the overlay collapsed to 0px and captured blank. The preview renders a
+  `min-height: 820px` stage around it. `viewport` in `cfg.overrides` does NOT fix this.
+- **`public/` assets do not ship.** `Header`, `Footer` and `Hero` render a broken-image
+  placeholder where the PNG logo `<img src="/...">` would be. The inline SVG brand marks
+  (`PoolMark`, `Wordmark`, …) are unaffected — prefer those. Fixing would mean uploading
+  `public/`, which the plan globs don't cover.
 - **`HomeEffects` is excluded from the card list** (it is in `NON_VISUAL` in
   `gen-entry.mjs`). Its own source comment says "Renders nothing." — it is a `useEffect`-only
   mount. Still exported from the bundle.
@@ -138,9 +184,14 @@ as a smoke error (`UserTimeline` threw on `metadata: null`; `KeyValues` calls
 - **`conventions.md` names ~83 classes and ~46 component names.** They all verified against
   the built artifacts on this run. Re-validate after any rename; a name that stops resolving
   makes the design agent write vocabulary that silently does nothing.
-- **No visual verification exists.** Everything above about "renders correctly" means
-  "mounts in jsdom with plausible text". First person with a browser should install
-  Playwright and run the real render check + `package-capture.mjs` grading.
+- **Per-cell grades were never minted.** The render check is clean and all 79 components
+  were reviewed at contact-sheet resolution (plus full-size for the ones that were broken),
+  but `.design-sync/.cache/review/*.grade.json` is empty, so `package-capture.mjs` reports
+  all 77 authored components as `pendingGrade`. A future run wanting the fast path should
+  read `ds-bundle/_screenshots/review/<group>__<Name>.png` per component and write verdicts.
+- **The stylesheet set is a standing risk.** If anyone adds a fourth `import "./x.css"` to
+  `app/layout.tsx`, `.design-sync/css-entry.css` must import it too — nothing checks this,
+  and the failure mode is silent unstyled output, exactly as `home.css` was.
 - **Toolchain assumed**: node 22.15, pnpm 10.15 (`COREPACK_ENABLE_STRICT=0` was set for the
   install), Tailwind 3.4.17, converter deps installed under `.ds-sync/` via npm.
 - **Fonts are fetched from the Google Fonts host at runtime.** If the design environment

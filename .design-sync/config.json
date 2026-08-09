@@ -169,5 +169,24 @@
     "WorkflowsTab": "  status: unknown;",
     "Wtf": "  /** This component takes no props. */"
   },
-  "readmeHeader": ".design-sync/conventions.md"
+  "readmeHeader": ".design-sync/conventions.md",
+  "overrides": {
+    "EnvBanner": {
+      "cardMode": "column"
+    },
+    "SentryPanel": {
+      "cardMode": "column"
+    },
+    "InviteFriendsModal": {
+      "cardMode": "single",
+      "primaryStory": "Open",
+      "viewport": "1200x900"
+    },
+    "Header": {
+      "cardMode": "column"
+    },
+    "Footer": {
+      "cardMode": "column"
+    }
+  }
 }

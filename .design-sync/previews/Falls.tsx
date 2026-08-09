@@ -5,7 +5,7 @@ import { Falls } from "my-v0-project"
 // visible at all.
 export function Curtains() {
   return (
-    <div className="relative h-[420px] w-full overflow-hidden bg-sky-tint">
+    <div className="hp relative h-[420px] w-full overflow-hidden bg-sky-tint">
       <Falls />
     </div>
   )
