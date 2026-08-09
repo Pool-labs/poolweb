@@ -1097,6 +1097,133 @@ export interface ObservabilityErrorsQuery {
   limit?: number;
 }
 
+// ─── Per-user logs, READ-ONLY (poolmobile #263, source: @pool/shared
+//     types/observability.types.ts + types/audit.types.ts) ────────────────────
+//
+// `GET /api/v1/admin/observability/user-logs?userId=&hours=&limit=` — the
+// SUPPORT/DEBUG pull: one named person's request logs, audit trail and
+// behavioural telemetry inside a bounded window, merged into one timeline.
+//
+// ⚠️ This endpoint is AUDITED ON VIEW server-side (`admin.user_logs_viewed`),
+// unlike the aggregate Errors feed. Pulling it is itself a governance fact,
+// because it is about an identified individual.
+//
+// ⚠️ PRIVACY, and it differs PER SOURCE — do not flatten them into one "event":
+//   - `logs`      — the same strict ALLOWLIST as #116 (no raw lines, no bodies,
+//                   no headers, no stack traces). Free text; render as TEXT.
+//   - `audit`     — server-authored, and DELIBERATELY retains money (integer
+//                   cents), payment handles and ids (#26). Correct to show on an
+//                   identity-gated admin surface; still text-only.
+//   - `analytics` — CLIENT-supplied, already stripped of PII/money/coords at
+//                   ingest (#24), and therefore the least authoritative of the
+//                   three. Label it as such; never treat it as proof.
+
+/** Which store one timeline entry came from. */
+export enum ObservabilityUserSource {
+  Logs = 'logs',
+  Audit = 'audit',
+  Analytics = 'analytics',
+}
+
+/**
+ * One `audit_logs` row (source: audit.types.ts `AuditLogEntry`).
+ *
+ * ⚠️ `action` and `targetType` are typed as STRING rather than mirrored enums,
+ * deliberately. The API's `AuditAction` is an open, fast-growing vocabulary
+ * (~80 dot-namespaced members and counting); a copy here would go stale the
+ * first time the API adds one, and a stale mirror on a DISPLAY-ONLY surface
+ * fails in the worst possible direction — the newest, least-understood action
+ * would render as a blank or an "unknown" chip precisely when someone is trying
+ * to work out what happened. The wire values are already human-legible
+ * (`settlement.confirmed`, `admin.ledger_adjusted`), so they are rendered as
+ * text and a new action needs no web deploy to read correctly.
+ */
+export interface AuditLogEntry {
+  id: string;
+  /** Dot-namespaced `AuditAction` wire value, e.g. `settlement.confirmed`. */
+  action: string;
+  actorId: string | null;
+  /** `AuditTargetType` wire value, e.g. `pool`, `user`, `conversation`. */
+  targetType: string;
+  targetId: string | null;
+  poolId: string | null;
+  /**
+   * Server-authored context. DELIBERATELY carries amounts in integer cents and,
+   * for #146 rows, payment handles. Render values as TEXT — never as an href.
+   */
+  metadata: Record<string, unknown>;
+  requestId: string | null;
+  ip: string | null;
+  createdAt: string;
+}
+
+/**
+ * One `analytics_events` row. Sanitized at INGEST by the #24 allowlist, so
+ * `props` are string-only and already stripped of PII/money/coordinates.
+ */
+export interface ObservabilityUserAnalyticsRecord {
+  id: string;
+  name: string;
+  sessionId: string;
+  platform: string;
+  appVersion: string | null;
+  props: Record<string, string>;
+  /** When the CLIENT says it happened. */
+  occurredAt: string;
+  /** When the SERVER ingested it — the field the timeline is ordered by. */
+  createdAt: string;
+}
+
+/**
+ * A discriminated timeline entry. `timestamp` is lifted onto every variant so a
+ * merged, newest-first ordering needs no per-source knowledge.
+ */
+export type ObservabilityUserTimelineEntry =
+  | { source: ObservabilityUserSource.Logs; timestamp: string; log: ObservabilityLogEntry }
+  | { source: ObservabilityUserSource.Audit; timestamp: string; audit: AuditLogEntry }
+  | {
+      source: ObservabilityUserSource.Analytics;
+      timestamp: string;
+      analytics: ObservabilityUserAnalyticsRecord;
+    };
+
+/** Per-source outcome — the #116 fail-open contract, one entry per store. */
+export interface ObservabilityUserSourceState {
+  status: ObservabilitySourceStatus;
+  /** How many entries this source contributed. */
+  count: number;
+  /** True when the source held more rows than the requested per-source page. */
+  truncated: boolean;
+}
+
+export interface ObservabilityUserLogs {
+  /** Echoed back, so a response can never be mistaken for another user's. */
+  userId: string;
+  window: { hours: number; since: string; until: string };
+  source: ObservabilityLogSource;
+  /**
+   * Each source fails open INDEPENDENTLY: a missing CloudWatch IAM grant still
+   * returns the audit trail. There is no all-or-nothing error path — these
+   * statuses carry the bad news, so an empty panel can always say WHY.
+   */
+  sources: {
+    logs: ObservabilityUserSourceState;
+    audit: ObservabilityUserSourceState;
+    analytics: ObservabilityUserSourceState;
+  };
+  /** All three sources merged, strictly most-recent-first. */
+  entries: ObservabilityUserTimelineEntry[];
+}
+
+/** Query contract (mirrors `observabilityUserLogsQuerySchema`). */
+export interface ObservabilityUserLogsQuery {
+  /** REQUIRED and a uuid server-side — there is deliberately no "everyone" mode. */
+  userId: string;
+  hours?: number;
+  /** Applied PER SOURCE, so the worst-case response is three times this. */
+  limit?: number;
+}
+
 // ─── Proactive admin alerting, READ-ONLY (poolmobile #190, source:
 //     @pool/shared types/admin-alerts.types.ts) ───────────────────────────────
 //

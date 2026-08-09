@@ -20,12 +20,25 @@
  * audit these reads (the #80/#81 convention — aggregate ops data, no money and
  * no message content).
  *
- * `AlertsPanel` (#190) sits at the top, ABOVE the filters: alarm state answers
+ * `AlertsPanel` (#190) sits near the top, ABOVE the filters: alarm state answers
  * "is something on fire right now", which is the question you arrive with, and
  * unlike everything below it is not scoped by the feed's window/kind filters —
- * it is live state, not a query result. It also polls on its own interval
- * rather than joining this page's manual Refresh, because the layout-level
- * banner does too and the two must not be able to disagree.
+ * it is live state, not a query result. It polls on its own interval rather than
+ * joining this page's manual Refresh, because the layout-level banner does too
+ * and the two must not be able to disagree.
+ *
+ * ⚠️ THE FIRST THING ON THE PAGE IS NOW THE PLAIN-LANGUAGE VERDICT (#14).
+ * Everything this tab shipped with is correct and none of it answers the
+ * question a non-developer founder arrives with — a tile reading
+ * `Pool timeout (P2024): 3` presumes you know what a connection pool is.
+ * `HealthSummary` states the verdict in one coloured sentence and lists the
+ * reasons underneath in ordinary words, derived PURELY from the two payloads
+ * this page already holds, so it can never disagree with the panels below it.
+ *
+ * That is also why the alerts fetch moved OUT of `AlertsPanel` and into
+ * `useAdminAlerts` here: the summary and the panel must render the same alarm
+ * payload, or the page could show "everything looks healthy" directly above a
+ * row reading IN ALARM.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -37,14 +50,17 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SeriesBarChart, type ChartPoint } from '@/components/ui/chart';
 import { AlertsPanel } from '@/components/admin/observability/AlertsPanel';
+import { HealthSummary } from '@/components/admin/observability/HealthSummary';
 import { LogFeedTable } from '@/components/admin/observability/LogFeedTable';
 import { SentryPanel } from '@/components/admin/observability/SentryPanel';
+import { useAdminAlerts } from '@/components/admin/observability/useAdminAlerts';
 import {
   SourceStatusNotice,
   SourceStatusPill,
 } from '@/components/admin/observability/SourceStatusNotice';
 import { observabilityApi } from '@/lib/admin/adminApi';
 import { formatDateTime } from '@/lib/admin/format';
+import { SIGNAL_PLAIN_LANGUAGE, UNALARMED_SIGNALS } from '@/lib/admin/health';
 import {
   FEED_KIND_LABELS,
   isSourceTrustworthy,
@@ -96,6 +112,9 @@ export default function AdminErrorsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ONE alerts read, shared by the verdict strip and the alerting panel below.
+  const alerts = useAdminAlerts();
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -130,17 +149,39 @@ export default function AdminErrorsPage() {
             Recent failures from this environment&apos;s own API logs, plus grouped Sentry issues.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+        <Button
+          variant="outline"
+          size="sm"
+          // Refreshes BOTH halves: the verdict strip is derived from the two
+          // together, so refreshing one would leave it half-stale.
+          onClick={() => {
+            void load();
+            alerts.refresh();
+          }}
+          disabled={loading}
+        >
           <RefreshCw className={loading ? 'mr-1.5 h-4 w-4 animate-spin' : 'mr-1.5 h-4 w-4'} />
           Refresh
         </Button>
       </div>
 
+      {/* The plain-language verdict (#14) — first, because it is the question a
+          founder came with. Pure derivation of the two payloads below it. */}
+      <HealthSummary
+        alerts={alerts.state}
+        feed={feed}
+        // Spin until BOTH halves have resolved once. Rendering a verdict off one
+        // of them would flash "recent failures could not be read" for as long as
+        // the other request takes — teaching a founder to ignore the exact
+        // wording that means "I cannot tell".
+        loading={alerts.loading || (loading && !feed)}
+      />
+
       {/* Live alarm + email posture (#190). Above the filters deliberately: it
           answers "is something on fire right now", which is the question you
           arrive with, and unlike everything below it is live state rather than
           a query result — none of these filters apply to it. */}
-      <AlertsPanel />
+      <AlertsPanel state={alerts.state} loading={alerts.loading} error={alerts.error} />
 
       {/* Filters — one row above the charts, mirroring the API's query bounds. */}
       <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
@@ -265,6 +306,44 @@ export default function AdminErrorsPage() {
               />
             ))}
           </div>
+
+          {/* The three WARN-level signals, spelled out (#14). They sit below
+              the error threshold on purpose, so no alarm counts them and the
+              tab's own default level filter hides them — which makes a plain
+              explanation, and a DIFFERENT remediation per Prisma code, the only
+              way anyone acts on them. */}
+          <Card>
+            <CardHeader className="p-4 pb-1">
+              <CardTitle className="text-sm">Signals no alarm covers</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 p-4 pt-2 lg:grid-cols-3">
+              {UNALARMED_SIGNALS.map((signal) => {
+                const copy = SIGNAL_PLAIN_LANGUAGE[signal];
+                const count = summary?.bySignal?.[signal] ?? 0;
+                const trustworthy = isSourceTrustworthy(logsStatus);
+                return (
+                  <div key={signal} className="rounded-lg border p-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-sm font-medium">{SIGNAL_LABELS[signal]}</span>
+                      <span
+                        className={
+                          trustworthy && count > 0
+                            ? 'text-xl font-bold text-amber-600 dark:text-amber-400'
+                            : 'text-xl font-bold'
+                        }
+                      >
+                        {trustworthy ? count : '—'}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{copy?.detail}</p>
+                    <p className="mt-1 text-xs font-medium text-muted-foreground">
+                      {copy?.remediation}
+                    </p>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>

@@ -41,6 +41,8 @@ import type {
   MoneyEventCountsReport,
   ObservabilityErrorsFeed,
   ObservabilityErrorsQuery,
+  ObservabilityUserLogs,
+  ObservabilityUserLogsQuery,
   PoolFunnelReport,
   PoolStatus,
   PoolVisibility,
@@ -280,6 +282,22 @@ export const observabilityApi = {
    * toggle with no work of its own.
    */
   alerts: () => request<AdminAlertState>('/observability/alerts'),
+
+  /**
+   * One user's merged log/audit/analytics timeline (#263, PoolWeb #14).
+   *
+   * REQUEST-DRIVEN, never polled: the caller passes an explicitly chosen user
+   * and window, and nothing is fetched until they ask. That is not a UI
+   * preference — the endpoint is AUDITED ON VIEW server-side
+   * (`admin.user_logs_viewed`, target = the named user), so a background poller
+   * would write an audit row every interval claiming a founder looked up that
+   * person's history when nobody did. A support pull must cost a deliberate act.
+   *
+   * `userId` travels as a query parameter and the PATH IS STATIC, so nothing
+   * user-supplied is interpolated into a URL path here.
+   */
+  userLogs: (params: ObservabilityUserLogsQuery) =>
+    request<ObservabilityUserLogs>(`/observability/user-logs${query({ ...params })}`),
 };
 
 // ─── Moderation queue (#158) ─────────────────────────────────────────────────

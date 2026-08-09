@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import { EnvSwitcher } from '@/components/admin/EnvSwitcher';
 import { cn } from '@/lib/utils';
 import { ENV_BADGE, ENV_DESCRIPTIONS, ENV_LABELS, type ApiEnv } from '@/lib/admin/adminEnv';
 
@@ -33,14 +32,21 @@ type Step = 'email' | 'code';
  * On success the server has set the httpOnly session cookies and we navigate to
  * the overview.
  *
- * ⚠️ THE ENVIRONMENT IS SHOWN AND CHANGEABLE HERE (poolmobile #112), because
- * this screen renders OUTSIDE the admin shell and would otherwise be the one
- * place in the dashboard that does not say which Pool environment you are
- * talking to. Admin allowlists and OTPs are per-environment, so a code minted
- * by staging simply will not verify against production — without this, "the
- * code didn't work" is indistinguishable from "you are logging into the wrong
- * environment". It is fetched from the server (`GET /admin/api/env`) rather
- * than guessed client-side.
+ * ⚠️ THE ENVIRONMENT MATTERS MOST ON THIS SCREEN. Admin allowlists and OTPs are
+ * per-environment, so a code minted by staging simply will not verify against
+ * production — without saying so, "the code didn't work" is indistinguishable
+ * from "you are logging into the wrong Pool".
+ *
+ * #112 answered that with a badge and a switcher inside this card, both of which
+ * appeared only once a client fetch resolved. As of #14 the loud, colour-coded
+ * strip in the admin LAYOUT carries both — server-resolved, on the first paint,
+ * above this card and on every other page — so this card keeps only the
+ * CONTEXTUAL sentence ("the code will be minted by X") and deliberately does NOT
+ * render a second switcher. One switch, one place.
+ *
+ * The `GET /admin/api/env` fetch is kept for that sentence alone; it is
+ * best-effort, and the server routes the OTP by its own cookie regardless, so
+ * this display can never disagree with the truth, only lag it.
  */
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -115,7 +121,10 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    // Not `min-h-screen`: the environment strip now sits above this card inside
+    // the same viewport, and a full-height card under it would push the page
+    // into a pointless scroll.
+    <div className="flex min-h-[85vh] items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <Card>
           <CardHeader className="space-y-1">
@@ -137,14 +146,10 @@ export default function AdminLoginPage() {
                   {ENV_LABELS[envState.env]}
                 </span>
                 <p className="text-center text-xs text-muted-foreground">
-                  Signing in to the {ENV_LABELS[envState.env].toLowerCase()} environment. Admin
-                  access is granted per environment.
+                  Your code will be minted by the {ENV_LABELS[envState.env].toLowerCase()}{' '}
+                  environment and will not work anywhere else. Admin access is granted per
+                  environment — use the switch at the top of the page to change it.
                 </p>
-                <EnvSwitcher
-                  env={envState.env}
-                  availableEnvs={envState.availableEnvs}
-                  authenticatedEnvs={envState.authenticatedEnvs}
-                />
               </div>
             )}
             <CardDescription className="text-center">

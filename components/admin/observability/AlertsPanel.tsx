@@ -1,18 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, BellRing, CheckCircle2, HelpCircle, Loader2, Mail } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { observabilityApi } from '@/lib/admin/adminApi';
 import { formatDateTime } from '@/lib/admin/format';
 import {
   ALARM_STATE_COPY,
   ALARM_STATE_SEVERITY,
   ALERT_EMAIL_STATUS_COPY,
-  ALERT_POLL_INTERVAL_MS,
   ALERT_SOURCE_COPY,
 } from '@/lib/admin/observability';
 import {
@@ -47,36 +44,22 @@ import {
  * the one thing that answers "how far over threshold?". It is CloudWatch metric
  * math, so it carries counts rather than user data — and it is rendered as a
  * plain text child regardless, like every other upstream string on this surface.
+ *
+ * ⚠️ IT NO LONGER FETCHES (#14). The state arrives as props from `useAdminAlerts`
+ * in the page, because the health-summary strip above it derives its verdict
+ * from the SAME payload — two pollers would put a "looks healthy" headline
+ * directly above a row reading IN ALARM whenever their reads landed seconds
+ * apart. One fetch, one payload, two renderers.
  */
-export function AlertsPanel() {
-  const [state, setState] = useState<AdminAlertState | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setState(await observabilityApi.alerts());
-      setError(null);
-    } catch (e) {
-      // Keep the last good state on screen — an unreachable API is not evidence
-      // that the alarms are fine, and blanking the panel would replace real
-      // information with none.
-      setError(e instanceof Error ? e.message : 'Could not read alerting state');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-    // Same cadence as the banner, and for the same reason: the alarms evaluate
-    // on a 5-minute period, so polling faster cannot make the data fresher.
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') void load();
-    }, ALERT_POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [load]);
-
+export function AlertsPanel({
+  state,
+  loading,
+  error,
+}: {
+  state: AdminAlertState | null;
+  loading: boolean;
+  error: string | null;
+}) {
   if (loading && !state) {
     return (
       <Card>

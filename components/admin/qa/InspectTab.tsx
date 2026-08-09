@@ -22,7 +22,7 @@ import type {
   QaUserBalances,
   QaUserInspection,
 } from '@/lib/admin/types';
-import { UserPicker, type PickedUser } from './UserPicker';
+import { UserPicker, type PickedUser } from '../UserPicker';
 import { ErrorAlert } from './primitives';
 
 /**

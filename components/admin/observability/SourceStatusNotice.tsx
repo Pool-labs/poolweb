@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import {
   isSourceTrustworthy,
   sourceStatusCopy,
+  SOURCE_TITLES,
   type SourceKind,
 } from '@/lib/admin/observability';
 import { ObservabilitySourceStatus } from '@/lib/admin/types';
@@ -57,7 +58,7 @@ export function SourceStatusNotice({
     >
       <Icon className="h-4 w-4" />
       <AlertTitle className="text-sm">
-        {source === 'logs' ? 'CloudWatch logs' : 'Sentry'}: {copy.label}
+        {SOURCE_TITLES[source]}: {copy.label}
       </AlertTitle>
       <AlertDescription className="text-xs">
         {copy.detail}
@@ -72,17 +73,26 @@ export function SourceStatusNotice({
   );
 }
 
-/** Compact inline pill for the panel header, mirroring the notice's tone. */
+/**
+ * Compact inline pill for a panel header, mirroring the notice's tone.
+ *
+ * `showTitle` names the source inside the pill — needed wherever several
+ * sources' pills sit in one row (the #263 per-user timeline shows three), since
+ * three bare "Live" pills say nothing about WHICH store was read.
+ */
 export function SourceStatusPill({
   source,
   status,
+  showTitle = false,
 }: {
   source: SourceKind;
   status: ObservabilitySourceStatus;
+  showTitle?: boolean;
 }) {
   const copy = sourceStatusCopy(source, status);
   return (
     <span
+      title={copy.detail}
       className={cn(
         'whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide',
         copy.tone === 'ok' && 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
@@ -90,7 +100,7 @@ export function SourceStatusPill({
         copy.tone === 'danger' && 'border-destructive/50 bg-destructive/10 text-destructive',
       )}
     >
-      {copy.label}
+      {showTitle ? `${SOURCE_TITLES[source]}: ${copy.label}` : copy.label}
     </span>
   );
 }
