@@ -1,0 +1,14 @@
+/* Tailwind INPUT for the design-sync build (compiled by .design-sync/build-css.mjs).
+   app/globals.css is Tailwind SOURCE — it must be compiled, or every preview and
+   every design renders unstyled. */
+
+/* next/font/google supplies Baloo 2 + DM Sans in the Next app; the design runtime
+   does not run Next, so load them as real webfonts and bind the same CSS vars
+   tailwind.config.ts reads (--font-sans / --font-display). */
+@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap");
+@import "../app/globals.css";
+
+:root {
+  --font-sans: "DM Sans";
+  --font-display: "Baloo 2";
+}
