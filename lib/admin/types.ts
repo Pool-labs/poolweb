@@ -10,6 +10,7 @@
  *   - packages/shared/src/types/user.types.ts            (UserFeatureFlags)
  *   - packages/shared/src/validation/pool.schema.ts      (PoolVisibility)
  *   - packages/shared/src/validation/settlement.schema.ts (BalanceEntry / SettlementMethod / SettlementStatus)
+ *   - packages/shared/src/types/safety.types.ts          (#158 moderation queue)
  *
  * Only the shapes the /admin web surface actually renders are copied here. All
  * money figures are INTEGER CENTS. Every API response is enveloped
@@ -1211,4 +1212,123 @@ export interface AdminAlertState {
   criticalCount: number;
   alarms: AdminAlertSummary[];
   email: AdminAlertEmailDelivery;
+}
+
+// ─── #158 moderation queue (source: safety.types.ts + safety.schema.ts) ──────
+// The store-review gate's third requirement: demonstrable ACTION on reports.
+// Every one of these endpoints is in the IDENTITY-GATED half of /admin (#79) —
+// never the m2m token — because this surface reads user message content and can
+// redact it, so each decision must be attributable to a named founder.
+
+/** What a report is about. Determines what got snapshotted (founder decision D2). */
+export enum ReportTargetType {
+  /** One message. `targetId` is a message id — the only redactable target. */
+  Message = 'MESSAGE',
+  /** A whole thread. `targetId` is a conversation id. */
+  Conversation = 'CONVERSATION',
+  /** A person, with no specific message attached. `targetId` is a user id. */
+  User = 'USER',
+}
+
+/** Why the reporter reported. A CLOSED set — `Other` is the escape hatch. */
+export enum ReportReason {
+  Spam = 'SPAM',
+  Harassment = 'HARASSMENT',
+  HateSpeech = 'HATE_SPEECH',
+  SexualContent = 'SEXUAL_CONTENT',
+  ScamOrFraud = 'SCAM_OR_FRAUD',
+  ViolenceOrThreats = 'VIOLENCE_OR_THREATS',
+  SelfHarm = 'SELF_HARM',
+  Impersonation = 'IMPERSONATION',
+  Other = 'OTHER',
+}
+
+/**
+ * Where a report is in the triage pipeline. `Open` and `Reviewing` are both
+ * UNRESOLVED — the API's `openCount` is the sum of the two.
+ */
+export enum ReportStatus {
+  Open = 'OPEN',
+  Reviewing = 'REVIEWING',
+  /** Terminal — a moderation action was taken. */
+  Actioned = 'ACTIONED',
+  /** Terminal — reviewed and found not to warrant action. */
+  Dismissed = 'DISMISSED',
+}
+
+/**
+ * What the reviewing admin actually did.
+ *
+ * `ContentRemoved` is the ONLY value this surface PERFORMS: it sets
+ * `Message.deletedAt` (D9) in the same transaction as the review, and the API
+ * 400s if the report's target is not a MESSAGE. `UserSuspended` / `UserWarned`
+ * are RECORDED here and carried out elsewhere — suspension is the existing #83
+ * `POST /admin/users/:id/suspend`, which opens its own transaction and has its
+ * own audit action. The UI links out to it rather than duplicating the call.
+ */
+export enum ReportAction {
+  None = 'NONE',
+  ContentRemoved = 'CONTENT_REMOVED',
+  UserWarned = 'USER_WARNED',
+  UserSuspended = 'USER_SUSPENDED',
+}
+
+/** One row of the moderation queue. */
+export interface AdminReportSummary {
+  id: string;
+  targetType: ReportTargetType;
+  targetId: string;
+  reason: ReportReason;
+  status: ReportStatus;
+  action: ReportAction;
+  reporterId: string;
+  /** The account reported; null when the report could not be attributed. */
+  reportedUserId: string | null;
+  /**
+   * Identity SNAPSHOTTED at report time — survives `deleteMe` anonymization, so
+   * a report against a departed account still shows a name, not a UUID.
+   */
+  reportedUserDisplayName: string | null;
+  reportedUserHandle: string | null;
+  conversationId: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  reviewedById: string | null;
+}
+
+/**
+ * A queue row plus the evidence.
+ *
+ * ⚠️ `details`, `contentSnapshot` and `reviewerNotes` are USER-AUTHORED FREE
+ * TEXT (the #116 L3/L4 rule applies at full strength here — this is literally
+ * reported abusive content). Render them as TEXT CHILDREN only: never
+ * `dangerouslySetInnerHTML`, never an `href`, never a `src`.
+ */
+export interface AdminReportDetail extends AdminReportSummary {
+  details: string | null;
+  /**
+   * The D2 evidence copy, taken at report time and stored ON THE REPORT ROW —
+   * which is why it still exists after the sender deleted their account
+   * (hard-deleting their messages) or after a previous review redacted it. It
+   * is a FROZEN copy, never live content, and the UI must say so.
+   */
+  contentSnapshot: string | null;
+  /** Internal-only. Never shown to the reporter or the reported user. */
+  reviewerNotes: string | null;
+}
+
+export interface AdminReportListResponse {
+  items: AdminReportSummary[];
+  nextCursor: string | null;
+  /** Unresolved (`Open` + `Reviewing`) count — the queue badge. */
+  openCount: number;
+}
+
+/** Body of `POST /admin/reports/:id/review` (adminReviewReportSchema). */
+export interface AdminReviewReportInput {
+  /** Required — a review that does not move the report is not a review. */
+  status: ReportStatus;
+  /** Defaults to `None` server-side, so dismissing needs no extra field. */
+  action?: ReportAction;
+  notes?: string;
 }
