@@ -133,7 +133,27 @@ async function handle(req: NextRequest, context: RouteContext): Promise<Response
   });
 }
 
+/**
+ * Every method a Route Handler can be asked for, exported deliberately as a
+ * COMPLETE set rather than a curated one.
+ *
+ * ⚠️ A Next Route Handler answers 405 for any method it does not export, and it
+ * does so BEFORE the request reaches `handle` — so an un-exported method is not
+ * a proxy that forwards badly, it is a proxy that is not there. That is exactly
+ * how `PUT` came to be missing (poolmobile #589): `PUT /admin/app/requirements`
+ * is the only PUT on the whole admin surface, and it is #313, the control that
+ * blocks every install of the app at launch. The dashboard could neither arm it
+ * nor — far worse — CLEAR it, because clearing is the same endpoint with
+ * `minimumVersion: null`.
+ *
+ * `handle` is method-agnostic: it forwards `req.method` and, for anything that
+ * is not GET/HEAD, the body. So there is nothing to decide per method, and a
+ * curated list only creates a way to be wrong. Exporting all of them means the
+ * admin API can add a method tomorrow and this proxy already carries it.
+ * (HEAD is served from GET by Next; OPTIONS is never needed same-origin.)
+ */
 export const GET = handle;
 export const POST = handle;
+export const PUT = handle;
 export const PATCH = handle;
 export const DELETE = handle;
