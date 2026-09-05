@@ -1,13 +1,13 @@
 // The navy ticker banner: what's happening on Pool. Pure CSS marquee — the
 // track is duplicated once and translates -50% in a seamless loop.
 const ITEMS: Array<{ text: string; sep: "coin" | "dropBlue" | "dropPink" | "bill" }> = [
-  { text: "📍 Nearby: trivia night at Felix's — 3 pools forming", sep: "coin" },
-  { text: "🥞 Brunch Crew pooled $240 in 12 seconds", sep: "dropBlue" },
-  { text: "🎿 Ski Trip '26 — 12 friends planning, one shared card", sep: "bill" },
-  { text: "🏠 Apartment 4B — rent day, one tap", sep: "dropPink" },
-  { text: "🎂 Dana's birthday fund just hit its goal", sep: "coin" },
-  { text: "📍 Nearby: Cardinals game — pool with your section", sep: "dropBlue" },
-  { text: "☕ Coffee run — Ava tapped. Done.", sep: "bill" },
+  { text: "Nearby: trivia night at Felix's — 3 pools forming", sep: "coin" },
+  { text: "Brunch Crew pooled $240 in 12 seconds", sep: "dropBlue" },
+  { text: "Ski Trip '26 — 12 friends planning, one shared card", sep: "bill" },
+  { text: "Apartment 4B — rent day, one tap", sep: "dropPink" },
+  { text: "Dana's birthday fund just hit its goal", sep: "coin" },
+  { text: "Nearby: Cardinals game — pool with your section", sep: "dropBlue" },
+  { text: "Coffee run — Ava tapped. Done.", sep: "bill" },
 ]
 
 function Sep({ kind }: { kind: (typeof ITEMS)[number]["sep"] }) {

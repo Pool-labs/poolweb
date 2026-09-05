@@ -436,7 +436,7 @@ export default function PreregisterPage() {
       <InviteFriendsModal
         open={showInviteModal}
         onClose={() => setShowInviteModal(false)}
-        title="🎉 You’re on the list!"
+        title="You’re on the list!"
         description="Want to bring more friends along? Add another below or share the link."
       />
     </div>

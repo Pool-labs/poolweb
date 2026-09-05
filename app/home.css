@@ -34,11 +34,27 @@
 .lt-p { color: var(--pool-pink); } .lt-g { color: var(--pool-green); }
 
 /* ---- nav (site-wide): scrolls with the page, floats on the wash ---- */
+/* ---- site header ----
+   The header OVERLAYS the page rather than sitting above it, and that is the
+   fix for the inconsistent-looking chrome. It has no background of its own, so
+   it shows whatever is behind it — but only the homepage rendered a full-bleed
+   background, so every other page put its colour INSIDE `main`, starting below
+   the header. The result was a cream strip belonging to no page and a hard seam
+   under it, different on every route.
+
+   Overlaying lets each page's own background run to the top of the viewport and
+   pass behind the header, the way the homepage always did. `main > :first-child`
+   gives back the height the header no longer occupies in flow, so every page
+   keeps the spacing it had — one rule instead of eleven page edits. */
+:root { --nav-h: 64px; }
+
 .hp-nav {
-  position: relative; z-index: 40;
+  position: absolute; top: 0; left: 0; right: 0; z-index: 40;
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px clamp(18px, 4vw, 48px);
 }
+
+main > :first-child { padding-top: var(--nav-h); }
 .hp-nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--navy); }
 .hp-nav-brand img { width: 40px; height: 40px; }
 .hp-nav-brand .hp-bubble { font-size: 1.5rem; letter-spacing: .04em; }
@@ -130,15 +146,14 @@
 .hp .hc-3 { width: 24px; right: -96px; top: 52%; transform: rotate(-8deg); }
 
 /* ---- beta strip ---- */
-.hp .beta { padding-top: 0; padding-bottom: clamp(64px, 8vw, 96px); }
+/* The pink flag. It labelled the private-beta block; that block is gone (Pool is
+   launching, not collecting a waiting list) and the rule now flags the Pool Card
+   as the thing being built next. */
 .hp .beta-pill {
   display: inline-block; background: var(--pool-pink); color: #fff;
   font-weight: 800; font-size: .78rem; letter-spacing: .14em;
   padding: 7px 18px; border-radius: 999px; margin-bottom: 16px;
 }
-.hp .beta p.lead { font-weight: 700; font-size: 1.13rem; }
-.hp .beta p.follow { font-size: .98rem; color: rgba(20, 34, 74, .75); margin: 6px 0 20px; }
-.hp .beta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .hp-pill {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 9px 20px; border-radius: 999px; text-decoration: none;

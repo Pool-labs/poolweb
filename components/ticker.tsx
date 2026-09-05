@@ -9,11 +9,11 @@ import { useEffect, useRef } from "react"
  */
 
 const entries = [
-  "🏖️ Beach House — Alex tapped $63 at Costco",
-  "☕ Coffee Run — Priya tapped $11",
-  "🎿 Ski Trip — Sam added $200",
-  "🏠 Apt 4B — rent day, everyone's in",
-  "🎂 Dana's Gift — goal reached 🎉",
+  "Beach House — Alex tapped $63 at Costco",
+  "Coffee Run — Priya tapped $11",
+  "Ski Trip — Sam added $200",
+  "Apt 4B — rent day, everyone's in",
+  "Dana's Gift — goal reached",
 ]
 
 function Track() {

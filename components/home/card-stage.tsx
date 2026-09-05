@@ -6,14 +6,14 @@ import { useRef, useState } from "react"
 import { COLORS, dropletSvg, prefersReducedMotion } from "./fx"
 
 const FEED = [
-  "✓ John spent $40 on gas ⛽",
-  "✓ Sarah spent $22 at Starbucks ☕",
-  "✓ Mia covered groceries — $63 🛒",
-  "✓ Alex paid the Wi-Fi bill — $58 📶",
-  "✓ Jay grabbed pizza night — $34 🍕",
-  "✓ Priya booked the Airbnb — $120 🏡",
-  "✓ Sam paid trivia entry — $10 🧠",
-  "✓ Dana stocked the fridge — $47 🥤",
+  "John spent $40 on gas",
+  "Sarah spent $22 at Starbucks",
+  "Mia covered groceries — $63",
+  "Alex paid the Wi-Fi bill — $58",
+  "Jay grabbed pizza night — $34",
+  "Priya booked the Airbnb — $120",
+  "Sam paid trivia entry — $10",
+  "Dana stocked the fridge — $47",
 ]
 
 export default function CardStage() {
@@ -46,8 +46,21 @@ export default function CardStage() {
   return (
     <section className="card-sec">
       <div className="hp-wrap">
+        {/*
+          ⚠️ THE CARD IS NOT SHIPPED YET, and this section is deliberately not a
+          "COMING SOON" sign. It is the clearest thing on the page and the reason
+          people understand Pool in one look, so it stays a headline feature —
+          but the copy is future tense about the card itself, which is the same
+          rule the app holds itself to (POOL_CARD_COPY: future tense always, no
+          dates, no money figures). The flag says NEXT UP rather than COMING
+          SOON: honest about where it is, without reading as "come back later".
+        */}
+        <span className="beta-pill">NEXT UP</span>
         <h2>Friends pool together.</h2>
-        <p className="card-lede">Then everyone gets one shared virtual card to spend from. That's it.</p>
+        <p className="card-lede">
+          Everyone spends from the same shared balance. Next up: the Pool Card — one card the whole
+          crew taps, so nobody has to front the bill and chase it down after.
+        </p>
         <div className="stage">
           <div className="crew">
             <div className="avatars" aria-label="The crew: Ava, Jay, Mia, Sam and 4 more">
@@ -102,7 +115,7 @@ export default function CardStage() {
                 <path d="M0 54 Q 25 40 50 54 T 100 54 T 150 54 T 200 54 T 250 54 T 300 54 T 350 54 T 400 54" stroke="#FF77B0" strokeWidth="9" />
               </svg>
             </button>
-            <span className="paid-chip">{tapCount === 0 ? "✓ Paid — whole crew covered" : FEED[(tapCount - 1) % FEED.length]}</span>
+            <span className="paid-chip">{tapCount === 0 ? "Paid — whole crew covered" : FEED[(tapCount - 1) % FEED.length]}</span>
             <span className="tap-hint">Go on — give the card a tap</span>
           </div>
         </div>

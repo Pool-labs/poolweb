@@ -4,11 +4,22 @@ import Link from "next/link"
 import { useState } from "react"
 import { Menu, X } from "lucide-react"
 
+/**
+ * ⚠️ `/preregister` and `/questionnaire` are deliberately ABSENT.
+ *
+ * Both pages still exist and still work — the pre-register API and its
+ * Firestore data are untouched, and the admin Waitlist tab still reads them.
+ * What changed is that neither is a PUBLIC entry point any more: Pool is
+ * launching rather than collecting a waiting list, so the site should send
+ * people to the app, and the questionnaire is a research link to be shared
+ * deliberately rather than a headline destination.
+ *
+ * Removing a nav item does not remove a route. Anyone holding either URL still
+ * lands on a working page.
+ */
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/download", label: "Download" },
-  { href: "/preregister", label: "Pre-Register" },
-  { href: "/questionnaire", label: "Questionnaire" },
   { href: "/faq", label: "FAQ" },
   { href: "/contact", label: "Contact" },
 ]
