@@ -11,6 +11,7 @@ import {
   ScrollText,
   ShieldAlert,
   ShieldCheck,
+  Smartphone,
   FlaskConical,
   LogOut,
 } from 'lucide-react';
@@ -41,6 +42,12 @@ const NAV_ITEMS = [
   // deliberately request-driven (nothing is fetched until a user is chosen).
   { href: '/admin/user-logs', label: 'User logs', icon: ScrollText },
   { href: '/admin/admins', label: 'Admins', icon: ShieldCheck },
+  // App version (#590, over poolmobile #313) — the force-update gate's config.
+  // Sits beside Admins because both are ops controls rather than day-to-day
+  // work, and it is available in EVERY environment for the same reason Errors
+  // is: the one that matters is production, and the gate that can strand a
+  // whole fleet must not be reachable only by `curl` when it needs clearing.
+  { href: '/admin/app-version', label: 'App version', icon: Smartphone },
   { href: '/admin/dashboard', label: 'Waitlist', icon: ClipboardList },
 ] as const;
 

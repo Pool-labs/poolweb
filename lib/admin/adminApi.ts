@@ -14,6 +14,7 @@
 
 import type {
   AdminAllowlistAddResponse,
+  AppVersionRequirementRecord,
   AdminAllowlistListResponse,
   AdminAllowlistRemoveResponse,
   AdminActiveUsersMetrics,
@@ -68,6 +69,7 @@ import type {
   QaSyntheticUsersResponse,
   QaUserInspection,
   QaWorkflowClosePoolBody,
+  SetAppVersionRequirementBody,
   QaWorkflowFriendRequestBody,
   QaWorkflowLogExpenseBody,
   QaWorkflowPoolInviteBody,
@@ -351,6 +353,31 @@ export const reportsApi = {
 
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: 'POST', body: JSON.stringify(body ?? {}) });
+
+/**
+ * #313 — the force-update gate's configuration (poolmobile #590).
+ *
+ * ⚠️ THE HIGHEST-BLAST-RADIUS CONTROL IN THE PRODUCT, and the reason it needs a
+ * page at all: a minimum one release too high blocks EVERY installed binary
+ * below it, behind a screen with no way past it — and the only undo is this
+ * same endpoint with `minimumVersion: null`. A control whose sole operator
+ * interface is `curl` is one that gets armed at go-live and is then hard to
+ * disarm while a fleet is dark.
+ *
+ * `PUT` is the ONLY PUT on the whole admin surface, which is how the Next proxy
+ * came to be missing it (#589) — a Route Handler answers 405 for a method it
+ * does not export, before the request reaches the handler.
+ */
+export const appVersionApi = {
+  /** Always answers BOTH platforms; an unset one carries `minimumVersion: null`. */
+  list: () => request<AppVersionRequirementRecord[]>('/app/requirements'),
+  /** `minimumVersion: null` CLEARS the gate for that platform. */
+  set: (body: SetAppVersionRequirementBody) =>
+    request<AppVersionRequirementRecord>('/app/requirements', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+};
 
 export const qaApi = {
   /** Authoritative enabled-check. Throws AdminApiError(404) when disabled. */
