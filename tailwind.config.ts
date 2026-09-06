@@ -6,6 +6,19 @@ const config: Config = {
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    // ⚠️ `./lib` WAS MISSING, and it fails SILENTLY — a class that appears only
+    // here is simply never generated, so the markup carries it and nothing
+    // renders. Fourteen were missing, and they were not decorative: the entire
+    // STAGING identity (`ENV_BADGE` / `ENV_BANNER` in `lib/admin/adminEnv.ts`)
+    // is amber, so the staging banner rendered cream and the active switcher
+    // button rendered `text-white` on a near-white well — invisible.
+    //
+    // That matters more than a colour: #112's whole argument is that
+    // environment identity is a SAFETY feature — the badge is what stands
+    // between reading staging numbers as production, or acting on production
+    // believing it is staging. Production's red survived only because those
+    // classes happen to appear elsewhere too.
+    "./lib/**/*.{js,ts,jsx,tsx,mdx}",
     "*.{js,ts,jsx,tsx,mdx}"
   ],
   prefix: "",
