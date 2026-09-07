@@ -1,0 +1,23 @@
+/* Tailwind INPUT for the design-sync build (compiled by .design-sync/build-css.mjs).
+   app/globals.css is Tailwind SOURCE — it must be compiled, or every preview and
+   every design renders unstyled. */
+
+/* next/font/google supplies Baloo 2 + DM Sans in the Next app; the design runtime
+   does not run Next, so load them as real webfonts and bind the same CSS vars
+   tailwind.config.ts reads (--font-sans / --font-display). */
+@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap");
+
+/* ALL THREE stylesheets app/layout.tsx imports, in the same order.
+   home.css and mobile.css are plain hand-written CSS (no Tailwind directives)
+   carrying the .hp-* / .splat / .step-coin / .feature vocabulary that the
+   components/home/* sections and Footer are built from. Compiling only
+   globals.css left those components with unsized SVGs — Footer rendered a
+   full-card Instagram glyph, HowSteps a full-card "1", Wtf a full-card icon. */
+@import "../app/globals.css";
+@import "../app/home.css";
+@import "../app/mobile.css";
+
+:root {
+  --font-sans: "DM Sans";
+  --font-display: "Baloo 2";
+}
