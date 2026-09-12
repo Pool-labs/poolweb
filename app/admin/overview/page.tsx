@@ -9,6 +9,7 @@ import { SeriesLineChart, SeriesBarChart, ChartPoint } from '@/components/ui/cha
 import { metricsApi, funnelsApi } from '@/lib/admin/adminApi';
 import { humanizeEnum } from '@/lib/admin/format';
 import type {
+  AdminActivationMetrics,
   AdminActiveUsersMetrics,
   AdminEngagementMetrics,
   AdminPoolMetrics,
@@ -24,6 +25,7 @@ const WINDOW_OPTIONS = [7, 30, 90];
 interface OverviewData {
   activeUsers: AdminActiveUsersMetrics | null;
   signups: AdminSignupsMetrics | null;
+  activation: AdminActivationMetrics | null;
   pools: AdminPoolMetrics | null;
   transactions: AdminTransactionMetrics | null;
   engagement: AdminEngagementMetrics | null;
@@ -36,6 +38,7 @@ interface OverviewData {
 const EMPTY: OverviewData = {
   activeUsers: null,
   signups: null,
+  activation: null,
   pools: null,
   transactions: null,
   engagement: null,
@@ -61,6 +64,7 @@ export default function AdminOverviewPage() {
     const [
       activeUsers,
       signups,
+      activation,
       pools,
       transactions,
       engagement,
@@ -71,6 +75,10 @@ export default function AdminOverviewPage() {
     ] = await Promise.allSettled([
       metricsApi.activeUsers(windowDays),
       metricsApi.signups(windowDays),
+      // Same window as signups on purpose (#592): the two panels answer the
+      // same question from two sources, and only a shared window makes a
+      // divergence between them mean something (a telemetry outage).
+      metricsApi.activation(windowDays),
       metricsApi.pools(windowDays),
       metricsApi.transactions(windowDays),
       metricsApi.engagement(windowDays),
@@ -83,6 +91,7 @@ export default function AdminOverviewPage() {
     const next: OverviewData = {
       activeUsers: pick(activeUsers),
       signups: pick(signups),
+      activation: pick(activation),
       pools: pick(pools),
       transactions: pick(transactions),
       engagement: pick(engagement),
@@ -136,6 +145,33 @@ export default function AdminOverviewPage() {
             <StatTile label="MAU" value={data.activeUsers?.mau} />
             <StatTile label="Signups (all time)" value={data.signups?.totalAllTime} />
             <StatTile label={`Signups (last ${days}d)`} value={data.signups?.totalInWindow} />
+            {/*
+             * Activation (#592) sits directly beside signups, same window —
+             * server-derived from `users` through the app's own signup
+             * predicate, so the auth funnel's client-emitted
+             * `onboarding_completed` (below) has something to be checked
+             * against. Its window denominator excludes soft-deleted accounts,
+             * so it may sit below the signups tile; that is documented on the
+             * type, not a bug.
+             */}
+            <StatTile
+              label={`Activated (last ${days}d)`}
+              value={data.activation?.activatedInWindow}
+              sub={
+                data.activation
+                  ? `${formatRate(data.activation.activationRateInWindow)} of ${data.activation.signupsInWindow} window signups`
+                  : undefined
+              }
+            />
+            <StatTile
+              label="Activated (all time)"
+              value={data.activation?.activatedAllTime}
+              sub={
+                data.activation
+                  ? `${formatRate(data.activation.activationRateAllTime)} of ${data.activation.totalUsers} accounts`
+                  : undefined
+              }
+            />
             <StatTile label="Total pools" value={data.pools?.total} />
             <StatTile label="Total transactions" value={data.transactions?.total} />
             <StatTile
@@ -177,6 +213,15 @@ export default function AdminOverviewPage() {
             <DistributionCard title="Pools by status" record={data.pools?.byStatus} />
             <DistributionCard title="Pools by visibility" record={data.pools?.byVisibility} />
             <DistributionCard title="Transactions by status" record={data.transactions?.byStatus} />
+            {/*
+             * Where the un-activated are held, by signup requirement (all
+             * time). An account blocked on several is counted under each —
+             * "how many are held at the Age step" is the answerable question.
+             */}
+            <DistributionCard
+              title="Un-activated — held at (all time)"
+              record={data.activation?.blockedByRequirement}
+            />
           </div>
 
           {/* Funnels */}
@@ -202,7 +247,15 @@ export default function AdminOverviewPage() {
   );
 }
 
-function StatTile({ label, value }: { label: string; value: number | undefined }) {
+function StatTile({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: number | undefined;
+  sub?: string;
+}) {
   return (
     <Card>
       <CardHeader className="p-4 pb-1">
@@ -210,9 +263,14 @@ function StatTile({ label, value }: { label: string; value: number | undefined }
       </CardHeader>
       <CardContent className="p-4 pt-0">
         <div className="text-2xl font-bold">{value ?? '—'}</div>
+        {sub !== undefined && <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>}
       </CardContent>
     </Card>
   );
+}
+
+function formatRate(rate: number): string {
+  return `${(rate * 100).toFixed(0)}%`;
 }
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {

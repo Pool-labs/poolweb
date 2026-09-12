@@ -32,6 +32,7 @@ import type {
   AdminReportDetail,
   AdminReportListResponse,
   AdminReviewReportInput,
+  AdminActivationMetrics,
   AdminSignupsMetrics,
   AdminTransactionMetrics,
   AdminUserActionResponse,
@@ -153,6 +154,8 @@ export const metricsApi = {
     request<AdminActiveUsersMetrics>(`/metrics/active-users${query({ days })}`),
   signups: (days?: number) =>
     request<AdminSignupsMetrics>(`/metrics/signups${query({ days })}`),
+  activation: (days?: number) =>
+    request<AdminActivationMetrics>(`/metrics/activation${query({ days })}`),
   pools: (days?: number) => request<AdminPoolMetrics>(`/metrics/pools${query({ days })}`),
   transactions: (days?: number) =>
     request<AdminTransactionMetrics>(`/metrics/transactions${query({ days })}`),

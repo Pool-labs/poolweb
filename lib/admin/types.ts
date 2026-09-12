@@ -143,6 +143,37 @@ export interface AdminSignupsMetrics {
   series: AdminSignupSeriesPoint[];
 }
 
+/**
+ * Server-derived activation (#592) — accounts with NO unmet signup requirement,
+ * computed from `users` through the same predicate the app's wizard uses. This
+ * is the cross-check for the auth funnel's client-emitted
+ * `onboarding_completed`: a divergence between the two IS a telemetry outage.
+ *
+ * ⚠️ `signupsInWindow` here is this metric's OWN denominator (non-DELETED
+ * accounts created in the window) and may sit below the signups panel's
+ * `totalInWindow`, which counts the historical signup regardless of a later
+ * soft-delete. Numerator and denominator always share a population — the
+ * property a rate needs — so the two panels are deliberately not forced to
+ * agree.
+ */
+export interface AdminActivationMetrics {
+  window: { days: number; since: string };
+  /** Non-deleted accounts, all time. */
+  totalUsers: number;
+  /** Of those, how many have no unmet signup requirement. */
+  activatedAllTime: number;
+  activationRateAllTime: number;
+  /** Non-deleted accounts created in the window — this metric's denominator. */
+  signupsInWindow: number;
+  activatedInWindow: number;
+  activationRateInWindow: number;
+  /**
+   * Where the un-activated are stuck, all-time, by SignupRequirement. An
+   * account blocked on several is counted under each.
+   */
+  blockedByRequirement: Record<string, number>;
+}
+
 export interface AdminPoolMetrics {
   total: number;
   byType: Record<string, number>;
