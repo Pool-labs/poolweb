@@ -48,7 +48,6 @@ const NAV_ITEMS = [
   // is: the one that matters is production, and the gate that can strand a
   // whole fleet must not be reachable only by `curl` when it needs clearing.
   { href: '/admin/app-version', label: 'App version', icon: Smartphone },
-  { href: '/admin/dashboard', label: 'Waitlist', icon: ClipboardList },
 ] as const;
 
 /**
@@ -58,6 +57,19 @@ const NAV_ITEMS = [
  * 404 = disabled).
  */
 const NON_PROD_NAV_ITEMS = [{ href: '/admin/qa', label: 'QA', icon: FlaskConical }] as const;
+
+/**
+ * Production-only entries (#602). The Waitlist tab reads — and can delete —
+ * live marketing-site signups straight from the ONE shared Firestore, which the
+ * environment switcher does not touch. On any non-production environment the
+ * banner above promises "test data only", and this tab would make that a lie —
+ * so the link renders only where the banner and the data agree. As with QA,
+ * hiding the link is a convenience: `/admin/dashboard` 404s server-side
+ * whenever the selected environment is not production.
+ */
+const PROD_ONLY_NAV_ITEMS = [
+  { href: '/admin/dashboard', label: 'Waitlist', icon: ClipboardList },
+] as const;
 
 /**
  * Admin nav chrome.
@@ -82,7 +94,9 @@ const NON_PROD_NAV_ITEMS = [{ href: '/admin/qa', label: 'QA', icon: FlaskConical
 export function AdminNav({ env }: { env: ApiEnv }) {
   const pathname = usePathname();
   const isProd = env === 'production';
-  const items = isProd ? NAV_ITEMS : [...NAV_ITEMS, ...NON_PROD_NAV_ITEMS];
+  const items = isProd
+    ? [...NAV_ITEMS, ...PROD_ONLY_NAV_ITEMS]
+    : [...NAV_ITEMS, ...NON_PROD_NAV_ITEMS];
 
   return (
     <header
