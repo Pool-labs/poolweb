@@ -232,7 +232,15 @@ function AlarmRow({ alarm }: { alarm: AdminAlertSummary }) {
         <span className="ml-auto font-mono text-[11px] text-muted-foreground">{alarm.name}</span>
       </div>
 
-      <p className="mt-1.5 text-xs text-muted-foreground">{alarm.description}</p>
+      {/* The server's frozen description states what firing MEANS, in the
+          present tense ("The API is logging errors well above its normal
+          rate") — so under an OK or not-reporting badge it read as the
+          opposite of the badge (#603). It renders only while the alarm is
+          actually firing; every other state is explained by the state copy
+          below, and the row's label already says what the alarm watches. */}
+      {copy.tone === 'danger' && (
+        <p className="mt-1.5 text-xs text-muted-foreground">{alarm.description}</p>
+      )}
       <p className="mt-1 text-xs text-muted-foreground">{copy.detail}</p>
 
       {alarm.stateReason && (
