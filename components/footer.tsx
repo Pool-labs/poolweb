@@ -49,7 +49,7 @@ export default function Footer() {
         <span aria-hidden="true"> · </span>
         <a href="/terms">Terms of Service</a>
       </p>
-      <small>{`© ${new Date().getFullYear()} Pool Labs LLC. All rights reserved.`}</small>
+      <small>{`© ${new Date().getFullYear()} Pool Labs Inc.. All rights reserved.`}</small>
     </footer>
   )
 }

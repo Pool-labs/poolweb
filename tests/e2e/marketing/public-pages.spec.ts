@@ -21,14 +21,14 @@ test.describe('Marketing pages', () => {
   test('privacy policy renders the official document', async ({ page }) => {
     await page.goto('/privacy');
     await expect(page.getByRole('heading', { name: 'Pool — Privacy Policy' })).toBeVisible();
-    await expect(page.getByText('operated by Pool Labs LLC')).toBeVisible();
+    await expect(page.getByText('operated by Pool Labs Inc.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Information we collect' })).toBeVisible();
   });
 
   test('terms of service renders the official document', async ({ page }) => {
     await page.goto('/terms');
     await expect(page.getByRole('heading', { name: 'Pool — Terms of Service' })).toBeVisible();
-    await expect(page.getByText('Pool Labs LLC, a Missouri limited liability company')).toBeVisible();
+    await expect(page.getByText('Pool Labs Inc., a Delaware corporation')).toBeVisible();
     // The one sentence the whole product hangs on (#392, pinned in-app too).
     await expect(
       page.getByRole('heading', { name: 'What Pool is — and is not' }),
