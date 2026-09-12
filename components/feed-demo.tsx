@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { Heart, ThumbsUp } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 
 /**
  * The feed demo: a sticker-style phone frame auto-playing a ~12s loop of a
- * fake Pool feed ("Lake Weekend 🚤"). Shows the social layer instead of
+ * fake Pool feed ("Lake Weekend"). Shows the social layer instead of
  * claiming it. Cards animate in with transform/opacity; the loop pauses
  * offscreen and on tab hide; reduced-motion shows the full static feed
  * (handled in CSS — .feed-item is fully visible under reduced motion).
@@ -112,7 +114,7 @@ export default function FeedDemo() {
           {/* Pool header */}
           <div className="px-3 pt-2 pb-3 border-b-2 border-navy bg-white">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-display font-bold text-navy text-lg leading-tight">🚤 Lake Weekend</span>
+              <span className="font-display font-bold text-navy text-lg leading-tight">Lake Weekend</span>
               <span className="chip-sticker bg-pool-green/25 text-[12px] tabular-nums">${balance}</span>
             </div>
             <div className="flex items-center mt-2">
@@ -131,7 +133,7 @@ export default function FeedDemo() {
             {/* 0 — pool started */}
             <div className={cn("feed-item text-center", shown(0) && "is-shown")}>
               <span className="inline-block rounded-full border-2 border-navy bg-pool-yellow/90 px-3 py-1 text-xs font-bold text-navy">
-                Maya started Lake Weekend 🚤
+                Maya started Lake Weekend
               </span>
             </div>
 
@@ -166,12 +168,14 @@ export default function FeedDemo() {
                   </p>
                 </div>
                 <div className="flex gap-1.5 mt-2 ml-9 h-6">
-                  <span className={cn("feed-pop chip-sticker text-[11px] py-0", shown(4) && "is-shown")}>🔥 2</span>
+                  <span className={cn("feed-pop chip-sticker text-[11px] py-0", shown(4) && "is-shown")}>
+                    <Heart className="inline h-3 w-3 -mt-0.5" aria-hidden="true" /> 2
+                  </span>
                   <span
                     className={cn("feed-pop chip-sticker text-[11px] py-0", shown(4) && "is-shown")}
                     style={{ transitionDelay: "120ms" }}
                   >
-                    ⛽ 1
+                    <ThumbsUp className="inline h-3 w-3 -mt-0.5" aria-hidden="true" /> 1
                   </span>
                 </div>
               </div>
@@ -190,7 +194,7 @@ export default function FeedDemo() {
                 <div className={cn("feed-pop ml-9 mt-2 flex items-center gap-2", shown(6) && "is-shown")}>
                   <Avatar initial="S" color="bg-pool-yellow" className="w-5 h-5 text-[10px]" />
                   <span className="rounded-full rounded-bl-none border-2 border-navy bg-sky-tint px-2.5 py-0.5 text-xs">
-                    🚤🚤🚤
+                    “let’s go”
                   </span>
                 </div>
               </div>

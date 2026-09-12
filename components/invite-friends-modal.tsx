@@ -22,7 +22,7 @@ interface InviteFriendsModalProps {
 export function InviteFriendsModal({
   open,
   onClose,
-  title = "🎉 You’re on the list!",
+  title = "You’re on the list!",
   description = "Want to bring some friends along? Add them here or share the link.",
   headline,
   subtext,

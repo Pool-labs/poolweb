@@ -61,18 +61,19 @@ export default function Hero() {
         <h1 className="rise">Pool. Tap. Done.</h1>
         <p className="sub rise-2">A social network for people who spend time — and money — together.</p>
         <div className="cta-row rise-2">
-          <Link className="hp-btn hp-btn-pink" href="/preregister">
+          <Link className="hp-btn hp-btn-pink" href="/download">
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 3l1.9 5.8L20 10l-5.4 2.6L12 19l-2.6-6.4L4 10l6.1-1.2z" />
+              <path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" />
             </svg>
-            Pre-register for Beta
+            Get the app
           </Link>
-          <Link className="hp-btn hp-btn-green" href="/questionnaire">
+          <Link className="hp-btn hp-btn-green" href="/faq">
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="5" y="4" width="14" height="17" rx="2" />
-              <path d="M9 4.5V3h6v1.5M9 10h6M9 14h6" />
+              <circle cx="12" cy="12" r="9" />
+              <path d="M9.6 9.4a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.8-.9 1.4v.3" />
+              <circle cx="12" cy="17" r="1" fill="#fff" stroke="none" />
             </svg>
-            Questionnaire
+            How Pool works
           </Link>
         </div>
       </div>

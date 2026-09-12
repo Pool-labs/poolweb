@@ -1,49 +1,63 @@
 import Link from "next/link"
-import { Bell } from "lucide-react"
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faAppStoreIos, faGooglePlay } from '@fortawesome/free-brands-svg-icons'
-import { PoolMark } from "@/components/brand/marks"
 import BrandPattern from "@/components/brand/pattern"
 
+/**
+ * Download.
+ *
+ * ⚠️ THE HERO MARK WAS `PoolMark`, the bare stacked-rings SVG — a different,
+ * simpler mark from the illustrated logo the header and footer use, which is
+ * why it read as unfinished. It now uses the same asset as the rest of the
+ * site, so the page carries one brand rather than two.
+ *
+ * The pre-register card is gone: Pool is launching rather than collecting a
+ * waiting list, and `/preregister` is no longer a public entry point. The page
+ * has one job now — say where the app will be, honestly, until there are real
+ * store links to put here.
+ */
 export default function DownloadPage() {
   return (
     <div className="min-h-screen py-16 sm:py-20 bg-pool-sky relative overflow-hidden">
       <BrandPattern variant="clouds" opacity={0.35} />
       <div className="container mx-auto px-4 relative z-10">
-        <div className="max-w-4xl mx-auto text-center">
+        <div className="max-w-2xl mx-auto text-center">
           <div className="mb-8 flex justify-center">
-            <PoolMark className="h-28 w-auto" />
+            <img
+              src="/images/pool-logo-new.png"
+              alt="Pool"
+              width={112}
+              height={112}
+              className="h-28 w-28 object-contain"
+            />
           </div>
 
-          <h1 className="font-display font-extrabold text-4xl sm:text-5xl md:text-6xl text-navy mb-10">{"Download POOL!"}</h1>
+          <h1 className="font-display font-extrabold text-4xl sm:text-5xl md:text-6xl text-navy mb-6">
+            Get Pool
+          </h1>
+          <p className="text-lg text-navy/80 mb-10 max-w-lg mx-auto">
+            Pool is coming to iPhone and Android. The moment it is live in the stores, the links
+            land right here.
+          </p>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto mb-12">
-            {/* Pre-Register Section */}
-            <div className="sticker sticker-interactive rounded-3xl bg-white p-8 md:-rotate-1 flex flex-col">
-              <div className="flex items-center justify-center mb-4">
-                <span className="inline-flex items-center justify-center w-14 h-14 rounded-full border-2 border-navy bg-pool-yellow">
-                  <Bell className="w-7 h-7 text-navy" />
-                </span>
-              </div>
-              <h2 className="font-display font-bold text-2xl text-navy mb-4">Get Notified When We Launch!</h2>
-              <p className="text-navy/80 mb-6 flex-1">
-                Be the first to know when POOL is available for download. Join our pre-registeration list for exclusive early access.
-              </p>
-              <Link href="/preregister" className="btn-sticker btn-pink w-full text-lg">
-                Pre-Register Now
-              </Link>
+          <div className="sticker rounded-3xl bg-white p-8 md:-rotate-1">
+            <div className="flex justify-center gap-6 mb-5 text-navy">
+              <FontAwesomeIcon icon={faAppStoreIos} className="h-12 w-12" />
+              <FontAwesomeIcon icon={faGooglePlay} className="h-12 w-12" />
             </div>
-
-            <div className="sticker rounded-3xl bg-sky-tint p-8 md:rotate-1 flex flex-col justify-center">
-              <div className="flex justify-center gap-4 mb-4 text-navy">
-                <FontAwesomeIcon icon={faAppStoreIos} className="h-12" />
-                <FontAwesomeIcon icon={faGooglePlay} className="h-12" />
-              </div>
-              <h3 className="font-display font-bold text-2xl text-navy mb-4">Coming Soon!</h3>
-              <p className="text-lg text-navy/80">Our app will be available on both the iOS App Store and Google Play Store soon. Stay tuned!</p>
-            </div>
+            <h2 className="font-display font-bold text-2xl text-navy mb-3">Coming soon</h2>
+            <p className="text-navy/80">
+              The App Store and Google Play links will appear here at launch.
+            </p>
           </div>
 
+          <p className="mt-10 text-navy/80">
+            Questions in the meantime?{" "}
+            <Link href="/contact" className="font-bold text-navy underline underline-offset-4">
+              Get in touch
+            </Link>
+            .
+          </p>
         </div>
       </div>
     </div>

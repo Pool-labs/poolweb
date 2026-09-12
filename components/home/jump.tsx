@@ -28,18 +28,18 @@ export default function Jump() {
           part of something bigger.
         </p>
         <div className="cta-row">
-          <Link className="hp-btn hp-btn-pink" href="/preregister">
+          <Link className="hp-btn hp-btn-pink" href="/download">
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 3l1.9 5.8L20 10l-5.4 2.6L12 19l-2.6-6.4L4 10l6.1-1.2z" />
             </svg>
-            Pre-register for Beta
+            Get the app
           </Link>
-          <Link className="hp-btn hp-btn-green" href="/questionnaire">
+          <Link className="hp-btn hp-btn-green" href="/faq">
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <rect x="5" y="4" width="14" height="17" rx="2" />
               <path d="M9 4.5V3h6v1.5M9 10h6M9 14h6" />
             </svg>
-            Questionnaire
+            How Pool works
           </Link>
         </div>
       </div>

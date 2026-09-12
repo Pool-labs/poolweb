@@ -25,7 +25,7 @@ const pools: Array<{
   accent: string
 }> = [
   {
-    name: "🥞 Brunch Crew",
+    name: "Brunch Crew",
     balance: "$184",
     members: [
       { initial: "M", color: avatarColors.pink },
@@ -38,7 +38,7 @@ const pools: Array<{
     accent: "bg-pool-blue",
   },
   {
-    name: "🎿 Ski Trip '26",
+    name: "Ski Trip '26",
     balance: "$1,240",
     members: [
       { initial: "S", color: avatarColors.green },
@@ -51,14 +51,14 @@ const pools: Array<{
     accent: "bg-pool-yellow",
   },
   {
-    name: "🏠 Apartment 4B",
+    name: "Apartment 4B",
     balance: "$960",
     members: [
       { initial: "A", color: avatarColors.yellow },
       { initial: "D", color: avatarColors.green },
       { initial: "M", color: avatarColors.blue },
     ],
-    feedLine: "Rent day — everyone's in 🎉",
+    feedLine: "Rent day — everyone's in",
     rotate: "md:-rotate-1",
     accent: "bg-pool-pink",
   },

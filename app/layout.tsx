@@ -4,8 +4,7 @@ import { Baloo_2, DM_Sans } from "next/font/google"
 import "./globals.css"
 import "./home.css"
 import "./mobile.css"
-import Header from "@/components/header"
-import Footer from "@/components/footer"
+import SiteChrome from "@/components/site-chrome"
 import ScrollToTop from "@/components/scroll-to-top"
 import { ThemeProvider } from "@/components/theme-provider"
 import MobileInit from "@/components/mobile-init"
@@ -64,9 +63,7 @@ export default function RootLayout({
         >
           <MobileInit />
           <ScrollToTop />
-          <Header />
-          <main>{children}</main>
-          <Footer />
+          <SiteChrome>{children}</SiteChrome>
         </ThemeProvider>
         <Analytics />
       </body>

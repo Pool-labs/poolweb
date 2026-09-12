@@ -152,7 +152,7 @@ export default function SurveyConfirmationPage() {
       <InviteFriendsModal
         open={showInviteModal}
         onClose={() => setShowInviteModal(false)}
-        title={firstName ? `Thanks, ${firstName}! 🎉` : "🎉 You’re on the list!"}
+        title={firstName ? `Thanks, ${firstName}!` : "You’re on the list!"}
         description="Want to bring a friend along? Add them below or share the questionnaire link."
         sharePath="/questionnaire"
       />
