@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ImpersonationSessions } from '@/components/admin/ImpersonationSessions';
 import { adminsApi, AdminApiError } from '@/lib/admin/adminApi';
 import { formatDate } from '@/lib/admin/format';
 import type { AdminAllowlistEntry } from '@/lib/admin/types';
@@ -22,6 +23,10 @@ import type { AdminAllowlistEntry } from '@/lib/admin/types';
  *
  * All calls go through the same-origin `/admin/api/allowlist*` proxy, which
  * injects the Bearer server-side; no token ever touches client JS.
+ *
+ * Also hosts the #84 "Impersonation sessions" oversight list (poolmobile
+ * #590): mutual oversight of "view as" is admin governance, so it lives here
+ * beside the roster of who holds admin access rather than on any user page.
  */
 export default function AdminAdminsPage() {
   const [entries, setEntries] = useState<AdminAllowlistEntry[]>([]);
@@ -221,6 +226,8 @@ export default function AdminAdminsPage() {
           )}
         </CardContent>
       </Card>
+
+      <ImpersonationSessions />
     </div>
   );
 }

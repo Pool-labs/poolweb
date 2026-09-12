@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ViewAsDialog } from '@/components/admin/ViewAsDialog';
 import { usersApi } from '@/lib/admin/adminApi';
 import { formatDateTime } from '@/lib/admin/format';
 import { UserFeatureFlagKey, type AdminUserDetail } from '@/lib/admin/types';
@@ -22,6 +23,7 @@ export default function AdminUserDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [viewAsOpen, setViewAsOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -179,12 +181,37 @@ export default function AdminUserDetailPage() {
                 </Button>
               )}
 
-              {/* #84 impersonation is deferred — disabled seam only, no handler. */}
-              <Button variant="outline" disabled title="Coming soon (#84)">
-                Impersonate (coming soon)
-              </Button>
+              {/* #84 "view as" (poolmobile #590, option 1): a read-only,
+                  15-minute, audited session with the token shown ONCE. The two
+                  refusals knowable up front (platform admin / suspended) are
+                  stated here rather than left to a round trip; every other
+                  refusal — self, a race, a live session — is the server's call
+                  and the dialog surfaces its message verbatim. */}
+              {user.isPlatformAdmin || user.isSuspended ? (
+                <div className="flex flex-col gap-1">
+                  <Button variant="outline" disabled>
+                    View as
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {user.isPlatformAdmin
+                      ? 'Platform admins cannot be impersonated.'
+                      : 'A suspended account cannot be impersonated.'}
+                  </span>
+                </div>
+              ) : (
+                <Button variant="outline" onClick={() => setViewAsOpen(true)}>
+                  View as
+                </Button>
+              )}
             </CardContent>
           </Card>
+
+          <ViewAsDialog
+            targetUserId={user.id}
+            targetName={name ?? user.id}
+            open={viewAsOpen}
+            onOpenChange={setViewAsOpen}
+          />
         </>
       )}
     </div>

@@ -53,6 +53,18 @@ export function formatDateTime(iso: string | null | undefined): string {
   });
 }
 
+/**
+ * Remaining time as "m:ss", clamped at 0:00 — the impersonation countdown
+ * (#84). Minutes-and-seconds only: the longest thing this ever counts is a
+ * 15-minute session TTL.
+ */
+export function formatCountdown(msRemaining: number): string {
+  const totalSeconds = Math.max(0, Math.floor(msRemaining / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
 /** Turn an enum-ish wire value ("FOO_BAR") into a display label ("Foo bar"). */
 export function humanizeEnum(value: string): string {
   const lower = value.replace(/_/g, ' ').toLowerCase();
