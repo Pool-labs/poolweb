@@ -44,7 +44,12 @@ export default function Footer() {
           </a>
         ))}
       </div>
-      <small>{`© ${new Date().getFullYear()} POOL App. All rights reserved.`}</small>
+      <p className="hp-legal-links">
+        <a href="/privacy">Privacy Policy</a>
+        <span aria-hidden="true"> · </span>
+        <a href="/terms">Terms of Service</a>
+      </p>
+      <small>{`© ${new Date().getFullYear()} Pool Labs LLC. All rights reserved.`}</small>
     </footer>
   )
 }

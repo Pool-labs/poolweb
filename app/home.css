@@ -404,3 +404,7 @@ main > :first-child { padding-top: var(--nav-h); }
   .hp .hc-1 { left: -44px; width: 34px; }
   .hp .hc-2 { right: -40px; }
 }
+
+/* Legal links in the footer (#595 — the published Privacy Policy + Terms). */
+.hp-footer .hp-legal-links { margin: 0.5rem 0 0.25rem; font-size: 0.85rem; }
+.hp-footer .hp-legal-links a { text-decoration: underline; text-underline-offset: 3px; }
