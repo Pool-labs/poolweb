@@ -1502,3 +1502,94 @@ export interface SetAppVersionRequirementBody {
  * form can refuse before a round trip. If the two ever disagree, the API wins.
  */
 export const APP_VERSION_MINIMUM_PATTERN = /^\d{1,9}(\.\d{1,9}){0,3}$/;
+
+// ─── Impersonation, "view as" (#84, over poolmobile #590) ────────────────────
+// Hand-copied from `packages/shared/src/types/impersonation.types.ts` and
+// `constants/impersonation.constants.ts` (keep in sync). The API mints, lists
+// and revokes short-lived READ-ONLY tokens that render the product as one user.
+
+/**
+ * Session TTL, MIRRORED from `IMPERSONATION.TTL_MINUTES` for copy only — the
+ * authoritative TTL is baked into the token's `exp` AND the session row, and
+ * the start response echoes it (`ttlMinutes`) so the countdown cannot drift.
+ */
+export const IMPERSONATION_TTL_MINUTES = 15;
+
+/**
+ * Reason bounds, MIRRORED from `IMPERSONATION.MIN/MAX_REASON_LENGTH`. A
+ * COURTESY, not the guard — the API's Zod schema is the authority; these exist
+ * so the form can refuse before a round trip. If they disagree, the API wins.
+ */
+export const IMPERSONATION_MIN_REASON_LENGTH = 10;
+export const IMPERSONATION_MAX_REASON_LENGTH = 280;
+
+/**
+ * Lifecycle state, DERIVED server-side at read time from `endedAt`/`expiresAt`.
+ * There is no stored status column and no sweeper: expiry is a property of the
+ * row. The dashboard may additionally show a locally-elapsed active session as
+ * expired once its countdown hits zero — the server would answer the same.
+ */
+export enum ImpersonationSessionStatus {
+  Active = 'active',
+  Expired = 'expired',
+  Ended = 'ended',
+}
+
+/** Why a session stopped being usable (written only on the explicit end). */
+export enum ImpersonationEndReason {
+  /** The impersonating admin ended their own session. */
+  AdminEnded = 'admin_ended',
+  /** A DIFFERENT platform admin ended someone else's live session. */
+  RevokedByAdmin = 'revoked_by_admin',
+  /** Ended after `expiresAt` — the TTL had already killed the token. */
+  Expired = 'expired',
+}
+
+/** One impersonation session as this dashboard renders it. */
+export interface ImpersonationSessionSummary {
+  id: string;
+  status: ImpersonationSessionStatus;
+  adminUserId: string;
+  /** Nullable — an account can exist mid-signup. Fall back to the id. */
+  adminEmail: string | null;
+  adminDisplayName: string | null;
+  targetUserId: string;
+  targetEmail: string | null;
+  targetDisplayName: string | null;
+  /** The support justification typed by the admin at start. Never optional. */
+  reason: string;
+  createdAt: string;
+  expiresAt: string;
+  endedAt: string | null;
+  endedById: string | null;
+  endReason: ImpersonationEndReason | null;
+}
+
+/**
+ * Inner `data` of `POST /admin/impersonation/sessions`.
+ *
+ * ⚠️ `impersonationToken` is returned EXACTLY ONCE, here. The server stores
+ * only the session id it carries, so it can never be re-read, re-issued or
+ * recovered — losing it means ending this session and starting a new
+ * (separately audited) one. The dashboard must hold it in dialog-local state
+ * only: never a cookie, never localStorage, never state that outlives the
+ * dialog.
+ */
+export interface StartImpersonationResponse {
+  session: ImpersonationSessionSummary;
+  /** Bearer for the MOBILE API as the target user. Read-only, short-lived. */
+  impersonationToken: string;
+  expiresAt: string;
+  /** TTL echoed by the server so the countdown cannot drift from it. */
+  ttlMinutes: number;
+}
+
+/** Inner `data` of `GET /admin/impersonation/sessions`. */
+export interface ImpersonationSessionListResponse {
+  sessions: ImpersonationSessionSummary[];
+}
+
+/** Inner `data` of `POST /admin/impersonation/sessions/:id/end`. */
+export interface EndImpersonationResponse {
+  session: ImpersonationSessionSummary;
+}

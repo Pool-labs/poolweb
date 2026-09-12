@@ -76,6 +76,10 @@ import type {
   QaWorkflowResponse,
   QaWorkflowSettlementBody,
   UserFeatureFlagKey,
+  EndImpersonationResponse,
+  ImpersonationSessionListResponse,
+  ImpersonationSessionStatus,
+  StartImpersonationResponse,
 } from './types';
 
 const PROXY_BASE = '/admin/api';
@@ -377,6 +381,46 @@ export const appVersionApi = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+};
+
+// ─── Impersonation, "view as" (#84, over poolmobile #590) ────────────────────
+// The highest-risk capability on the admin surface, and the reason every call
+// here is identity-gated server-side: "who viewed as whom, and why" is audited
+// with the REAL admin as actor, which a shared secret could never attribute.
+//
+// ⚠️ THE TOKEN IS RETURNED EXACTLY ONCE, by `start`. It is a live bearer for
+// the MOBILE API as the target user (read-only, 15-minute TTL) and the server
+// cannot re-issue it. Callers must keep it in dialog-local state only — never
+// a cookie, never localStorage, never anything that outlives the dialog. This
+// is the ONE credential that ever transits client JS on this surface, and it
+// does so because the Next proxy injects the ADMIN's bearer and has no
+// mechanism to carry a different one (poolmobile#590's option-1 decision).
+
+export const impersonationApi = {
+  /**
+   * Start a session. Refused (403) for self, a platform admin, or a suspended/
+   * deleted target; 409 while the caller already has a live session (one per
+   * admin). The reason is MANDATORY (10–280 chars) because it lands on the
+   * audit row — the server is the authority on all of it.
+   */
+  start: (userId: string, reason: string) =>
+    request<StartImpersonationResponse>('/impersonation/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ userId, reason }),
+    }),
+  /** Oversight list — EVERY admin's sessions, newest first. */
+  list: (params: { status?: ImpersonationSessionStatus; limit?: number } = {}) =>
+    request<ImpersonationSessionListResponse>(`/impersonation/sessions${query({ ...params })}`),
+  /**
+   * End (or revoke) a session. ANY active admin may end ANY session — mutual
+   * visibility is the oversight model. The token dies on its very next
+   * request. 409 when the session already ended (someone else won the race).
+   */
+  end: (id: string) =>
+    request<EndImpersonationResponse>(
+      `/impersonation/sessions/${encodeURIComponent(id)}/end`,
+      { method: 'POST' },
+    ),
 };
 
 export const qaApi = {
