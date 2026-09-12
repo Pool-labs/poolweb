@@ -333,3 +333,22 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Published legal documents (/privacy, /terms — poolmobile #595) ──────────
+   The HTML is generated from canonical markdown; there is no Tailwind
+   typography plugin in this project, so these element styles do the work. */
+.legal-doc { line-height: 1.65; font-size: 1rem; }
+.legal-doc h1 { font-size: 2.25rem; font-weight: 800; margin: 0 0 1.5rem; }
+.legal-doc h2 { font-size: 1.5rem; font-weight: 700; margin: 2.5rem 0 1rem; }
+.legal-doc h3 { font-size: 1.15rem; font-weight: 600; margin: 1.5rem 0 0.5rem; }
+.legal-doc p { margin: 0.75rem 0; }
+.legal-doc ul, .legal-doc ol { margin: 0.75rem 0 0.75rem 1.5rem; list-style: disc; }
+.legal-doc ol { list-style: decimal; }
+.legal-doc li { margin: 0.35rem 0; }
+.legal-doc a { text-decoration: underline; text-underline-offset: 4px; }
+.legal-doc hr { margin: 2rem 0; border-color: hsl(var(--border)); }
+.legal-doc blockquote { border-left: 3px solid hsl(var(--border)); padding-left: 1rem; margin: 1rem 0; color: hsl(var(--muted-foreground)); }
+.legal-doc table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.925rem; display: block; overflow-x: auto; }
+.legal-doc th, .legal-doc td { border: 1px solid hsl(var(--border)); padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; }
+.legal-doc th { background: hsl(var(--muted)); font-weight: 600; }
+.legal-doc code { font-family: ui-monospace, monospace; font-size: 0.9em; background: hsl(var(--muted)); padding: 0.1em 0.35em; border-radius: 0.25rem; }
