@@ -1459,3 +1459,46 @@ export interface AdminReviewReportInput {
   action?: ReportAction;
   notes?: string;
 }
+
+// ─── #313 force-update gate (poolmobile #590) ────────────────────────────────
+//
+// Hand-copied from `packages/shared/src/types/app-version.types.ts` and
+// `constants/app-version.constants.ts`, the same arrangement every other DTO in
+// this file uses — this app is a pure REST client and shares no build with the
+// API.
+
+/** The platform a binary was built for. */
+export enum AppPlatform {
+  Ios = 'ios',
+  Android = 'android',
+}
+
+/**
+ * One platform's requirement as the admin surface sees it.
+ *
+ * `minimumVersion: null` means NO MINIMUM IS SET — the ordinary state, the one
+ * every environment starts in. It is not `0.0.0` and it is not an error.
+ */
+export interface AppVersionRequirementRecord {
+  platform: AppPlatform;
+  minimumVersion: string | null;
+  updatedAt: string;
+  /** The platform admin who last set it. Null for a row that predates any set. */
+  updatedById: string | null;
+}
+
+/** Body of `PUT /admin/app/requirements`. `null` clears. */
+export interface SetAppVersionRequirementBody {
+  platform: AppPlatform;
+  minimumVersion: string | null;
+}
+
+/**
+ * What the API will accept as a minimum — a plain dotted store version.
+ *
+ * ⚠️ MIRRORED from `APP_VERSION_MINIMUM_PATTERN`, and it is a COURTESY, not the
+ * guard: the API validates with its own copy and a hand-written CHECK
+ * constraint makes an unrankable minimum UNSTORABLE. This exists only so the
+ * form can refuse before a round trip. If the two ever disagree, the API wins.
+ */
+export const APP_VERSION_MINIMUM_PATTERN = /^\d{1,9}(\.\d{1,9}){0,3}$/;
