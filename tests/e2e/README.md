@@ -74,4 +74,17 @@ Mailtrap capture inbox. The setup project (`auth.setup.ts`):
 - **User logs**: fetched exactly once per run (each fetch writes an
   `admin.user_logs_viewed` audit row by design).
 
+## What DOES write, and why
+
+- **View as** (`admin/view-as.spec.ts`, poolweb #30): starts one real
+  read-only impersonation session on staging — the only way to reach the
+  one-time token phase whose `Copy token` feedback it verifies — then ENDS it
+  through the Admins page. Two audit rows per run
+  (`admin.impersonation_started` / `_ended`), a named reason on both, and a
+  skip (never an end of somebody else's session) if a live one already exists.
+- **Widened detail rendering** (`admin/detail-rich.spec.ts`, poolweb #31):
+  writes nothing — it intercepts the real detail GET and widens the response
+  body to the poolmobile #618 shape in flight, because no environment serves
+  that shape yet.
+
 CI wiring is out of scope for the first pass (poolmobile #594's AC).

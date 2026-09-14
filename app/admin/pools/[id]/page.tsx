@@ -11,16 +11,40 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  ABSENT,
+  ChipList,
+  DetailCard,
+  Field,
+  TextBlock,
+  Unreported,
+  yesNo,
+} from '@/components/admin/detail';
 import { poolsApi } from '@/lib/admin/adminApi';
+import { parseCityKey } from '@/lib/admin/cityKey';
 import { formatDateTime, formatMoney, humanizeEnum } from '@/lib/admin/format';
-import type {
-  AdminDepositEntry,
-  AdminLedgerSettlement,
-  AdminLedgerTransaction,
-  AdminPoolDetail,
-  AdminPoolLedgerSummary,
-  BalanceEntry,
+import {
+  hasRichPoolDetail,
+  type AdminDepositEntry,
+  type AdminLedgerSettlement,
+  type AdminLedgerTransaction,
+  type AdminPoolDetail,
+  type AdminPoolLedgerSummary,
+  type BalanceEntry,
 } from '@/lib/admin/types';
+
+/**
+ * Pool detail (#83 management + #82 read-only ledger), regrouped into sections
+ * by poolweb #31 over the poolmobile #618 contract: Identity · Location ·
+ * About · Money · Members · Lifecycle, plus the ledger tabs unchanged.
+ *
+ * Renders against BOTH the narrow (pre-#618) and the widened payload — the
+ * #112 switch can point this page at a production API that has not been
+ * dispatched since June — and a section the API does not report says so in
+ * one line (`Unreported`). The roster links every member through to the
+ * (audited) user page; the pool read itself stays un-audited, which is why the
+ * roster carries name/username/role/joinedAt and never a contact detail.
+ */
 
 export default function AdminPoolDetailPage() {
   const params = useParams<{ id: string }>();
@@ -93,6 +117,9 @@ export default function AdminPoolDetailPage() {
             <Badge variant="secondary">{humanizeEnum(pool.status)}</Badge>
             <Badge variant="outline">{humanizeEnum(pool.visibility)}</Badge>
             {pool.isSuspended && <Badge variant="destructive">Suspended</Badge>}
+            {/* Staging-only (#566): rendered ONLY when present, so a production
+                page carries no trace of it. */}
+            {pool.seedCohort && <Badge variant="outline">Seed cohort: {pool.seedCohort}</Badge>}
           </div>
 
           {actionError && (
@@ -106,30 +133,28 @@ export default function AdminPoolDetailPage() {
             <StatTile label="Members" value={String(pool.memberCount)} />
             <StatTile
               label="Total deposited"
-              value={ledger ? formatMoney(ledger.totalDepositedCents) : '—'}
+              value={ledger ? formatMoney(ledger.totalDepositedCents) : ABSENT}
               mono
             />
             <StatTile
               label="Total spent"
-              value={ledger ? formatMoney(ledger.totalSpentCents) : '—'}
+              value={
+                ledger
+                  ? formatMoney(ledger.totalSpentCents)
+                  : pool.totalSpentCents !== undefined
+                    ? formatMoney(pool.totalSpentCents)
+                    : ABSENT
+              }
               mono
             />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <Field label="Pool ID" value={pool.id} mono />
-                <Field label="Creator" value={pool.creator.displayName ?? pool.creator.email ?? pool.creator.id} />
-                <Field label="Created" value={formatDateTime(pool.createdAt)} />
-                <Field label="Updated" value={formatDateTime(pool.updatedAt)} />
-                {pool.deletedAt && <Field label="Suspended at" value={formatDateTime(pool.deletedAt)} />}
-              </CardContent>
-            </Card>
-
+            <IdentitySection pool={pool} />
+            <LocationSection pool={pool} />
+            <AboutSection pool={pool} />
+            <MoneySection pool={pool} ledger={ledger} />
+            <LifecycleSection pool={pool} />
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Actions</CardTitle>
@@ -152,6 +177,8 @@ export default function AdminPoolDetailPage() {
             </Card>
           </div>
 
+          <MembersSection pool={pool} />
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Ledger (read-only)</CardTitle>
@@ -163,6 +190,195 @@ export default function AdminPoolDetailPage() {
         </>
       )}
     </div>
+  );
+}
+
+// ─── Sections (#31 over the #618 contract) ───────────────────────────────────
+
+function IdentitySection({ pool }: { pool: AdminPoolDetail }) {
+  return (
+    <DetailCard title="Identity">
+      <Field label="Pool ID" value={pool.id} mono />
+      <Field label="Name" value={pool.name} />
+      <Field label="Status" value={humanizeEnum(pool.status)} />
+      <Field label="Visibility" value={humanizeEnum(pool.visibility)} />
+      <Field label="Suspended" value={pool.isSuspended ? 'Yes' : 'No'} />
+      {pool.deletedAt && <Field label="Suspended at" value={formatDateTime(pool.deletedAt)} />}
+      <Field label="Creator">
+        <Link href={`/admin/users/${pool.creator.id}`} className="underline">
+          {pool.creator.displayName ?? pool.creator.email ?? pool.creator.id}
+        </Link>
+      </Field>
+      {pool.seedCohort && <Field label="Seed cohort" value={pool.seedCohort} />}
+    </DetailCard>
+  );
+}
+
+function LocationSection({ pool }: { pool: AdminPoolDetail }) {
+  const rich = hasRichPoolDetail(pool);
+  const key = parseCityKey(pool.locationCityKey);
+  return (
+    <DetailCard
+      title="Location"
+      description="City-level from the canonical key (#128/#469); the exact venue only if the owner opted in (#21)."
+    >
+      {!rich ? (
+        <Unreported what="Location fields" />
+      ) : (
+        <>
+          <Field label="City" value={pool.locationCity} />
+          <Field label="Region" value={key?.regionCode} />
+          <Field label="Country" value={key ? (key.countryName ?? ABSENT) : null} />
+          <Field label="City key" value={pool.locationCityKey} mono />
+          <Field label="Exact venue shown" value={yesNo(pool.showExactVenue)} />
+          <Field label="Venue address" value={pool.venueAddress} />
+          <Field
+            label="Coordinates"
+            mono
+            value={
+              pool.locationLat === null ||
+              pool.locationLat === undefined ||
+              pool.locationLng === null ||
+              pool.locationLng === undefined
+                ? null
+                : `${pool.locationLat.toFixed(5)}, ${pool.locationLng.toFixed(5)}`
+            }
+          />
+        </>
+      )}
+    </DetailCard>
+  );
+}
+
+function AboutSection({ pool }: { pool: AdminPoolDetail }) {
+  const rich = hasRichPoolDetail(pool);
+  return (
+    <DetailCard title="About" description="What the pool is for (#236), its tags and house rules (#401).">
+      {!rich ? (
+        <Unreported what="About fields" />
+      ) : (
+        <>
+          <Field label="Category" value={pool.category} />
+          <Field label="Subcategory" value={pool.subcategory} />
+          <ChipList label="Tags" items={pool.tags} labelFn={humanizeEnum} />
+          <ChipList label="Custom tags" items={pool.customTags} />
+          <TextBlock label="Short description" value={pool.shortDescription} />
+          <TextBlock label="House rules (advisory — Pool does not check these)" value={pool.rules} />
+          <Field label="Hidden from global leaderboards" value={yesNo(pool.hideFromGlobalLeaderboards)} />
+        </>
+      )}
+    </DetailCard>
+  );
+}
+
+function MoneySection({ pool, ledger }: { pool: AdminPoolDetail; ledger: AdminPoolLedgerSummary | null }) {
+  const rich = hasRichPoolDetail(pool);
+  return (
+    <DetailCard title="Money" description="Integer cents from the pool row; the ledger tabs below are the row-level record.">
+      <Field label="Balance" value={formatMoney(pool.balanceCents)} mono />
+      {!rich ? (
+        <Unreported what="Contribution, spend and member-limit fields" />
+      ) : (
+        <>
+          <Field
+            label="Contribution amount"
+            mono
+            value={
+              pool.contributionAmountCents === undefined ? null : formatMoney(pool.contributionAmountCents)
+            }
+          />
+          <Field
+            label="Total spent"
+            mono
+            value={pool.totalSpentCents === undefined ? null : formatMoney(pool.totalSpentCents)}
+          />
+          <Field label="Expenses logged" value={pool.totalExpenses} />
+          <Field
+            label="Net admin adjustments"
+            mono
+            value={
+              pool.netAdjustmentsCents === undefined || pool.netAdjustmentsCents === null
+                ? ledger
+                  ? formatMoney(ledger.netAdjustmentsCents ?? 0)
+                  : null
+                : formatMoney(pool.netAdjustmentsCents)
+            }
+          />
+          <Field
+            label="Member limit"
+            value={
+              pool.memberLimit === undefined && pool.memberLimitMin === undefined
+                ? null
+                : `${pool.memberLimitMin ?? ABSENT} – ${pool.memberLimit ?? ABSENT}`
+            }
+          />
+        </>
+      )}
+    </DetailCard>
+  );
+}
+
+function LifecycleSection({ pool }: { pool: AdminPoolDetail }) {
+  return (
+    <DetailCard title="Lifecycle">
+      <Field label="Created" value={formatDateTime(pool.createdAt)} />
+      <Field label="Updated" value={formatDateTime(pool.updatedAt)} />
+      <Field
+        label="Last activity"
+        value={hasRichPoolDetail(pool) ? formatDateTime(pool.lastActivityAt) : null}
+      />
+      {pool.deletedAt && <Field label="Suspended at" value={formatDateTime(pool.deletedAt)} />}
+    </DetailCard>
+  );
+}
+
+function MembersSection({ pool }: { pool: AdminPoolDetail }) {
+  const members = pool.members;
+  return (
+    <DetailCard
+      title={`Members (${pool.memberCount})`}
+      description="Active roster. Each row opens the user's (audited) detail page; contact details never travel on this payload."
+    >
+      {members === undefined ? (
+        <Unreported what="The roster rows" />
+      ) : members.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No active members.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Member</TableHead>
+                <TableHead>Username</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Joined</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {members.map((m) => (
+                <TableRow key={m.userId}>
+                  <TableCell>
+                    <Link href={`/admin/users/${m.userId}`} className="font-medium underline">
+                      {m.displayName ?? m.username ?? m.userId}
+                    </Link>
+                    {m.userId === pool.creator.id && (
+                      <Badge variant="outline" className="ml-2">
+                        Creator
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {m.username ? `@${m.username}` : ABSENT}
+                  </TableCell>
+                  <TableCell>{humanizeEnum(m.role)}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDateTime(m.joinedAt)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </DetailCard>
   );
 }
 
@@ -447,15 +663,6 @@ function StatTile({ label, value, mono }: { label: string; value: string; mono?:
         <div className={mono ? 'font-mono text-xl font-bold' : 'text-2xl font-bold'}>{value}</div>
       </CardContent>
     </Card>
-  );
-}
-
-function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={mono ? 'font-mono text-xs' : 'text-right'}>{value}</span>
-    </div>
   );
 }
 

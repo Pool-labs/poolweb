@@ -265,6 +265,55 @@ export interface AdminUserMembershipSummary {
   member: number;
 }
 
+/**
+ * The widened detail contract (poolmobile #618 — the founder's 2026-09-13
+ * decisions: full detail INCLUDING the sensitive tier, and the user read is
+ * AUDITED ON VIEW server-side as `admin.user_detail_viewed`).
+ *
+ * ⚠️ Every #618 field is OPTIONAL here on purpose. The dashboard renders
+ * against whichever API the #112 switch points at, and production is on a
+ * pre-#618 image (its `/admin/users/:id` returns the narrow shape above the
+ * line). A required field would make the page a liar about a payload that
+ * simply predates it; an optional one lets each section say "not reported by
+ * this API version" instead. `hasRichUserDetail` is the one predicate that
+ * decides which of the two the page is looking at.
+ *
+ * Field names are the Prisma column names — the same names #618's allowlist
+ * select will emit — so wiring the data on is a server deploy, not a second
+ * frontend change.
+ */
+
+/** A linked social identity (#266). `provider` is `apple` | `google`. */
+export interface AdminUserIdentitySummary {
+  provider: string;
+  /** ISO-8601; when the identity was linked. */
+  linkedAt: string;
+}
+
+/**
+ * The five payment handles (#146/#250) — the sensitive tier's sharpest edge:
+ * a Zelle handle IS an email and an Interac handle IS a phone number.
+ * `null` = not set (an unconfirmed handle is unrepresentable server-side).
+ */
+export interface AdminUserPaymentHandles {
+  venmo: string | null;
+  cashapp: string | null;
+  paypal: string | null;
+  zelle: string | null;
+  interac: string | null;
+}
+
+/** One pool the user is an ACTIVE member of — the row the page links through. */
+export interface AdminUserPoolMembership {
+  poolId: string;
+  poolName: string;
+  role: string;
+  /** ISO-8601. */
+  joinedAt: string;
+  poolStatus?: PoolStatus;
+  poolVisibility?: PoolVisibility;
+}
+
 export interface AdminUserDetail {
   id: string;
   email: string | null;
@@ -280,6 +329,64 @@ export interface AdminUserDetail {
   isPlatformAdmin: boolean;
   poolCount: number;
   membership: AdminUserMembershipSummary;
+
+  // ── #618 — location. Country + region + city all derive from the key. ──
+  locationCity?: string | null;
+  /** `name|region|country` (#128/#469) — parsed by `parseCityKey`. */
+  locationCityKey?: string | null;
+  shareLocation?: boolean;
+  locationUpdatedAt?: string | null;
+  /** Sensitive tier (founder decision): raw coordinates. */
+  locationLat?: number | null;
+  locationLng?: number | null;
+
+  // ── #618 — profile. ──
+  /** Sensitive tier: the exact date of birth (ISO-8601). */
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  occupation?: string | null;
+  occupationDetail?: string | null;
+  lifestyleStatus?: string | null;
+  lifestyleDetail?: string | null;
+  interests?: string[];
+  customInterests?: string[];
+  bio?: string | null;
+  isDiscoverable?: boolean;
+
+  // ── #618 — engagement / account. ──
+  /** Last seen (ISO-8601). */
+  lastActivityAt?: string | null;
+  pointBalance?: number;
+  lifetimePoints?: number;
+  currentStreak?: number;
+  longestStreak?: number;
+  /** #453 — set when Apple's relay (or the address itself) reported dead. */
+  emailUndeliverableAt?: string | null;
+  hasPassword?: boolean;
+  identities?: AdminUserIdentitySummary[];
+  trustedDeviceCount?: number;
+  pushTokenCount?: number;
+
+  // ── #618 — sensitive tier: payment handles + preferred rail. ──
+  paymentHandles?: AdminUserPaymentHandles;
+  preferredPaymentProvider?: string | null;
+
+  // ── #618 — memberships, upgraded from counts to the actual pools. ──
+  pools?: AdminUserPoolMembership[];
+
+  // ── #618 — staging context (#566 / #479). Null/absent in production. ──
+  seedCohort?: string | null;
+  demoMode?: string | null;
+}
+
+/**
+ * Whether the payload is the widened #618 shape. A pre-#618 API omits every
+ * new key, so the presence of ANY one that the server always includes (nullable
+ * or not) is the discriminator — `lastActivityAt` is emitted unconditionally
+ * by the widened select, even when null.
+ */
+export function hasRichUserDetail(user: AdminUserDetail): boolean {
+  return 'lastActivityAt' in user;
 }
 
 export interface AdminPoolSummary {
@@ -301,6 +408,21 @@ export interface AdminPoolCreatorSummary {
   displayName: string | null;
 }
 
+/**
+ * One ACTIVE member on the pool detail's roster (#618). Deliberately
+ * name/username/role/joinedAt ONLY — a pool is not a person, so the pool read
+ * is not audited, and it therefore never carries a member's contact details
+ * or handles (those live on the audited user page one click away).
+ */
+export interface AdminPoolMemberSummary {
+  userId: string;
+  displayName: string | null;
+  username: string | null;
+  role: string;
+  /** ISO-8601. */
+  joinedAt: string;
+}
+
 export interface AdminPoolDetail {
   id: string;
   name: string;
@@ -313,6 +435,49 @@ export interface AdminPoolDetail {
   creator: AdminPoolCreatorSummary;
   createdAt: string;
   updatedAt: string;
+
+  // ── #618 — location. ──
+  locationCity?: string | null;
+  /** `name|region|country` (#128/#469) — parsed by `parseCityKey`. */
+  locationCityKey?: string | null;
+  /** #21 — the owner's opt-in to publish the exact venue. */
+  showExactVenue?: boolean;
+  venueAddress?: string | null;
+  /** Sensitive tier (founder decision): raw coordinates. */
+  locationLat?: number | null;
+  locationLng?: number | null;
+
+  // ── #618 — about: what the pool is FOR. ──
+  /** #236 taxonomy — free text, deliberately not an enum. */
+  category?: string | null;
+  subcategory?: string | null;
+  tags?: string[];
+  customTags?: string[];
+  /** #401 house rules — advisory, never enforced. */
+  rules?: string | null;
+  shortDescription?: string | null;
+
+  // ── #618 — money (integer cents) + config. ──
+  contributionAmountCents?: number;
+  totalSpentCents?: number;
+  totalExpenses?: number;
+  /** #106 — signed net of admin ledger adjustments, if the API reports it. */
+  netAdjustmentsCents?: number | null;
+  memberLimit?: number | null;
+  memberLimitMin?: number | null;
+  hideFromGlobalLeaderboards?: boolean;
+
+  // ── #618 — lifecycle extras + roster. ──
+  lastActivityAt?: string | null;
+  members?: AdminPoolMemberSummary[];
+
+  // ── #618 — staging context (#566). Null/absent in production. ──
+  seedCohort?: string | null;
+}
+
+/** Whether the payload is the widened #618 shape (see `hasRichUserDetail`). */
+export function hasRichPoolDetail(pool: AdminPoolDetail): boolean {
+  return 'category' in pool;
 }
 
 // Per-endpoint response shapes (the `data` inside `{ success, data }`).
@@ -379,6 +544,11 @@ export interface AdminPoolLedgerSummary {
   cardBalanceCents: number;
   totalDepositedCents: number;
   totalSpentCents: number;
+  /**
+   * #106 — signed net of admin ledger adjustments. Emitted by the API since
+   * the adjustments landed; optional here because a pre-#106 image omits it.
+   */
+  netAdjustmentsCents?: number;
   memberBalances: BalanceEntry[];
   counts: {
     deposits: number;

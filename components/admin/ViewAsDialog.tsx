@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, Copy, Eye, Loader2, ShieldAlert } from 'lucide-react';
+import { Check, Copy, Eye, Loader2, ShieldAlert, XCircle } from 'lucide-react';
 import Link from 'next/link';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -45,7 +45,45 @@ import {
  * one). While the token is on screen, the overlay and Escape do NOT dismiss:
  * an accidental close would destroy a credential that cannot be re-shown, so
  * closing requires the named "Done — discard the token" action.
+ *
+ * COPY FEEDBACK (#30). This is the one copy in the product that must never be
+ * silent: the token is a live credential shown once, and an operator who is
+ * unsure whether the copy landed has to choose between closing (and destroying
+ * it) and minting a second, separately audited session. So `Copy token` ends
+ * in one of two VISIBLE, DISTINCT outcomes — "Copied" or "Couldn't copy" — that
+ * both revert after a short dwell so the control stays reusable, and both are
+ * ANNOUNCED through a polite live region, because the label flip is otherwise
+ * purely visual. A refusal (the Clipboard API rejects on a denied permission or
+ * a non-secure context, and is absent entirely on some contexts) additionally
+ * selects the token so a manual ⌘C / Ctrl+C still works — it never looks like
+ * success, and it never claims the token was copied.
  */
+
+/** Outcome of the last `Copy token` attempt. `Idle` is also the reverted state. */
+enum CopyState {
+  Idle = 'idle',
+  Copied = 'copied',
+  Failed = 'failed',
+}
+
+/** How long a copy outcome stays on the button before it reverts to reusable. */
+const COPY_FEEDBACK_MS = 2500;
+/** A failure lingers longer — it carries an instruction the operator has to act on. */
+const COPY_FAILURE_FEEDBACK_MS = 6000;
+/**
+ * Gap between blanking the live region and writing the outcome into it. A
+ * MACROTASK, deliberately: two setStates in one tick (or across a microtask)
+ * can be batched into a single render, in which case the blank never reaches
+ * the DOM and a repeated identical outcome is never re-spoken.
+ */
+const COPY_ANNOUNCE_DELAY_MS = 50;
+
+const COPY_ANNOUNCEMENT: Readonly<Record<CopyState, string>> = {
+  [CopyState.Idle]: '',
+  [CopyState.Copied]: 'Token copied to the clipboard.',
+  [CopyState.Failed]:
+    'Could not copy the token. It is selected — copy it manually with Command-C or Control-C.',
+};
 
 interface ViewAsDialogProps {
   targetUserId: string;
@@ -63,9 +101,17 @@ export function ViewAsDialog({ targetUserId, targetName, open, onOpenChange }: V
   const [conflict, setConflict] = useState(false);
   /** ⚠️ The ONLY place the token ever lives. Cleared on every close. */
   const [result, setResult] = useState<StartImpersonationResponse | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<CopyState>(CopyState.Idle);
+  /**
+   * The live-region text. Kept SEPARATE from `copyState` so a second copy can
+   * re-announce: assistive tech speaks a live region when its text CHANGES,
+   * and two consecutive successes would otherwise be one announcement.
+   */
+  const [announcement, setAnnouncement] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const tokenRef = useRef<HTMLTextAreaElement | null>(null);
+  const revertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const announceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const tokenOnScreen = result !== null;
 
@@ -76,14 +122,30 @@ export function ViewAsDialog({ targetUserId, targetName, open, onOpenChange }: V
     return () => clearInterval(interval);
   }, [tokenOnScreen]);
 
+  const clearRevertTimer = useCallback(() => {
+    if (revertTimer.current !== null) {
+      clearTimeout(revertTimer.current);
+      revertTimer.current = null;
+    }
+    if (announceTimer.current !== null) {
+      clearTimeout(announceTimer.current);
+      announceTimer.current = null;
+    }
+  }, []);
+
+  // A pending revert or announcement must not fire into an unmounted dialog.
+  useEffect(() => clearRevertTimer, [clearRevertTimer]);
+
   const reset = useCallback(() => {
     setReason('');
     setSubmitting(false);
     setError(null);
     setConflict(false);
     setResult(null); // ← the token is gone from the page here.
-    setCopied(false);
-  }, []);
+    clearRevertTimer();
+    setCopyState(CopyState.Idle);
+    setAnnouncement('');
+  }, [clearRevertTimer]);
 
   const handleOpenChange = (next: boolean) => {
     if (!next) reset();
@@ -115,15 +177,41 @@ export function ViewAsDialog({ targetUserId, targetName, open, onOpenChange }: V
     }
   };
 
+  /** Settle the button into an outcome, and schedule its revert to reusable. */
+  const settleCopy = (outcome: CopyState.Copied | CopyState.Failed) => {
+    clearRevertTimer();
+    setCopyState(outcome);
+    // Blank first so an identical repeat outcome still changes the text and is
+    // spoken again (see `announcement`); the message lands one macrotask later.
+    setAnnouncement('');
+    announceTimer.current = setTimeout(() => {
+      announceTimer.current = null;
+      setAnnouncement(COPY_ANNOUNCEMENT[outcome]);
+    }, COPY_ANNOUNCE_DELAY_MS);
+    revertTimer.current = setTimeout(
+      () => {
+        revertTimer.current = null;
+        setCopyState(CopyState.Idle);
+      },
+      outcome === CopyState.Failed ? COPY_FAILURE_FEEDBACK_MS : COPY_FEEDBACK_MS,
+    );
+  };
+
   const onCopy = async () => {
     if (!result) return;
     try {
+      // `navigator.clipboard` is undefined outside a secure context — that is a
+      // refusal too, and must land on the same failure path as a rejection.
+      if (typeof navigator === 'undefined' || !navigator.clipboard) {
+        throw new Error('Clipboard API unavailable');
+      }
       await navigator.clipboard.writeText(result.impersonationToken);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      settleCopy(CopyState.Copied);
     } catch {
-      // Clipboard API refused (permissions / non-secure context): select the
-      // token so a manual ⌘C still works, and say nothing false.
+      // Clipboard API refused (permissions / non-secure context): say so —
+      // distinctly from success — and select the token so a manual ⌘C still
+      // works. Nothing here may claim the token was copied.
+      settleCopy(CopyState.Failed);
       tokenRef.current?.focus();
       tokenRef.current?.select();
     }
@@ -243,15 +331,31 @@ export function ViewAsDialog({ targetUserId, targetName, open, onOpenChange }: V
                 aria-label="Impersonation token (shown once)"
               />
               <div className="flex items-center justify-between gap-2">
-                <Button variant="outline" size="sm" onClick={() => void onCopy()}>
-                  {copied ? (
+                <Button
+                  variant={copyState === CopyState.Failed ? 'destructive' : 'outline'}
+                  size="sm"
+                  onClick={() => void onCopy()}
+                  aria-label={
+                    copyState === CopyState.Copied
+                      ? 'Copy token — copied'
+                      : copyState === CopyState.Failed
+                        ? 'Copy token — could not copy'
+                        : 'Copy token'
+                  }
+                >
+                  {copyState === CopyState.Copied ? (
                     <>
-                      <Check className="mr-1 h-4 w-4" />
+                      <Check className="mr-1 h-4 w-4" aria-hidden="true" />
                       Copied
+                    </>
+                  ) : copyState === CopyState.Failed ? (
+                    <>
+                      <XCircle className="mr-1 h-4 w-4" aria-hidden="true" />
+                      Couldn&apos;t copy
                     </>
                   ) : (
                     <>
-                      <Copy className="mr-1 h-4 w-4" />
+                      <Copy className="mr-1 h-4 w-4" aria-hidden="true" />
                       Copy token
                     </>
                   )}
@@ -263,6 +367,19 @@ export function ViewAsDialog({ targetUserId, targetName, open, onOpenChange }: V
                     <>Expires {formatDateTime(result.expiresAt)} · {formatCountdown(remainingMs)} left</>
                   )}
                 </span>
+              </div>
+              {copyState === CopyState.Failed && (
+                <p className="text-xs text-destructive" data-testid="copy-token-failure">
+                  Couldn&apos;t copy — the browser refused clipboard access. The token is selected
+                  above; copy it manually with ⌘C / Ctrl+C.
+                </p>
+              )}
+              {/* Announces the copy outcome to assistive tech. Always mounted
+                  while the token is on screen, so the region exists BEFORE its
+                  text changes — a live region inserted with its message is
+                  routinely not spoken. */}
+              <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+                {announcement}
               </div>
             </div>
 
