@@ -26,4 +26,17 @@ test.describe('Waitlist (staging)', () => {
     await expect(page.getByRole('heading', { name: 'Admin Dashboard' })).toHaveCount(0);
     await expect(page.getByText('Pre-registered')).toHaveCount(0);
   });
+
+  test('the stats page is gated the same way', async ({ page }) => {
+    await page.goto('/admin/stats');
+    await expect(page.getByText('This page could not be found')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Survey Statistics' })).toHaveCount(0);
+  });
+
+  test('the waitlist data route refuses a staging session', async ({ page }) => {
+    // The data itself is served only to a session the PRODUCTION API accepts;
+    // with staging selected the route does not exist, and nothing is read.
+    const res = await page.request.get('/admin/api/waitlist');
+    expect(res.status()).toBe(404);
+  });
 });

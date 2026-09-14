@@ -1,46 +1,35 @@
 import { NextRequest, NextResponse } from "next/server"
-import { submitSurvey } from "@/app/firebase/services"
-import { getLocationFromVercelHeaders } from "@/lib/server-location"
 
+import { getAdminFirestore } from "@/lib/server/firebaseAdmin"
+import { invalidInput, readBoundedJson, resolveLocation, waitlistFailure } from "@/lib/waitlist/http"
+import { questionnaireSchema } from "@/lib/waitlist/schema"
+import { submitQuestionnaire } from "@/lib/waitlist/store"
+
+export const runtime = "nodejs"
+
+/**
+ * POST /api/questionnaire — submit (or add to) questionnaire answers.
+ *
+ * Only the live questionnaire's fields are accepted (`questionnaireSchema`);
+ * anything else in the body is dropped. The response is the same for a new
+ * address, a known one, and one whose questionnaire is already complete: a
+ * message and a one-time `siteVisitToken` for the follow-up question.
+ */
 export async function POST(request: NextRequest) {
+  const body = await readBoundedJson(request)
+  if (!body.ok) return body.response
+
+  const parsed = questionnaireSchema.safeParse(body.value)
+  if (!parsed.success) return invalidInput()
+
   try {
-    const data = await request.json()
-
-    const { firstName, lastName, email, clientLocation, hasVisitedSite, ...surveyData } = data
-
-    const serverLocation = getLocationFromVercelHeaders(request)
-    const finalLocation = serverLocation || clientLocation || "Unknown"
-
-    // Submit to Firebase with location and hasVisitedSite
-    const result = await submitSurvey(firstName, lastName, email, surveyData, finalLocation, hasVisitedSite)
-
-    // Get the updated user data to return in response
-    const { getPreregisterUserByEmail } = await import("@/app/firebase/services")
-    const updatedUser = await getPreregisterUserByEmail(email)
-
-    return NextResponse.json(
-      { 
-        message: result.isUpdate ? "Survey updated successfully" : "Survey submitted successfully",
-        docId: result.id,
-        isUpdate: result.isUpdate,
-        hasVisitedSite: updatedUser?.hasVisitedSite
-      },
-      { status: 200 }
+    const { siteVisitToken } = await submitQuestionnaire(
+      getAdminFirestore(),
+      { ...parsed.data, location: resolveLocation(request, parsed.data.clientLocation) },
+      new Date(),
     )
-  } catch (error: any) {
-    if (error.message === "SURVEY_ALREADY_COMPLETED") {
-      return NextResponse.json(
-        { 
-          error: "Survey already completed",
-          code: "SURVEY_ALREADY_COMPLETED" 
-        },
-        { status: 409 } // Conflict status
-      )
-    }
-    
-    return NextResponse.json(
-      { error: "Failed to submit survey" },
-      { status: 500 }
-    )
+    return NextResponse.json({ message: "Thanks, your answers are in.", siteVisitToken }, { status: 200 })
+  } catch (error) {
+    return waitlistFailure("questionnaire", error)
   }
 }

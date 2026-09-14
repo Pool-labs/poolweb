@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { deletePreregisterUser, getPreregisterUsers, PreregisterUserWithId, signOut } from '@/app/firebase/services';
+import { adminLogout, waitlistApi } from '@/lib/admin/adminApi';
+import { toCsv } from '@/lib/waitlist/csv';
+import type { WaitlistEntry } from '@/lib/waitlist/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -35,15 +37,16 @@ type StatusFilter = 'all' | 'new' | 'legacy' | 'none' | 'completed' | 'visited' 
 
 export function WaitlistDashboard() {
   const router = useRouter();
-  const [users, setUsers] = useState<PreregisterUserWithId[]>([]);
+  const [users, setUsers] = useState<WaitlistEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [countryFilter, setCountryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortColumn, setSortColumn] = useState<SortColumn>('submittedAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [selectedUser, setSelectedUser] = useState<PreregisterUserWithId | null>(null);
-  const [userToDelete, setUserToDelete] = useState<PreregisterUserWithId | null>(null);
+  const [selectedUser, setSelectedUser] = useState<WaitlistEntry | null>(null);
+  const [userToDelete, setUserToDelete] = useState<WaitlistEntry | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -68,7 +71,7 @@ export function WaitlistDashboard() {
     return Array.from(set).sort();
   }, [users]);
 
-  const getCountry = (u: PreregisterUserWithId) =>
+  const getCountry = (u: WaitlistEntry) =>
     u.location?.split(',').pop()?.trim() || 'Unknown';
 
   const filteredUsers = useMemo(() => {
@@ -166,29 +169,19 @@ export function WaitlistDashboard() {
 
   const loadUsers = async () => {
     try {
-      const allUsers = await getPreregisterUsers();
-      // Sort by submission date (newest first)
-      const sorted = allUsers.sort((a, b) => {
-        const dateA = new Date(a.submittedAt || 0).getTime();
-        const dateB = new Date(b.submittedAt || 0).getTime();
-        return dateB - dateA;
-      });
-      setUsers(sorted);
-      setFilteredUsers(sorted);
+      // Newest first, as served by /admin/api/waitlist.
+      setUsers(await waitlistApi.list());
+      setLoadError(null);
     } catch (error) {
-      // Silently handle error
+      // A failed read must never render as "No users found".
+      setLoadError(error instanceof Error ? error.message : 'Could not load the waitlist.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      router.push('/admin/login');
-    } catch (error) {
-      // Silently handle error
-    }
+  const handleSignOut = () => {
+    void adminLogout();
   };
 
   const handleConfirmDelete = async () => {
@@ -196,7 +189,7 @@ export function WaitlistDashboard() {
     setIsDeleting(true);
     setDeleteError(null);
     try {
-      await deletePreregisterUser(userToDelete.id);
+      await waitlistApi.remove(userToDelete.id);
       // Drop them from local state without refetching
       setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
       // If they were also the selected user in the details panel, close it
@@ -250,6 +243,11 @@ export function WaitlistDashboard() {
 
     const csvData = filteredUsers.map(user => {
       const survey = user.surveyData || {};
+      // A stored answer is free text or a list of chosen options.
+      const answer = (key: string): string => {
+        const value = survey[key];
+        return Array.isArray(value) ? value.join('; ') : value ?? '';
+      };
       const counts = countAnsweredQuestions(user.surveyData);
       return [
         `${user.firstName} ${user.lastName}`,
@@ -261,28 +259,27 @@ export function WaitlistDashboard() {
         `${counts.legacy}`,
         user.hasVisitedSite ? 'Yes' : 'No',
         user.submittedAt ? format(new Date(user.submittedAt), 'yyyy-MM-dd HH:mm') : '',
-        survey.prefunding || '',
-        survey.prefundingWhy || '',
-        Array.isArray(survey.settlementMethods) ? survey.settlementMethods.join('; ') : '',
-        survey.settlementMethodsOther || '',
-        survey.settlementFeedback || '',
-        survey.moneyInAir || '',
-        survey.moneyInAirAmount || '',
-        survey.weeklySpend || '',
-        Array.isArray(survey.splitTypes) ? survey.splitTypes.join('; ') : '',
-        survey.splitTypesOther || '',
-        survey.hangoutPoolWillingness || '',
-        survey.hangoutPoolWhy || '',
-        Array.isArray(survey.socialFeatures) ? survey.socialFeatures.join('; ') : '',
-        survey.socialFeaturesOther || '',
-        survey.friendConversion || '',
+        answer('prefunding'),
+        answer('prefundingWhy'),
+        answer('settlementMethods'),
+        answer('settlementMethodsOther'),
+        answer('settlementFeedback'),
+        answer('moneyInAir'),
+        answer('moneyInAirAmount'),
+        answer('weeklySpend'),
+        answer('splitTypes'),
+        answer('splitTypesOther'),
+        answer('hangoutPoolWillingness'),
+        answer('hangoutPoolWhy'),
+        answer('socialFeatures'),
+        answer('socialFeaturesOther'),
+        answer('friendConversion'),
       ];
     });
 
-    const csv = [
-      headers.join(','),
-      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
+    // Every cell is visitor-written: `toCsv` escapes quotes and neutralises
+    // spreadsheet formulas (see lib/waitlist/csv.ts).
+    const csv = toCsv([headers, ...csvData]);
 
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -642,7 +639,13 @@ export function WaitlistDashboard() {
               ))}
             </div>
             
-            {filteredUsers.length === 0 && (
+            {loadError && (
+              <div role="alert" className="text-center py-8 text-destructive">
+                Could not load the waitlist: {loadError}
+              </div>
+            )}
+
+            {!loadError && filteredUsers.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 No users found
               </div>

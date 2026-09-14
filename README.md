@@ -47,3 +47,24 @@ Set `POOL_API_BASE_URL` (server-only — not `NEXT_PUBLIC_*`) to the Pool API ba
 `POOL_API_BASE_URL` now sets the **default environment** the dashboard opens on; the switcher can move to the other one at runtime with no redeploy. Staging and production have built-in base URLs, so the toggle needs no extra config — set `POOL_API_BASE_URL_STAGING` / `POOL_API_BASE_URL_PRODUCTION` only to point an environment somewhere else.
 
 On Vercel, add `POOL_API_BASE_URL` as an environment variable (Production → `https://api.poolapp.co`, Preview/staging → `https://api-staging.poolapp.co`).
+
+## Waitlist data (Firestore)
+
+The marketing waitlist (`/preregister`, `/questionnaire`) is stored in Firestore, project `pool-857f1`, collection `preregistered_users`. **All access is server-side** through the Firebase Admin SDK (`lib/server/firebaseAdmin.ts`, `lib/waitlist/store.ts`); the browser never talks to Firebase, and the committed `firestore.rules` denies all client access.
+
+- **Public routes** — `POST /api/preregister`, `/api/questionnaire`, `/api/update-site-visit`. Bodies are validated against an allowlist (`lib/waitlist/schema.ts`), lookups are point reads (new entries are keyed by the sha256 of the normalized email), and every route answers the same way whether or not an address is already on the list.
+- **Admin screens** — `/admin/dashboard` (Waitlist) and `/admin/stats` render only with **Production** selected, and their data comes from `GET/DELETE /admin/api/waitlist[/:id]`, which proves a platform-admin session against the production Pool API before touching Firestore. Deletions are logged to `waitlist_deletions` (entry id, time, admin's Pool user id).
+- **Credential** — `FIREBASE_SERVICE_ACCOUNT_JSON` (server-only, Vercel *Sensitive*): the full service-account key JSON. Without it the waitlist routes return 503.
+
+### Runbook: credential and rules
+
+1. Firebase console → Project settings → Service accounts → **Generate new private key**. Paste the whole JSON into Vercel as `FIREBASE_SERVICE_ACCOUNT_JSON` (Production and Preview, marked Sensitive). Delete the downloaded file.
+2. Deploy. Check the waitlist form works (`/preregister`).
+3. Publish the rules in `firestore.rules`: paste them into Firebase console → Firestore → Rules, or run `firebase deploy --only firestore:rules --project pool-857f1`. Do this only **after** step 2 — the rules deny everything the old client-side code relied on.
+4. To rotate the key: generate a new one, update the Vercel variable, redeploy, then delete the old key in Google Cloud → IAM → Service accounts.
+
+Request volume on the public routes is not limited in code (an in-memory counter is not reliable across Vercel instances). If they are abused, add a Vercel Firewall rate-limit rule for `/api/preregister`, `/api/questionnaire`, `/api/update-site-visit` and `/api/contact`.
+
+## Tests
+
+`pnpm test` runs the unit tests (vitest, `tests/unit`, offline — Firestore is faked). `pnpm typecheck` runs `tsc`. The Playwright suite (`pnpm e2e`) is separate and staging-only; see `tests/e2e/README.md`.

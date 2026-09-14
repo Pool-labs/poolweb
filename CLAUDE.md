@@ -9,9 +9,11 @@ npm run dev       # Start development server
 npm run build     # Production build
 npm run start     # Start production server
 npm run lint      # Run ESLint
+pnpm test         # Unit tests (vitest, tests/unit — offline, Firestore faked)
+pnpm typecheck    # tsc --noEmit
 ```
 
-No test framework is configured.
+Unit tests live in `tests/unit` (vitest, `vitest.config.mts`); the Playwright suite in `tests/e2e` is separate and staging-only.
 
 ## Architecture
 
@@ -19,9 +21,10 @@ No test framework is configured.
 
 ### Key Directories
 
-- `app/` — Next.js app router: pages, layouts, API routes, and Firebase config
-- `app/firebase/` — Firebase client config (`firebaseConfig.ts`) and Firestore service functions (`firestore.ts`)
+- `app/` — Next.js app router: pages, layouts, API routes
 - `app/api/` — API routes: `contact`, `preregister`, `questionnaire`, `location`, `update-site-visit`
+- `lib/server/firebaseAdmin.ts` — server-only Firebase Admin SDK init (the ONLY Firebase entry point)
+- `lib/waitlist/` — waitlist store (all Firestore reads/writes), request schemas, CSV encoding, types
 - `components/` — Reusable React components; `components/ui/` is shadcn/ui primitives
 - `lib/` — Utilities (classname merging, location detection, mobile helpers)
 - `styles/` — Global and theme CSS
@@ -30,12 +33,18 @@ No test framework is configured.
 
 Two independent backends, deliberately kept separate:
 
-- **Marketing site → Firebase Firestore** for the waitlist: `preregistered_users` collection, written by the public API routes (`app/api/{preregister,questionnaire,update-site-visit}`) and read by the legacy waitlist admin screens. **Unchanged.**
+- **Marketing site → Firebase Firestore** for the waitlist: `preregistered_users` collection, written by the public API routes (`app/api/{preregister,questionnaire,update-site-visit}`) and read by the waitlist admin screens. **Server-side only, via the Firebase Admin SDK** — see *Waitlist (Firestore)* below.
 - **Platform-admin surface → the Pool API** (`api.poolapp.co` / `api-staging.poolapp.co`), a pure REST client — see *Platform-Admin Section* below.
 - **Resend** for sending contact form emails.
-- Firestore service layer lives in `app/firebase/services/firestoreService.ts`.
 
-> **Firebase Auth is no longer used for admin login (#85).** The former email/password + `admins`-collection gate was removed. `app/firebase/services/authService.ts` now exports only a residual `signOut` (kept so the legacy waitlist screens compile). `firebaseConfig` + `firestoreService` + all `NEXT_PUBLIC_FIREBASE_*` env are kept for the marketing site.
+### Waitlist (Firestore) — server-side only
+
+- **The browser never talks to Firebase.** There is no Firebase client SDK in the app and no `NEXT_PUBLIC_FIREBASE_*` config. `lib/server/firebaseAdmin.ts` (`import 'server-only'`) initialises the Admin SDK from ONE server-only env var, `FIREBASE_SERVICE_ACCOUNT_JSON`, and **fails closed** (`FirebaseAdminUnavailableError` → 503) when it is missing or malformed — never falling back to another way in. The Admin SDK bypasses security rules, which is what lets the committed `firestore.rules` deny ALL client access; the rules file is the source of truth and is published by hand (README runbook).
+- **All reads/writes are in `lib/waitlist/store.ts`**, which takes the Firestore instance as a parameter (unit-tested against `tests/unit/support/fakeFirestore.ts`). New entries are keyed by `sha256(normalized email)`, so a lookup is a point read; legacy random-id entries are found by an `email ==`/`in` query (`limit 1`). **Nothing on a public path lists the collection.** Read-modify-write runs in a Firestore transaction.
+- **Public routes are allowlisted and enumeration-safe.** `lib/waitlist/schema.ts` strips unknown keys (stripped, not refused — returning visitors' saved progress can carry old-version keys), bounds every length, and keeps only the choice values the form offers (`QUESTIONNAIRE_OPTIONS` in `lib/questionnaire-questions.ts`, which the questionnaire page also renders from — one list, two readers). Every route answers identically whether an address is new, known or complete. An unauthenticated submission may FILL an entry's missing name/location but never replace it, and an empty answer never erases an earlier one. `update-site-visit` applies only with the one-time `siteVisitToken` the questionnaire response issued (stored as a sha256 hash, 1h, single use, never changes an answer already recorded).
+- **Admin data goes through `app/admin/api/waitlist[/:id]`** (static routes, so they beat the `[...path]` proxy). `lib/admin/adminSession.ts` → `requireProductionAdminSession` is the gate: production selected, else 404; then it calls the same identity-gated probe login uses (`/admin/metrics/signups?days=1`) with the cookie's Bearer, refreshing once on a 401, and acts only on a 200 — so a forged or staging cookie cannot reach Firestore (middleware only checks cookie presence). DELETE also refuses a browser-flagged cross-site request and commits the delete together with a `waitlist_deletions` record (entry id, time, admin's Pool user id — no data about the deleted person). The admin DTO is an explicit projection (`toWaitlistEntry`), so the token hash and any later field never reach the browser.
+- **CSV exports** go through `lib/waitlist/csv.ts` (`csvCell`/`csvRow`/`toCsv`): quotes doubled, and a cell starting with `= + - @ TAB CR` is prefixed with `'` so a spreadsheet shows it as text (CWE-1236). Every waitlist cell is written by the public.
+- **Residuals (documented, not solved in code):** no rate limit in code (an in-memory counter is not a limit on Vercel — use a Vercel Firewall rule); nothing proves a submitter owns the email they type, so anyone can add questionnaire answers to an incomplete entry for an address they know (they cannot replace names/location or erase answers).
 
 ### Platform-Admin Section (REST client, #85)
 
@@ -55,7 +64,7 @@ The `/admin` surface is a **pure REST client of the Pool API** — no Firebase-f
 - **Screens**: `app/admin/overview` (metrics #80 + funnels #81 + activation #592 — **sectioned since web #31**: Growth · Activation · Pools · Engagement & money · Health, each a `<section aria-labelledby>` whose heading states its scope; the one range control scopes every windowed section, Health is the live #190 alarm state read once per load and links into Errors & Health; the regroup REMOVED nothing and additionally renders the last-seen / points / streak histograms the payloads always carried), `app/admin/users` + `[id]` (list/search + suspend/restore + feature-flag toggle + the #84 **View as** dialog — see below), `app/admin/pools` + `[id]` (list + suspend/restore + read-only ledger #82), `app/admin/moderation` + `[id]` (reports queue + review, see above), `app/admin/errors` (Errors/Health, see above), `app/admin/user-logs` (per-user timeline, see above). Money is integer cents, rendered via `lib/admin/format.ts`.
 - **Detail pages are grouped section cards over the poolmobile #618 contract (web #31)**: `/admin/users/:id` = Identity · Location · Profile · Engagement · Payment handles · Memberships (+ a Staging-context card that exists ONLY when `seedCohort`/`demoMode` is present, so production pages carry no trace of it); `/admin/pools/:id` = Identity · Location · About · Money · Lifecycle · Members, then the unchanged ledger tabs. The two pages **cross-link** (a member row → its user page, a membership row and the creator → the pool/user page). Shared kit in `components/admin/detail.tsx` (`DetailCard`/`Field`/`ChipList`/`TextBlock`/`Unreported`). **Country + region + city derive from `locationCityKey`** (`lib/admin/cityKey.ts` parses `name|region|country`, #128/#469; country name via `Intl.DisplayNames`) — coordinates are rendered as their own sensitive-tier row, never used to answer "where". ⚠️ **Every #618 field is OPTIONAL in `lib/admin/types.ts` on purpose**: the #112 switch can point either page at a production API that predates #618 (it has never been dispatched), and `hasRichUserDetail`/`hasRichPoolDetail` (presence of a key the widened select always emits) decide whether a section renders rows or the one-line `Unreported` note — never a column of dashes that reads as "this person has no profile". Field names are the Prisma column names #618's allowlist select emits (the contract is pinned as a comment on poolmobile#618), so wiring the data on is a server deploy, not a second frontend change. ⚠️ The widened user read is **audited on view** server-side (`admin.user_detail_viewed`, #618's decision 2) — the user page fetches once per visit and after an explicit action, never on a timer (the #263 user-logs rule).
 - **View as — copy feedback (web #30)**: `Copy token` in `ViewAsDialog` ends in one of two VISIBLE, DISTINCT outcomes — `Copied` or `Couldn't copy` (destructive tone + a manual ⌘C fallback line, and the token is selected) — both reverting after a dwell so the control stays reusable, and both announced through a polite `role="status"` live region that is mounted BEFORE its text changes (a live region inserted with its message is routinely not spoken). An absent `navigator.clipboard` (non-secure context) lands on the same failure path as a rejection. This is the one copy in the product that must never be silent: the token is shown once and closing the dialog destroys it (poolmobile #222's no-silent-outcome rule at its highest-stakes instance). Covered by `tests/e2e/admin/view-as.spec.ts`, which — unlike every other admin spec — WRITES (one audited 15-minute session per run, ended by the spec through the Admins page).
-- **Legacy waitlist screens** (`app/admin/dashboard`, `app/admin/stats`) are **Firestore-backed and untouched**; they now sit behind the same OTP-cookie gate and are linked from the admin nav as "Waitlist".
+- **Waitlist screens** (`app/admin/dashboard`, `app/admin/stats`) are **production-only** (server page gate, poolmobile #602) and read their data from the gated `/admin/api/waitlist` routes — see *Waitlist (Firestore)* above. They are linked from the admin nav as "Waitlist" (production only).
 - **QA console — STAGING ONLY** (`app/admin/qa`, poolmobile #132): a founders' console to trigger notifications, run scheduled jobs, drive multi-user workflows, set up state and inspect a user, instead of waiting on timers or contriving real events. Tabbed (Notifications · Jobs · Workflows · State · Inspect); components in `components/admin/qa/`, calls isolated in `qaApi` (`lib/admin/adminApi.ts`) + DTOs in the QA block of `lib/admin/types.ts`. All routes are namespaced `/qa/...` so the existing catch-all proxy forwards them unchanged — **no proxy change**. **Visibility is double-gated:** the page 404s server-side when `getApiEnv() === 'production'`, and the authoritative check is the API — **`GET /qa/status` returns 404 whenever the console is disabled server-side**, which the client treats as "disabled" (renders nothing, redirects to the overview). The nav entry (`NON_PROD_NAV_ITEMS` in `AdminNav`) is convenience only, never the gate. Guarded controls (broadcast-to-all, reseed, wipe, reset-account, force-pool-status) each require their own typed confirmation phrase **plus** `window.confirm` — the five phrases differ so a typo in one box can never trigger another action, and each is compared with strict equality (no trim/case-folding) exactly as the server does. Push/broadcast copy is additionally checked client-side against the API's money-free-copy rule (no currency symbols, decimal amounts or @handles on a lock screen). Two results get deliberately non-standard rendering: **reset-account resolves 200 with per-step failures inside it** (it is not atomic — a refused `leave_pool` on a pool OWNER is the normal case), so `steps[]` is always rendered per-step rather than as a flat success; and **force-pool-status is the one endpoint that bypasses the delegate-to-real-code rule**, so its returned `warning` is rendered verbatim in a `destructive` Alert at the same weight as the destructive controls.
 - **Env**: `POOL_API_BASE_URL` (server-only — NOT `NEXT_PUBLIC_*`; defaults to staging) sets the **default environment**; `POOL_API_BASE_URL_{STAGING,PRODUCTION,LOCAL}` optionally override the built-in per-environment base URLs (#112). See `.env.local.example`.
 
@@ -79,7 +88,7 @@ The `/admin` surface is a **pure REST client of the Pool API** — no Firebase-f
 ## Environment Variables
 
 - `POOL_API_BASE_URL` — **server-only** base URL of the Pool API used by the `/admin` Route Handlers + proxy (defaults to `https://api-staging.poolapp.co`). Never `NEXT_PUBLIC_*` — it must not be bundled into client JS.
-- Firebase config vars are prefixed `NEXT_PUBLIC_FIREBASE_*` (marketing site + waitlist screens). The Firebase project ID is `pool-857f1`.
+- `FIREBASE_SERVICE_ACCOUNT_JSON` — **server-only** service-account key JSON for the Firebase project (`pool-857f1`); the waitlist's only credential. No `NEXT_PUBLIC_FIREBASE_*` variables are read any more.
 
 See `.env.local.example` for the full list.
 

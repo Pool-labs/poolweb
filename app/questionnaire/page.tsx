@@ -1,6 +1,7 @@
 "use client"
 
 import { detectClientLocation } from "@/lib/location-utils"
+import { QUESTIONNAIRE_OPTIONS } from "@/lib/questionnaire-questions"
 import { AlertCircle, CheckSquare, ChevronRight, Gift, Globe, Square } from "lucide-react"
 import { useRouter } from "next/navigation"
 import type React from "react"
@@ -95,6 +96,9 @@ export default function SurveyPage() {
   const [hasVisitedSite, setHasVisitedSite] = useState<boolean | null>(null)
   const [showSiteVisitModal, setShowSiteVisitModal] = useState(false)
   const [userEmail, setUserEmail] = useState<string>("")
+  // One-time token from the questionnaire response; the follow-up site-visit
+  // answer is only recorded when it comes with this.
+  const [siteVisitToken, setSiteVisitToken] = useState<string>("")
 
   const totalSteps = 4
   const totalQuestions = 8
@@ -333,13 +337,13 @@ export default function SurveyPage() {
     // Store email for later use
     setUserEmail(formData.email)
 
-    // Proceed with submission - we'll check hasVisitedSite in Firebase after submission
+    // Submit; the site-visit follow-up is asked once the submission succeeds
     await submitForm()
   }
 
   const handleSiteVisitUpdate = async (visited: boolean) => {
     try {
-      // Update hasVisitedSite in Firebase
+      // Record the site-visit answer (server-side, token-gated)
       const response = await fetch("/api/update-site-visit", {
         method: "POST",
         headers: {
@@ -347,7 +351,8 @@ export default function SurveyPage() {
         },
         body: JSON.stringify({
           email: userEmail || formData.email,
-          hasVisitedSite: visited
+          hasVisitedSite: visited,
+          siteVisitToken,
         }),
       })
 
@@ -398,33 +403,17 @@ export default function SurveyPage() {
 
       const result = await response.json()
 
-      console.log("Survey submission response:", result)
-      console.log("hasVisitedSite from response:", result.hasVisitedSite)
-
       // Clear saved progress if survey is now 100% complete
       if (isAllQuestionsAnswered()) {
         // All questions answered, clearing saved progress
         localStorage.removeItem(STORAGE_KEY)
       }
 
-      // Check if we need to show the hasVisitedSite popup based on the response
-      if (result.hasVisitedSite === null || result.hasVisitedSite === undefined) {
-        // Show the popup instead of navigating immediately
-        console.log("Showing site visit modal because hasVisitedSite is null/undefined")
-        setShowSiteVisitModal(true)
-        setIsSubmitting(false)
-        return
-      }
-
-      // Navigate to confirmation page if hasVisitedSite is already set
-      const params = new URLSearchParams({
-        complete: String(!isPartialSubmission),
-        updated: String(result.isUpdate || false),
-        firstName: formData.firstName || '',
-        lastName: formData.lastName || '',
-        email: formData.email || ''
-      })
-      router.push(`/questionnaire/confirmation?${params}`)
+      // The response is deliberately the same whether this email was new or
+      // already on the list, so the follow-up question is always asked; the
+      // server records the answer only if none is stored yet.
+      setSiteVisitToken(typeof result.siteVisitToken === "string" ? result.siteVisitToken : "")
+      setShowSiteVisitModal(true)
     } catch (error) {
       console.error("Survey submission error:", error)
       alert("An error occurred while submitting the survey. Please try again.")
@@ -676,7 +665,7 @@ export default function SurveyPage() {
                 Would you pre-fund for activities (put money in before the event)?
               </label>
               <div className="space-y-3">
-                {["Yes", "No"].map((option) => (
+                {QUESTIONNAIRE_OPTIONS.prefunding.map((option) => (
                   <label
                     key={option}
                     className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
@@ -709,12 +698,7 @@ export default function SurveyPage() {
                 How do you currently settle group expenses? (check all that apply)
               </label>
               <div className="space-y-3">
-                {[
-                  "Venmo, Cash App, Zelle (or similar payment apps)",
-                  "Collect money up front",
-                  "Split the check",
-                  "Other",
-                ].map((option) => (
+                {QUESTIONNAIRE_OPTIONS.settlementMethods.map((option) => (
                   <label
                     key={option}
                     className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
@@ -765,7 +749,7 @@ export default function SurveyPage() {
                 Do you think there's money "in the air" right now — money owed to you, or that you owe to friends?
               </label>
               <div className="space-y-3">
-                {["$0-$50", "$50-$100", "No IOU's", "Don't know"].map((option) => (
+                {QUESTIONNAIRE_OPTIONS.moneyInAir.map((option) => (
                   <label
                     key={option}
                     className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
@@ -810,13 +794,7 @@ export default function SurveyPage() {
                 What kinds of things do you usually split? (check all that apply)
               </label>
               <div className="space-y-3">
-                {[
-                  "Food & drinks",
-                  "Rent/bills",
-                  "Entertainment (movies, concerts, games, etc.)",
-                  "Vacations/trips",
-                  "Other",
-                ].map((option) => (
+                {QUESTIONNAIRE_OPTIONS.splitTypes.map((option) => (
                   <label
                     key={option}
                     className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
@@ -855,7 +833,7 @@ export default function SurveyPage() {
                 Are you willing to hang out with random people with similar interests AND pool money together?
               </label>
               <div className="space-y-3">
-                {["Hangout Only", "Pool Money Only", "Both", "Neither"].map((option) => (
+                {QUESTIONNAIRE_OPTIONS.hangoutPoolWillingness.map((option) => (
                   <label
                     key={option}
                     className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
@@ -893,13 +871,7 @@ export default function SurveyPage() {
                 Would you care about social features in a money app? (check all that apply)
               </label>
               <div className="space-y-3">
-                {[
-                  "Leaderboards",
-                  "Messaging",
-                  "Recommended pools nearby",
-                  "Other",
-                  "None",
-                ].map((option) => (
+                {QUESTIONNAIRE_OPTIONS.socialFeatures.map((option) => (
                   <label
                     key={option}
                     className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
@@ -938,7 +910,7 @@ export default function SurveyPage() {
                 If you wanted your friends to use POOL, how hard would it be to get them to join?
               </label>
               <div className="space-y-3">
-                {["Pretty easy", "Need some convincing", "Pretty hard"].map((option) => (
+                {QUESTIONNAIRE_OPTIONS.friendConversion.map((option) => (
                   <label
                     key={option}
                     className="flex items-center p-4 bg-white/30 rounded-2xl border-2 border-transparent hover:border-pool-blue cursor-pointer transition-all"
