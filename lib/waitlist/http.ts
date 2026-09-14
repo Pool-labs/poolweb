@@ -7,16 +7,17 @@ import {
   logFirebaseAdminUnavailable,
 } from '@/lib/server/firebaseAdmin';
 import { getLocationFromVercelHeaders } from '@/lib/server-location';
-import { WAITLIST_LIMITS } from './schema';
+import { WAITLIST_LIMITS } from './limits';
 
 /**
  * Plumbing shared by the public waitlist Route Handlers.
  *
  * ⚠️ No rate limiting lives here. An in-memory counter is not a limit on
  * Vercel — each function instance keeps its own, and instances come and go —
- * so pretending would be worse than saying so. Request volume is bounded at
- * the edge instead (a Vercel Firewall rate-limit rule on these paths), and
- * each request is bounded here: a capped body, point reads only.
+ * so pretending would be worse than saying so. Request VOLUME belongs at the
+ * edge (a Vercel Firewall rate-limit rule on these paths — see the README;
+ * none is configured by this code). What IS bounded here is each request: a
+ * capped body, bounded fields, point reads only.
  */
 
 export type BodyResult = { ok: true; value: unknown } | { ok: false; response: NextResponse };

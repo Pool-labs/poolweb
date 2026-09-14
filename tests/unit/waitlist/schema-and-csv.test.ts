@@ -23,11 +23,23 @@ describe('preregisterSchema', () => {
   it.each([
     ['a missing name', { ...contact, firstName: '' }],
     ['a whitespace-only name', { ...contact, lastName: '   ' }],
-    ['an over-long name', { ...contact, firstName: 'a'.repeat(WAITLIST_LIMITS.MAX_NAME_LENGTH + 1) }],
     ['a malformed email', { ...contact, email: 'almost@valid' }],
+    ['an email with spaces', { ...contact, email: 'ada lovelace@example.com' }],
     ['a non-string email', { ...contact, email: ['ada@example.com'] }],
   ])('refuses %s', (_label, body) => {
     expect(preregisterSchema.safeParse(body).success).toBe(false);
+  });
+
+  it('accepts any address the form accepts, including internationalised ones', () => {
+    for (const email of ['user@bücher.de', 'a!#$%&*/=?^{|}~@example.xn--p1ai', 'first.last+tag@sub.example.co']) {
+      expect(preregisterSchema.safeParse({ ...contact, email }).success).toBe(true);
+    }
+  });
+
+  it('cuts an over-long name to its limit instead of refusing the signup', () => {
+    const parsed = preregisterSchema.parse({ ...contact, firstName: '😀'.repeat(WAITLIST_LIMITS.MAX_NAME_LENGTH + 5) });
+    expect(Array.from(parsed.firstName)).toHaveLength(WAITLIST_LIMITS.MAX_NAME_LENGTH);
+    expect(parsed.firstName).not.toMatch(/[\uD800-\uDBFF]$/); // no split surrogate pair
   });
 
   it('drops an over-long client location instead of refusing the signup', () => {
@@ -64,15 +76,24 @@ describe('questionnaireSchema', () => {
     expect(parsed.survey.settlementMethods).toEqual(['Split the check']);
   });
 
-  it('refuses over-long free text and oversized choice lists', () => {
-    expect(
-      questionnaireSchema.safeParse({ ...contact, prefundingWhy: 'a'.repeat(WAITLIST_LIMITS.MAX_LONG_ANSWER_LENGTH + 1) })
-        .success,
-    ).toBe(false);
-    expect(
-      questionnaireSchema.safeParse({ ...contact, splitTypes: Array(WAITLIST_LIMITS.MAX_CHOICES + 1).fill('Other') })
-        .success,
-    ).toBe(false);
+  it('bounds free text by cutting it, never by refusing the submission', () => {
+    const parsed = questionnaireSchema.parse({
+      ...contact,
+      prefundingWhy: 'a'.repeat(WAITLIST_LIMITS.MAX_LONG_ANSWER_LENGTH + 100),
+      splitTypesOther: 'b'.repeat(WAITLIST_LIMITS.MAX_SHORT_ANSWER_LENGTH + 100),
+    });
+    expect(parsed.survey.prefundingWhy).toHaveLength(WAITLIST_LIMITS.MAX_LONG_ANSWER_LENGTH);
+    expect(parsed.survey.splitTypesOther).toHaveLength(WAITLIST_LIMITS.MAX_SHORT_ANSWER_LENGTH);
+  });
+
+  it('bounds choice lists to the offered options, whatever arrives', () => {
+    const parsed = questionnaireSchema.parse({
+      ...contact,
+      splitTypes: [...Array(500).fill('Other'), 'x'.repeat(10_000), 42],
+      socialFeatures: 'Messaging',
+    });
+    expect(parsed.survey.splitTypes).toEqual(['Other']);
+    expect(parsed.survey.socialFeatures).toEqual([]);
   });
 
   it('still needs contact details', () => {

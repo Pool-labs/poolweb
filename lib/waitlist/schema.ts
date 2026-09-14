@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { QUESTIONNAIRE_OPTIONS } from '@/lib/questionnaire-questions';
+import { WAITLIST_LIMITS } from './limits';
 import type { SurveyData } from './types';
 
 /**
@@ -13,28 +14,40 @@ import type { SurveyData } from './types';
  * older questionnaire version, and refusing those would leave them unable to
  * submit at all.
  *
- * Bounds are generous for a human filling in the form and tight for anything
- * else. Choice questions keep only the values the form offers
- * (`QUESTIONNAIRE_OPTIONS`) — an unknown value is dropped, not stored.
+ * Every stored value is bounded, but nothing a visitor can type into the
+ * forms is REFUSED for its length or shape — a refusal the form did not warn
+ * about is an error they can never get past by retrying. So:
+ *  - over-long names and answers are cut to their limit (the questionnaire's
+ *    text fields also carry `maxLength`, so in practice nothing is cut);
+ *  - choice questions keep only the values the form offers
+ *    (`QUESTIONNAIRE_OPTIONS`) — anything else is dropped, not stored;
+ *  - the email rule is the forms' own shape rule (text@text.text, no spaces),
+ *    so internationalised addresses are accepted.
+ * The whole body is capped (`MAX_BODY_BYTES`) before any of this runs.
  */
 
-export const WAITLIST_LIMITS = {
-  /** Whole request body, checked before parsing. */
-  MAX_BODY_BYTES: 32 * 1024,
-  MAX_NAME_LENGTH: 100,
-  MAX_EMAIL_LENGTH: 254,
-  MAX_LOCATION_LENGTH: 200,
-  MAX_LONG_ANSWER_LENGTH: 5000,
-  MAX_SHORT_ANSWER_LENGTH: 500,
-  MAX_CHOICE_LENGTH: 200,
-  MAX_CHOICES: 10,
-  MAX_TOKEN_LENGTH: 128,
-} as const;
+export { WAITLIST_LIMITS };
 
-const name = z.string().trim().min(1).max(WAITLIST_LIMITS.MAX_NAME_LENGTH);
+/** Cut to at most `max` characters without splitting a surrogate pair. */
+function truncate(value: string, max: number): string {
+  return value.length <= max ? value : Array.from(value).slice(0, max).join('');
+}
 
-/** Trimmed, as typed. The store derives the normalized form. */
-const email = z.string().trim().max(WAITLIST_LIMITS.MAX_EMAIL_LENGTH).email();
+const name = z
+  .string()
+  .trim()
+  .min(1)
+  .transform((v) => truncate(v, WAITLIST_LIMITS.MAX_NAME_LENGTH));
+
+/**
+ * Trimmed, as typed; the store derives the normalized form. Same shape rule as
+ * the forms (one `@`, no whitespace, a dot in the domain).
+ */
+const email = z
+  .string()
+  .trim()
+  .max(WAITLIST_LIMITS.MAX_EMAIL_LENGTH)
+  .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
 
 const clientLocation = z
   .string()
@@ -44,23 +57,24 @@ const clientLocation = z
   .catch(undefined);
 
 function answer(max: number) {
-  return z.string().max(max).optional().transform((v) => (v ?? '').trim());
+  return z
+    .string()
+    .optional()
+    .transform((v) => truncate((v ?? '').trim(), max));
 }
 
 function singleChoice(options: readonly string[]) {
-  return z
-    .string()
-    .max(WAITLIST_LIMITS.MAX_CHOICE_LENGTH)
-    .optional()
-    .transform((v) => (v !== undefined && options.includes(v) ? v : ''));
+  return z.unknown().transform((v) => (typeof v === 'string' && options.includes(v) ? v : ''));
 }
 
 function multiChoice(options: readonly string[]) {
   return z
-    .array(z.string().max(WAITLIST_LIMITS.MAX_CHOICE_LENGTH))
-    .max(WAITLIST_LIMITS.MAX_CHOICES)
-    .optional()
-    .transform((values) => Array.from(new Set((values ?? []).filter((v) => options.includes(v)))));
+    .unknown()
+    .transform((v) =>
+      Array.isArray(v)
+        ? Array.from(new Set(v.filter((x): x is string => typeof x === 'string' && options.includes(x))))
+        : [],
+    );
 }
 
 const LONG = WAITLIST_LIMITS.MAX_LONG_ANSWER_LENGTH;

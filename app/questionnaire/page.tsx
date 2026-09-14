@@ -2,6 +2,7 @@
 
 import { detectClientLocation } from "@/lib/location-utils"
 import { QUESTIONNAIRE_OPTIONS } from "@/lib/questionnaire-questions"
+import { WAITLIST_LIMITS } from "@/lib/waitlist/limits"
 import { AlertCircle, CheckSquare, ChevronRight, Gift, Globe, Square } from "lucide-react"
 import { useRouter } from "next/navigation"
 import type React from "react"
@@ -686,6 +687,7 @@ export default function SurveyPage() {
                 <textarea
                   value={formData.prefundingWhy}
                   onChange={(e) => handleInputChange("prefundingWhy", e.target.value)}
+                  maxLength={WAITLIST_LIMITS.MAX_LONG_ANSWER_LENGTH}
                   rows={2}
                   className="w-full mt-3 px-4 py-3 rounded-2xl border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors resize-none"
                   placeholder="Why?"
@@ -726,6 +728,7 @@ export default function SurveyPage() {
                   type="text"
                   value={formData.settlementMethodsOther}
                   onChange={(e) => handleInputChange("settlementMethodsOther", e.target.value)}
+                  maxLength={WAITLIST_LIMITS.MAX_SHORT_ANSWER_LENGTH}
                   className="w-full mt-3 px-4 py-3 rounded-full border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors"
                   placeholder="Please specify..."
                 />
@@ -733,6 +736,7 @@ export default function SurveyPage() {
               <textarea
                 value={formData.settlementFeedback}
                 onChange={(e) => handleInputChange("settlementFeedback", e.target.value)}
+                maxLength={WAITLIST_LIMITS.MAX_LONG_ANSWER_LENGTH}
                 rows={3}
                 className="w-full mt-3 px-4 py-3 rounded-2xl border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors resize-none"
                 placeholder="What do you like or dislike about how you currently settle?"
@@ -822,6 +826,7 @@ export default function SurveyPage() {
                   type="text"
                   value={formData.splitTypesOther}
                   onChange={(e) => handleInputChange("splitTypesOther", e.target.value)}
+                  maxLength={WAITLIST_LIMITS.MAX_SHORT_ANSWER_LENGTH}
                   className="w-full mt-3 px-4 py-3 rounded-full border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors"
                   placeholder="Please specify..."
                 />
@@ -854,6 +859,7 @@ export default function SurveyPage() {
                 <textarea
                   value={formData.hangoutPoolWhy}
                   onChange={(e) => handleInputChange("hangoutPoolWhy", e.target.value)}
+                  maxLength={WAITLIST_LIMITS.MAX_LONG_ANSWER_LENGTH}
                   rows={2}
                   className="w-full mt-3 px-4 py-3 rounded-2xl border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors resize-none"
                   placeholder="Why?"
@@ -899,6 +905,7 @@ export default function SurveyPage() {
                   type="text"
                   value={formData.socialFeaturesOther}
                   onChange={(e) => handleInputChange("socialFeaturesOther", e.target.value)}
+                  maxLength={WAITLIST_LIMITS.MAX_SHORT_ANSWER_LENGTH}
                   className="w-full mt-3 px-4 py-3 rounded-full border-2 border-pool-blue focus:border-pool-pink outline-none transition-colors"
                   placeholder="Please specify..."
                 />

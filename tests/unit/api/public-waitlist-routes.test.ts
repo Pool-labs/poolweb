@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 import { POST as preregisterPOST } from '@/app/api/preregister/route';
 import { POST as questionnairePOST } from '@/app/api/questionnaire/route';
 import { POST as siteVisitPOST } from '@/app/api/update-site-visit/route';
+import { WAITLIST_LIMITS } from '@/lib/waitlist/limits';
 import { FakeFirestore } from '../support/fakeFirestore';
 
 // `vi.mock` is hoisted above these imports, so the routes see the fake.
@@ -60,7 +61,7 @@ describe('POST /api/preregister', () => {
 
   it('refuses malformed JSON and oversized bodies', async () => {
     expect((await preregisterPOST(post('/api/preregister', '{not json'))).status).toBe(400);
-    const huge = JSON.stringify({ ...signup, padding: 'x'.repeat(40 * 1024) });
+    const huge = JSON.stringify({ ...signup, padding: 'x'.repeat(WAITLIST_LIMITS.MAX_BODY_BYTES) });
     expect((await preregisterPOST(post('/api/preregister', huge))).status).toBe(413);
   });
 

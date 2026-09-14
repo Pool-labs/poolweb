@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { adminLogout, waitlistApi } from '@/lib/admin/adminApi';
+import { AdminApiError, adminLogout, waitlistApi } from '@/lib/admin/adminApi';
 import { toCsv } from '@/lib/waitlist/csv';
 import type { WaitlistEntry } from '@/lib/waitlist/types';
 import { Button } from '@/components/ui/button';
@@ -188,15 +188,20 @@ export function WaitlistDashboard() {
     if (!userToDelete) return;
     setIsDeleting(true);
     setDeleteError(null);
-    try {
-      await waitlistApi.remove(userToDelete.id);
+    const dropFromList = () => {
       // Drop them from local state without refetching
       setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
       // If they were also the selected user in the details panel, close it
       if (selectedUser?.id === userToDelete.id) setSelectedUser(null);
       setUserToDelete(null);
+    };
+    try {
+      await waitlistApi.remove(userToDelete.id);
+      dropFromList();
     } catch (error: any) {
-      setDeleteError(error?.message || 'Failed to delete user');
+      // 404 = already gone (another admin deleted it): the outcome wanted.
+      if (error instanceof AdminApiError && error.status === 404) dropFromList();
+      else setDeleteError(error?.message || 'Failed to delete user');
     } finally {
       setIsDeleting(false);
     }
