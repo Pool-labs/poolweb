@@ -37,4 +37,27 @@ test.describe('Pools', () => {
     await expect(page.getByRole('tab', { name: /Deposits \(\d+\)/ })).toBeVisible();
     await expect(page.getByRole('tab', { name: /Balances \(\d+\)/ })).toBeVisible();
   });
+
+  test('detail page is grouped into the #31 sections and links users through', async ({ page }) => {
+    await page.goto('/admin/pools');
+    await page.getByRole('link', { name: 'View', exact: true }).first().click();
+    await page.waitForURL(/\/admin\/pools\/[^/]+$/);
+    await expect(page.getByText('Pool not found')).toHaveCount(0);
+
+    for (const section of ['Identity', 'Location', 'About', 'Money', 'Lifecycle']) {
+      await expect(page.getByText(section, { exact: true }).first()).toBeVisible();
+    }
+    await expect(page.getByText(/^Members \(\d+\)$/)).toBeVisible();
+
+    // The creator is always a link to the user page — on both API shapes.
+    const creatorLink = page.locator('a[href^="/admin/users/"]').first();
+    await expect(creatorLink).toBeVisible();
+    await expect(creatorLink).toHaveAttribute('href', /^\/admin\/users\/[^/]+$/);
+
+    // Widened (#618) or narrow payload — either the About rows or the
+    // one-line note, never a column of dashes.
+    const unreported = page.getByText(/not reported by this API version/);
+    const richRow = page.getByText('Category', { exact: true });
+    await expect(unreported.or(richRow).first()).toBeVisible();
+  });
 });
