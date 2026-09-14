@@ -82,6 +82,7 @@ import type {
   ImpersonationSessionStatus,
   StartImpersonationResponse,
 } from './types';
+import type { WaitlistEntry } from '@/lib/waitlist/types';
 
 const PROXY_BASE = '/admin/api';
 
@@ -488,6 +489,20 @@ export const qaApi = {
     /** userId travels as a QUERY param — the path is static. */
     user: (userId: string) => request<QaUserInspection>(`/qa/inspect/user${query({ userId })}`),
   },
+};
+
+// ─── Marketing waitlist (Firestore, production only) ──────────────────────────
+
+/**
+ * The waitlist does not live in the Pool API. These hit dedicated same-origin
+ * Route Handlers (`app/admin/api/waitlist/**`, which take precedence over the
+ * proxy) that prove the admin session server-side and read Firestore with the
+ * Admin SDK. Nothing in the browser talks to Firestore.
+ */
+export const waitlistApi = {
+  list: () => request<WaitlistEntry[]>('/waitlist'),
+  remove: (id: string) =>
+    request<{ id: string }>(`/waitlist/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };
 
 /**

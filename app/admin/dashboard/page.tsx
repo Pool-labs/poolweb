@@ -25,6 +25,11 @@ import { WaitlistDashboard } from './WaitlistDashboard';
  *
  * The nav entry is a convenience only — typing the URL directly hits this gate.
  *
+ * This page gate decides what RENDERS. The data is guarded separately and
+ * authoritatively: the browser never talks to Firestore; it calls
+ * `/admin/api/waitlist`, which re-checks the environment and proves the
+ * session against the production API before the Admin SDK reads anything.
+ *
  * Decision recorded on #602: the waitlist is STILL COLLECTED (the public
  * `/preregister` page and API remain live; only the nav link was removed by
  * PoolWeb#21). Retiring the tab + exporting the data was considered and
