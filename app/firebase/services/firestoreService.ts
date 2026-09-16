@@ -70,8 +70,20 @@ export interface PreregisterUserWithId extends PreregisterUser {
  */
 export async function addPreregisterUser(userData: PreregisterUser): Promise<string> {
   try {
-    // Check if user already exists
-    const existingUser = await getPreregisterUserByEmail(userData.email);
+    // Check if user already exists.
+    //
+    // ⚠️ The Firestore rules for `preregistered_users` are CREATE-ONLY: a browser
+    // may add a row but may not read one (that read is what exposed every
+    // signup). So this lookup is expected to fail with `permission-denied`, and
+    // a denied read must NOT fail the signup — we simply create the row and
+    // accept that a repeat submission can duplicate. The duplicate check comes
+    // back with the server-side Admin SDK (#630), which is not bound by rules.
+    const existingUser = await getPreregisterUserByEmail(userData.email).catch(
+      (error: unknown) => {
+        if ((error as { code?: string })?.code === "permission-denied") return null;
+        throw error;
+      },
+    );
     
     if (existingUser) {
       // If they already preregistered, throw error
@@ -211,7 +223,13 @@ export async function getPreregisterUserByEmail(email: string): Promise<Preregis
     
     return null;
   } catch (error) {
-    throw new Error("Failed to retrieve preregister user by email");
+    // Preserve the Firestore error code on the wrapper: callers branch on
+    // `permission-denied` (the create-only rules deny this read), and a bare
+    // `new Error(...)` would erase the one field that distinguishes "not
+    // allowed to look" from "the lookup broke".
+    const wrapped = new Error("Failed to retrieve preregister user by email");
+    (wrapped as { code?: string }).code = (error as { code?: string })?.code;
+    throw wrapped;
   }
 }
 
