@@ -1,0 +1,19 @@
+rules_version = '2';
+
+// Firestore security rules for the Pool marketing site (project pool-857f1).
+//
+// DENY ALL client access. Every read and write of the waitlist
+// (`preregistered_users`) and its deletion log (`waitlist_deletions`) goes
+// through the Next.js server with the Firebase Admin SDK, which is not subject
+// to these rules. No browser or public-config client needs Firestore.
+//
+// Publish only AFTER the deployment that moved Firestore server-side is live
+// with FIREBASE_SERVICE_ACCOUNT_JSON set (see README: "Waitlist data").
+// This file is the source of truth — change it here and review it like code.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

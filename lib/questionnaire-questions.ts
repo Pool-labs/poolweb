@@ -185,6 +185,32 @@ export const LEGACY_META: Record<string, QuestionMeta> = {
   },
 }
 
+// ---- Answer options for the live questionnaire ----
+// The ONE list of choices each current question offers. The questionnaire page
+// renders from these, and the server validator (`lib/waitlist/schema.ts`)
+// keeps only these values, so a stored answer is always one the form could
+// actually have produced. Edit an option here and both sides move together.
+export const QUESTIONNAIRE_OPTIONS = {
+  prefunding: ['Yes', 'No'],
+  settlementMethods: [
+    'Venmo, Cash App, Zelle (or similar payment apps)',
+    'Collect money up front',
+    'Split the check',
+    'Other',
+  ],
+  moneyInAir: ['$0-$50', '$50-$100', "No IOU's", "Don't know"],
+  splitTypes: [
+    'Food & drinks',
+    'Rent/bills',
+    'Entertainment (movies, concerts, games, etc.)',
+    'Vacations/trips',
+    'Other',
+  ],
+  hangoutPoolWillingness: ['Hangout Only', 'Pool Money Only', 'Both', 'Neither'],
+  socialFeatures: ['Leaderboards', 'Messaging', 'Recommended pools nearby', 'Other', 'None'],
+  friendConversion: ['Pretty easy', 'Need some convincing', 'Pretty hard'],
+} as const satisfies Record<string, readonly string[]>
+
 // Main field keys (sub-fields like splitTypesOther excluded so they don't
 // inflate the "answered" count).
 export const CURRENT_MAIN_FIELDS = [

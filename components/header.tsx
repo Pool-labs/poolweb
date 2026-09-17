@@ -11,8 +11,8 @@ import { Menu, X } from "lucide-react"
  *
  * `/preregister` IS a public entry point again (founder decision 2026-09-16):
  * people who land on the site before the app is in the stores can register
- * their interest. Its write path is create-only at the Firestore rules, and
- * moves server-side with the Admin SDK change on `fix/630-waitlist-admin-sdk`.
+ * their interest. Its API writes through the server-side Admin SDK, so the
+ * Firestore rules stay deny-all for browsers.
  */
 const navLinks = [
   { href: "/", label: "Home" },

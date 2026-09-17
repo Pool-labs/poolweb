@@ -1,35 +1,30 @@
 import { NextRequest, NextResponse } from "next/server"
-import { updateUserVisitedSite } from "@/app/firebase/services"
 
+import { getAdminFirestore } from "@/lib/server/firebaseAdmin"
+import { invalidInput, readBoundedJson, waitlistFailure } from "@/lib/waitlist/http"
+import { siteVisitSchema } from "@/lib/waitlist/schema"
+import { recordSiteVisit } from "@/lib/waitlist/store"
+
+export const runtime = "nodejs"
+
+/**
+ * POST /api/update-site-visit — answer the questionnaire's follow-up question.
+ *
+ * Takes effect only with the one-time token the questionnaire response issued
+ * (see `recordSiteVisit`). It answers the same way whether or not anything was
+ * recorded, so it reveals nothing about which addresses are on the list.
+ */
 export async function POST(request: NextRequest) {
+  const body = await readBoundedJson(request)
+  if (!body.ok) return body.response
+
+  const parsed = siteVisitSchema.safeParse(body.value)
+  if (!parsed.success) return invalidInput()
+
   try {
-    const { email, hasVisitedSite } = await request.json()
-
-    if (!email || typeof hasVisitedSite !== 'boolean') {
-      return NextResponse.json(
-        { error: "Email and hasVisitedSite (boolean) are required" },
-        { status: 400 }
-      )
-    }
-
-    const success = await updateUserVisitedSite(email, hasVisitedSite)
-
-    if (success) {
-      return NextResponse.json(
-        { message: "Site visit status updated successfully" },
-        { status: 200 }
-      )
-    } else {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      )
-    }
-  } catch (error: any) {
-    console.error("Error updating site visit status:", error)
-    return NextResponse.json(
-      { error: "Failed to update site visit status" },
-      { status: 500 }
-    )
+    await recordSiteVisit(getAdminFirestore(), parsed.data, new Date())
+    return NextResponse.json({ message: "Thanks!" }, { status: 200 })
+  } catch (error) {
+    return waitlistFailure("update-site-visit", error)
   }
 }
