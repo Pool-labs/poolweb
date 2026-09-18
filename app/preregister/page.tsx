@@ -4,6 +4,9 @@ import { InviteFriendsModal } from "@/components/invite-friends-modal"
 import { detectClientLocation } from "@/lib/location-utils"
 import { AlertCircle, CheckCircle, ChevronDown, ChevronUp, Sparkles, UserPlus, X } from "lucide-react"
 import BrandPattern from "@/components/brand/pattern"
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faAppStoreIos } from '@fortawesome/free-brands-svg-icons'
+import { APP_STORE_URL } from "@/lib/store-links"
 import type React from "react"
 import { useState } from "react"
 
@@ -161,8 +164,43 @@ export default function PreregisterPage() {
               Preregister for Pool
             </h1>
             <p className="text-lg sm:text-xl text-navy/80">
-              Be the first to know when our mobile app launches!
+              Be the first to know when Pool lands on Android.
             </p>
+          </div>
+
+          {/*
+            ⚠️ POOL SHIPPED ON iOS ON 2026-09-18, AND THIS PAGE OUTLIVED THAT.
+            It is still linked from the main nav and still says "be the first to
+            know when our app launches" — so an iPhone visitor who could install
+            right now was being asked to join a waiting list instead. That is
+            the worst version of a stale marketing page: it costs a download and
+            reads as a product that has not shipped.
+
+            The form is kept rather than deleted, because the Android list is
+            still worth collecting — but the App Store comes FIRST and louder
+            than it, so nobody signs up for something they could already have.
+          */}
+          <div className="sticker rounded-3xl bg-white p-6 sm:p-8 mb-8 md:-rotate-1">
+            <div className="text-center">
+              <div className="flex justify-center mb-4 text-navy">
+                <FontAwesomeIcon icon={faAppStoreIos} className="h-10 w-10" />
+              </div>
+              <h2 className="font-display font-bold text-2xl text-navy mb-2">
+                On iPhone? Pool is out now.
+              </h2>
+              <p className="text-navy/80 mb-6">
+                No waiting list needed — download it free from the App Store today.
+              </p>
+              <a
+                href={APP_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hp-btn hp-btn-pink inline-flex items-center justify-center gap-2"
+              >
+                <FontAwesomeIcon icon={faAppStoreIos} className="h-5 w-5" />
+                Get it on the App Store
+              </a>
+            </div>
           </div>
 
           {/* Form Card */}
