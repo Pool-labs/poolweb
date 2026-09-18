@@ -39,6 +39,7 @@ import type {
   AdminCreateUserResponse,
   AdminGeographyMetrics,
   LeaderboardHeadlines,
+  AdminMoneyMetrics,
   AdminPointsMetrics,
   AdminSignupsMetrics,
   AdminTransactionMetrics,
@@ -190,6 +191,15 @@ export const metricsApi = {
    */
   geography: (days?: number) =>
     request<AdminGeographyMetrics>(`/metrics/geography${query({ days })}`),
+  /**
+   * Platform-wide money volume in integer cents (poolmobile#647).
+   *
+   * ⚠️ ITS OWN CALL, NOT A FIELD ON `transactions`. The server serves it from a
+   * separate UNCACHED endpoint precisely so that money never rides inside a
+   * cached admin response (founder decision D1). Folding it into the
+   * transactions read here would put it back in the cached one.
+   */
+  money: (days?: number) => request<AdminMoneyMetrics>(`/metrics/money${query({ days })}`),
   /**
    * Rank 1 of every global board (#681).
    *

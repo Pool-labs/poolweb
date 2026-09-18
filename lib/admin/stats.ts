@@ -21,6 +21,8 @@ import type {
   AdminActiveUsersMetrics,
   AdminAlertState,
   AdminEngagementMetrics,
+  AdminMoneyDayPoint,
+  AdminMoneyMetrics,
   AdminPointsMetrics,
   AdminPoolMetrics,
   AdminSignupsMetrics,
@@ -39,6 +41,7 @@ export interface StatsData {
   activation: AdminActivationMetrics | null;
   pools: AdminPoolMetrics | null;
   transactions: AdminTransactionMetrics | null;
+  money: AdminMoneyMetrics | null;
   engagement: AdminEngagementMetrics | null;
   points: AdminPointsMetrics | null;
   authFunnel: FunnelReport | null;
@@ -117,6 +120,29 @@ export function recordToEntries(
 /** A `{ date, count }` series → chart rows. */
 export function seriesToRows(series: TimeSeriesPoint[] | undefined): LabelledRow[] {
   return (series ?? []).map((p) => ({ label: p.date, value: p.count }));
+}
+
+/**
+ * A money day series → chart rows, in INTEGER CENTS.
+ *
+ * ⚠️ THE ROWS STAY IN CENTS ON PURPOSE. Dividing by 100 here would put a float
+ * in the data, and money never becomes a float in this codebase — the chart
+ * formats at the edge instead (`TrendChart`'s `valueFormatter`), which is also
+ * the only place a `$` can be added honestly.
+ *
+ * ⚠️ AND THE GAPS ARE REAL. The server omits a day with no movement on either
+ * side, so consecutive rows are not necessarily consecutive days. That is the
+ * same convention every other #80 series uses; do not zero-fill it, because a
+ * zero-filled calendar makes a quiet platform and a broken query look alike.
+ */
+export function moneySeriesToRows(series: AdminMoneyDayPoint[] | undefined): LabelledRow[] {
+  return (series ?? []).map((point) => ({
+    label: point.date,
+    // `value` satisfies LabelledRow; the chart reads the two named keys.
+    value: point.depositedCents,
+    deposited: point.depositedCents,
+    spent: point.spentCents,
+  }));
 }
 
 /**
@@ -259,9 +285,11 @@ export function regionLabel(region: AdminGeographyRegion): string {
 /**
  * How many cities carry a plottable point, and how many do not.
  *
- * The map is blocked on the tiles CDN (poolmobile#649), so this is what the map
- * panel reports instead of pretending to be empty: the data IS here, and this
- * says exactly how much of it would render the moment the tiles are readable.
+ * The map has no renderer yet (`maplibre-gl` is not a dependency), so this is
+ * what the map panel reports instead of pretending to be empty: the data IS
+ * here, and this says exactly how much of it would render the moment it is
+ * drawn. It was blocked on the tiles CDN until poolmobile#649 shipped CORS;
+ * that is fixed and live, so only the work remains.
  */
 export function mappableCities(cities: AdminGeographyCity[] | undefined): {
   withPoint: number;
