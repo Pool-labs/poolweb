@@ -27,6 +27,13 @@ export function LegalDoc({ html }: { html: string }) {
           <Link href="/terms" className="underline underline-offset-4">
             Terms of Service
           </Link>
+          {/* Google Play's Child Safety Standards policy requires these
+              standards to be EXTERNALLY PUBLISHED, so the page has to be
+              reachable from the site rather than only via the URL handed to
+              Play. Do not remove. */}
+          <Link href="/child-safety" className="underline underline-offset-4">
+            Child Safety
+          </Link>
         </nav>
       </div>
 
