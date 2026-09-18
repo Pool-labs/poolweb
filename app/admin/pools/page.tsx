@@ -178,20 +178,28 @@ function PoolsList() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Visibility</TableHead>
-                    <TableHead>City</TableHead>
-                    <TableHead className="text-right">Members</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    {/*
+                      ⚠️ Eight columns do not fit a phone. Visibility, Members
+                      and Created are hidden below `sm`/`md`; Name, Status,
+                      City, Balance and the ACTION always render — a row you can
+                      read but not open is the failure this avoids. Balance
+                      stays because it is the figure somebody opens this list to
+                      scan.
+                    */}
+                    <TableHead className="px-2 sm:px-4">Name</TableHead>
+                    <TableHead className="px-2 sm:px-4">Status</TableHead>
+                    <TableHead className="hidden md:table-cell">Visibility</TableHead>
+                    <TableHead className="px-2 sm:px-4">City</TableHead>
+                    <TableHead className="hidden text-right sm:table-cell">Members</TableHead>
+                    <TableHead className="px-2 text-right sm:px-4">Balance</TableHead>
+                    <TableHead className="hidden md:table-cell">Created</TableHead>
+                    <TableHead className="px-2 text-right sm:px-4">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {pools.map((p) => (
                     <TableRow key={p.id}>
-                      <TableCell className="font-medium">
+                      <TableCell className="px-2 font-medium sm:px-4">
                         {p.name}
                         {p.isSuspended && (
                           <Badge variant="destructive" className="ml-2">
@@ -199,16 +207,27 @@ function PoolsList() {
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell>{humanizeEnum(p.status)}</TableCell>
-                      <TableCell>{humanizeEnum(p.visibility)}</TableCell>
+                      <TableCell className="px-2 sm:px-4">{humanizeEnum(p.status)}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {humanizeEnum(p.visibility)}
+                      </TableCell>
                       {/* City-level; `title` carries the canonical key the filter matches on. */}
-                      <TableCell className="text-muted-foreground" title={p.locationCityKey ?? undefined}>
+                      <TableCell
+                        className="px-2 text-muted-foreground sm:px-4"
+                        title={p.locationCityKey ?? undefined}
+                      >
                         {p.locationCity ?? '—'}
                       </TableCell>
-                      <TableCell className="text-right">{p.memberCount}</TableCell>
-                      <TableCell className="text-right font-mono">{formatMoney(p.balanceCents)}</TableCell>
-                      <TableCell className="text-muted-foreground">{formatDate(p.createdAt)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="hidden text-right sm:table-cell">
+                        {p.memberCount}
+                      </TableCell>
+                      <TableCell className="px-2 text-right font-mono sm:px-4">
+                        {formatMoney(p.balanceCents)}
+                      </TableCell>
+                      <TableCell className="hidden text-muted-foreground md:table-cell">
+                        {formatDate(p.createdAt)}
+                      </TableCell>
+                      <TableCell className="px-2 text-right sm:px-4">
                         <Button asChild variant="ghost" size="sm">
                           <Link href={`/admin/pools/${p.id}`}>View</Link>
                         </Button>
