@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { APP_STORE_URL } from "@/lib/store-links"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import BrandPattern from "@/components/brand/pattern"
 
@@ -20,7 +21,9 @@ import BrandPattern from "@/components/brand/pattern"
  *  - The Pool Card is FUTURE TENSE. No dates. Same rule the app applies to its
  *    own card copy.
  *  - No fees, because there are none.
- *  - Store links stay "coming soon" until the app is actually listed.
+ *  - Store links are REAL once the app is listed, and honestly absent before.
+ *    iOS went live 2026-09-18; Android has not, and the answer below says so
+ *    rather than implying both. Both read `lib/store-links.ts`.
  */
 
 const FAQ = [
@@ -114,11 +117,21 @@ const FAQ = [
     q: "Where can I get the app?",
     a: (
       <>
-        Pool is coming to iPhone and Android. The store links will be on the{" "}
+        Pool is live on the{" "}
+        <a
+          href={APP_STORE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-bold underline underline-offset-4"
+        >
+          App Store
+        </a>{" "}
+        for iPhone and iPad. Android is not on Google Play yet — when it is, the link will be
+        on the{" "}
         <Link href="/download" className="font-bold underline underline-offset-4">
           download page
-        </Link>{" "}
-        the moment it is live.
+        </Link>
+        .
       </>
     ),
   },

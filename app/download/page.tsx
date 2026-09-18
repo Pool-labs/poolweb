@@ -2,6 +2,7 @@ import Link from "next/link"
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faAppStoreIos, faGooglePlay } from '@fortawesome/free-brands-svg-icons'
 import BrandPattern from "@/components/brand/pattern"
+import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/store-links"
 
 /**
  * Download.
@@ -12,9 +13,17 @@ import BrandPattern from "@/components/brand/pattern"
  * site, so the page carries one brand rather than two.
  *
  * The pre-register card is gone: Pool is launching rather than collecting a
- * waiting list, and `/preregister` is no longer a public entry point. The page
- * has one job now — say where the app will be, honestly, until there are real
- * store links to put here.
+ * waiting list, and `/preregister` is no longer a public entry point.
+ *
+ * ⚠️ POOL IS LIVE ON THE APP STORE (2026-09-18) AND NOT YET ON GOOGLE PLAY, and
+ * this page shows that asymmetry rather than hiding it. Two matching store
+ * buttons would send every Android visitor to a dead end — worse than telling
+ * them plainly that it is coming, because a broken link reads as a broken
+ * company. The iOS button is a real, prominent call to action; the Android card
+ * is a quiet, honest note beside it.
+ *
+ * Both URLs come from `lib/store-links.ts`. When Play goes live, set
+ * `PLAY_STORE_URL` there — the copy for both states is already written here.
  */
 export default function DownloadPage() {
   return (
@@ -36,20 +45,53 @@ export default function DownloadPage() {
             Get Pool
           </h1>
           <p className="text-lg text-navy/80 mb-10 max-w-lg mx-auto">
-            Pool is coming to iPhone and Android. The moment it is live in the stores, the links
-            land right here.
+            Pool is live on the App Store. Android is on its way.
           </p>
 
           <div className="sticker rounded-3xl bg-white p-8 md:-rotate-1">
-            <div className="flex justify-center gap-6 mb-5 text-navy">
+            <div className="flex justify-center mb-5 text-navy">
               <FontAwesomeIcon icon={faAppStoreIos} className="h-12 w-12" />
-              <FontAwesomeIcon icon={faGooglePlay} className="h-12 w-12" />
             </div>
-            <h2 className="font-display font-bold text-2xl text-navy mb-3">Coming soon</h2>
-            <p className="text-navy/80">
-              The App Store and Google Play links will appear here at launch.
-            </p>
+            <h2 className="font-display font-bold text-2xl text-navy mb-3">
+              Download for iPhone
+            </h2>
+            <p className="text-navy/80 mb-6">Free on the App Store. iPhone and iPad.</p>
+            <a
+              href={APP_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hp-btn hp-btn-pink inline-flex items-center justify-center gap-2"
+            >
+              <FontAwesomeIcon icon={faAppStoreIos} className="h-5 w-5" />
+              Get it on the App Store
+            </a>
           </div>
+
+          {PLAY_STORE_URL === null ? (
+            /* ⚠️ Deliberately NOT a button, and deliberately quieter than the
+               card above. A disabled-looking Play button invites a tap that
+               cannot go anywhere; a sentence sets the expectation correctly
+               and costs the Android visitor nothing. */
+            <div className="mt-6 rounded-2xl border-2 border-navy/15 bg-white/60 p-6">
+              <div className="flex items-center justify-center gap-3 text-navy/70">
+                <FontAwesomeIcon icon={faGooglePlay} className="h-6 w-6" />
+                <span className="font-display font-bold text-lg">Android is coming</span>
+              </div>
+              <p className="mt-2 text-navy/70 text-sm">
+                Pool is not on Google Play yet. The link will be right here the day it is.
+              </p>
+            </div>
+          ) : (
+            <a
+              href={PLAY_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hp-btn hp-btn-green mt-6 inline-flex items-center justify-center gap-2"
+            >
+              <FontAwesomeIcon icon={faGooglePlay} className="h-5 w-5" />
+              Get it on Google Play
+            </a>
+          )}
 
           <p className="mt-10 text-navy/80">
             Questions in the meantime?{" "}

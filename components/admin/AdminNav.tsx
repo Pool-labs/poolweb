@@ -23,7 +23,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { adminLogout } from '@/lib/admin/adminApi';
-import { ENV_BADGE, ENV_DESCRIPTIONS, ENV_LABELS, type ApiEnv } from '@/lib/admin/adminEnv';
+import { ENV_LABELS, type ApiEnv } from '@/lib/admin/adminEnv';
 
 const NAV_ITEMS = [
   { href: '/admin/stats', label: 'Stats', icon: BarChart3 },
@@ -92,12 +92,23 @@ const PROD_ONLY_NAV_ITEMS = [
  * real users' money, so PRODUCTION tints this whole header and rules it in red —
  * the chrome changes, not just a pill.
  *
- * ⚠️ THE SWITCHER ITSELF NO LONGER LIVES HERE (#14). It moved to the
- * full-width `EnvBanner` above, which renders on every page INCLUDING login and
- * carries it under an explicit "Switch to" label. There is now exactly one
- * switcher in the dashboard; the badge kept here is an echo of the strip, so the
- * environment is still stated at the point of every action even after the strip
- * has scrolled away.
+ * ⚠️ NEITHER THE SWITCHER NOR THE BADGE LIVES HERE ANY MORE. The switcher moved
+ * to the full-width `EnvBanner` above (#14); the wordmark-plus-badge went with
+ * it on 2026-09-18, because it was saying a second time what the banner already
+ * says better. The banner leads with "You are on STAGING", explains what that
+ * MEANS, and carries the switcher — three lines above a pill reading "Staging".
+ *
+ * ⚠️ AND THE ARGUMENT FOR KEEPING THE BADGE DID NOT SURVIVE CHECKING. It was
+ * "the environment is still stated at the point of every action even after the
+ * strip has scrolled away" — but neither this header nor the banner is `sticky`
+ * or `fixed`, so they scroll away together, a few pixels apart. The badge was
+ * never visible in a moment the banner was not.
+ *
+ * ⚠️ WHAT DOES STAY IS THE PRODUCTION TINT, and it is not decoration. A red
+ * rule and a red wash on the whole bar is an ambient signal you cannot read
+ * past — it does not compete for attention with the nav labels the way a pill
+ * does, and it is the one part of this header that says "real users, real
+ * money" without anybody having to look at it.
  *
  * Everything here is derived from the `env` the SERVER resolved (the layout
  * reads the httpOnly cookie); the client never decides which environment it is
@@ -148,12 +159,12 @@ export function AdminNav({ env }: { env: ApiEnv }) {
       )}
     >
       <div ref={panelRef} className="container mx-auto px-4 py-3">
-        {/* ── Phone: brand + environment + a hamburger ─────────────────────
-            ⚠️ THE ENVIRONMENT BADGE STAYS ON THE BAR, never inside the menu.
-            It is the one thing on this header that is a SAFETY signal (#112),
-            and a signal you have to open a menu to see is not one. */}
-        <div className="flex items-center justify-between gap-2 lg:hidden">
-          <Brand env={env} />
+        {/* ── Phone: just the menu ─────────────────────────────────────────
+            The environment is stated in full by the `EnvBanner` directly above
+            this bar, on every page including login — so there is nothing left
+            here to say, and a bar carrying one control does not need a label
+            explaining that it is a bar. */}
+        <div className="flex items-center justify-end gap-2 lg:hidden">
           <Button
             type="button"
             variant="ghost"
@@ -188,7 +199,6 @@ export function AdminNav({ env }: { env: ApiEnv }) {
         {/* ── Desktop: the single row, unchanged ───────────────────────── */}
         <div className="hidden lg:flex lg:items-center lg:justify-between lg:gap-2">
           <div className="flex items-center gap-1">
-            <Brand env={env} />
             {items.map((item) => (
               <NavItemLink key={item.href} item={item} pathname={pathname} />
             ))}
@@ -197,24 +207,6 @@ export function AdminNav({ env }: { env: ApiEnv }) {
         </div>
       </div>
     </header>
-  );
-}
-
-/** The wordmark + the environment badge — identical in both layouts. */
-function Brand({ env }: { env: ApiEnv }) {
-  return (
-    <div className="flex min-w-0 items-center gap-2">
-      <span className="whitespace-nowrap font-bold">Pool Admin</span>
-      <span
-        title={`Insights are for the ${ENV_LABELS[env].toLowerCase()} environment — ${ENV_DESCRIPTIONS[env]}`}
-        className={cn(
-          'whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold tracking-wide',
-          ENV_BADGE[env].className,
-        )}
-      >
-        {ENV_LABELS[env]}
-      </span>
-    </div>
   );
 }
 
@@ -253,6 +245,15 @@ function NavItemLink({
   );
 }
 
+/**
+ * Sign out — and the ONE place on this bar that still names the environment.
+ *
+ * ⚠️ Deliberately kept when the wordmark's badge went (2026-09-18). Sessions
+ * are per-environment (#112), so "Sign out" alone would be ambiguous about
+ * which one it ends — and this is the single control here with a consequence
+ * that differs by environment. Every other label on the bar is a destination,
+ * where the environment is already stated by the banner above.
+ */
 function SignOutButton({ env, className }: { env: ApiEnv; className?: string }) {
   return (
     <Button
