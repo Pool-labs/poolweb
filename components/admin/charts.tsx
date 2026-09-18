@@ -169,6 +169,8 @@ export function TrendChart({
   xKey = 'label',
   xLabel,
   yLabel,
+  yWidth = 40,
+  valueFormatter,
   height = 220,
   emptyReason = 'no-data',
   emptyDetail,
@@ -178,6 +180,18 @@ export function TrendChart({
   xKey?: string;
   xLabel?: string;
   yLabel?: string;
+  /** Widen the y-gutter when the formatted ticks are long (money, say). */
+  yWidth?: number;
+  /**
+   * Formats the axis ticks AND the tooltip figure.
+   *
+   * ⚠️ REQUIRED WHENEVER THE ROWS CARRY CENTS. The row value stays integer
+   * cents — `$120.00` plotted as `12000` is the same line, and keeping cents
+   * in the data means no float ever touches money — but an unformatted axis
+   * would read `12000` to somebody looking at a dollar chart, which is wrong
+   * by a factor of 100 and looks entirely plausible. Pass `formatMoney`.
+   */
+  valueFormatter?: (value: number) => string;
   height?: number;
   emptyReason?: ChartEmptyReason;
   emptyDetail?: string;
@@ -192,10 +206,18 @@ export function TrendChart({
         <XAxis dataKey={xKey} tick={AXIS_TICK} interval="preserveStartEnd" minTickGap={24}>
           {xLabel && <Label value={xLabel} position="insideBottom" offset={-12} style={AXIS_LABEL_STYLE} />}
         </XAxis>
-        <YAxis allowDecimals={false} tick={AXIS_TICK} width={40}>
+        <YAxis
+          allowDecimals={false}
+          tick={AXIS_TICK}
+          width={yWidth}
+          tickFormatter={valueFormatter}
+        >
           {yLabel && <Label value={yLabel} angle={-90} position="insideLeft" style={AXIS_LABEL_STYLE} />}
         </YAxis>
-        <Tooltip {...TOOLTIP_PROPS} />
+        <Tooltip
+          {...TOOLTIP_PROPS}
+          formatter={valueFormatter ? (value: number) => valueFormatter(value) : undefined}
+        />
         {series.length > 1 && <Legend wrapperStyle={LEGEND_STYLE} />}
         {series.map((s) => (
           <Line
@@ -586,6 +608,7 @@ export function StatTile({
   sub,
   delta,
   deltaLabel,
+  deltaFormat,
 }: {
   label: string;
   value: number | string | undefined;
@@ -593,6 +616,12 @@ export function StatTile({
   delta?: WindowDelta;
   /** Names the comparison window — a delta with no stated baseline is noise. */
   deltaLabel?: string;
+  /**
+   * Formats the delta's ABSOLUTE half. Required when `value` is money: pass
+   * the same formatter the value used, or the tile states one change in two
+   * units — "$42,100.00" above "−1,052,500" — and says which is which nowhere.
+   */
+  deltaFormat?: (magnitude: number) => string;
 }) {
   const display =
     value === undefined ? '—' : typeof value === 'number' ? value.toLocaleString('en-US') : value;
@@ -611,7 +640,7 @@ export function StatTile({
             )}
           >
             <span aria-hidden="true">{DELTA_GLYPH[delta.direction]}</span>
-            <span>{formatDelta(delta)}</span>
+            <span>{formatDelta(delta, deltaFormat)}</span>
             {deltaLabel && (
               <span className="font-normal text-muted-foreground">{deltaLabel}</span>
             )}

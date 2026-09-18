@@ -44,9 +44,10 @@ import type { StatsTabProps } from '@/components/admin/stats/types';
  *
  * 3. **AN EMPTY PANEL ALWAYS SAYS WHY.** Borrowed from #116: a blank chart that
  *    explains nothing lets "we could not read this" pass for "nothing is
- *    happening", and on a stats page that mistake is silent and permanent. Two
- *    panels here are empty BY DECISION and say so — money volume in cents
- *    (poolmobile#647) and the DAU/WAU/MAU trend (poolmobile#648).
+ *    happening", and on a stats page that mistake is silent and permanent. One
+ *    panel here is still empty BY DECISION and says so — the DAU/WAU/MAU trend
+ *    (poolmobile#648). Money volume used to be the second; poolmobile#647
+ *    shipped, so it is now a real panel fed by its own uncached endpoint.
  */
 
 const EMPTY: StatsData = {
@@ -55,6 +56,7 @@ const EMPTY: StatsData = {
   activation: null,
   pools: null,
   transactions: null,
+  money: null,
   engagement: null,
   points: null,
   authFunnel: null,
@@ -139,6 +141,7 @@ export default function AdminStatsPage() {
       activation,
       pools,
       transactions,
+      money,
       engagement,
       points,
       authFunnel,
@@ -157,6 +160,10 @@ export default function AdminStatsPage() {
       metricsApi.activation(windowDays),
       metricsApi.pools(windowDays),
       metricsApi.transactions(windowDays),
+      // ⚠️ A SEPARATE call from `transactions` on purpose (poolmobile#647):
+      // the server keeps money volume on its own UNCACHED endpoint so cents
+      // never ride inside a cached admin response.
+      metricsApi.money(windowDays),
       metricsApi.engagement(windowDays),
       metricsApi.points(windowDays),
       funnelsApi.auth(windowDays),
@@ -178,6 +185,7 @@ export default function AdminStatsPage() {
       activation: pick(activation),
       pools: pick(pools),
       transactions: pick(transactions),
+      money: pick(money),
       engagement: pick(engagement),
       points: pick(points),
       authFunnel: pick(authFunnel),

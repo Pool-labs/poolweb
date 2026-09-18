@@ -109,7 +109,8 @@ describe('labels', () => {
 describe('mappableCities', () => {
   it('counts what WOULD plot, and what would not', () => {
     // The map panel reports this instead of rendering empty: the data is here,
-    // the tiles are not readable (poolmobile#649).
+    // there is just no renderer yet (the tiles themselves became readable when
+    // poolmobile#649 shipped CORS).
     const cities = [
       city({ key: 'a', lat: 38.9, lng: -92.3, centroidSource: AdminGeographyCentroidSource.Curated }),
       city({ key: 'b', lat: 30.2, lng: -97.7, centroidSource: AdminGeographyCentroidSource.Pools }),

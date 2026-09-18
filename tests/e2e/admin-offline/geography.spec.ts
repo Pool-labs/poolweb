@@ -41,7 +41,7 @@ test.describe('Geography tab (fixtures)', () => {
     await expect(tile).toContainText('not an error');
   });
 
-  test('the map panel blames CORS, not the data', async ({ page }) => {
+  test('the map panel blames the missing renderer, not the data', async ({ page }) => {
     // ⚠️ The whole point of the panel. "No data" would be false — two of the
     // three cities have a point and there is a venue pin ready.
     await serveAdminFixtures(page);
@@ -49,11 +49,14 @@ test.describe('Geography tab (fixtures)', () => {
     await page.getByRole('tab', { name: 'Geography' }).click();
 
     const map = page.getByText('Map', { exact: true }).locator('xpath=../../..');
-    await expect(map).toContainText('not readable from a browser yet');
-    await expect(map).toContainText('poolmobile#649');
+    await expect(map).toContainText('not built yet');
+    await expect(map).toContainText('maplibre-gl');
     await expect(map).toContainText('2');
     await expect(map).toContainText('exact-venue');
     await expect(map).not.toContainText('No data');
+    // ⚠️ poolmobile#649 SHIPPED. The panel may say the block is history; it
+    // may not still claim the tiles are unreadable, which is now false.
+    await expect(map).not.toContainText('not readable from a browser yet');
   });
 
   test('a city row links to the list with the key passed through EXACTLY', async ({ page }) => {
