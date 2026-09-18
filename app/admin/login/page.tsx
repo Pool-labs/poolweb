@@ -106,7 +106,7 @@ export default function AdminLoginPage() {
         setCode('');
         return;
       }
-      router.replace('/admin/overview');
+      router.replace('/admin/stats');
       router.refresh();
     } catch {
       setError('Network error. Try again.');

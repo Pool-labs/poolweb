@@ -1,0 +1,214 @@
+import { expect, test } from '@playwright/test';
+
+import { LEGACY_POOLS, LEGACY_SIGNUPS } from '../fixtures/statsPayloads';
+import { plantOfflineSession, serveAdminFixtures } from '../helpers/offlineAdmin';
+
+/**
+ * Stats, driven from fixtures (poolweb #33).
+ *
+ * The API-backed `admin/stats.spec.ts` proves the page works against the real
+ * staging API. This one proves the three things live data cannot:
+ *
+ *   1. the delta ARITHMETIC — known inputs, a checkable rendered percentage;
+ *   2. a panel whose call FAILED says so, and never renders as "no data";
+ *   3. a payload from an API older than #624 degrades PER PANEL — the page
+ *      still renders, and each panel that lost its source says which.
+ *
+ * Nothing here touches an environment (see `helpers/offlineAdmin.ts`).
+ */
+
+test.beforeEach(async ({ context }) => {
+  await plantOfflineSession(context);
+});
+
+test.describe('Stats (fixtures)', () => {
+  test('renders the delta the arithmetic actually produces', async ({ page }) => {
+    await serveAdminFixtures(page);
+    await page.goto('/admin/stats');
+
+    await expect(page.getByRole('heading', { name: 'Stats', level: 1 })).toBeVisible();
+
+    // 25 signups this window against 20 in the one before: +5, i.e. +25%.
+    const signupTile = page.getByText('Signups (last 30d)', { exact: true }).locator('xpath=../..');
+    await expect(signupTile).toContainText('25');
+    await expect(signupTile).toContainText('+25% (+5)');
+    await expect(signupTile).toContainText('▲');
+    await expect(signupTile).toContainText('vs the 30 days before');
+
+    // A fall renders as a fall: 40 transactions against 50 before.
+    await page.getByRole('tab', { name: 'Money' }).click();
+    const txTile = page.getByText('Transactions (last 30d)', { exact: true }).locator('xpath=../..');
+    await expect(txTile).toContainText('−20% (−10)');
+    await expect(txTile).toContainText('▼');
+
+    // ⚠️ An unchanged figure says so in words. "0%" reads as a broken metric.
+    await page.getByRole('tab', { name: 'Pools' }).click();
+    const newPoolsTile = page.getByText('New pools (last 30d)', { exact: true }).locator('xpath=../..');
+    await expect(newPoolsTile).toContainText('No change');
+  });
+
+  test('a panel whose call failed says so — it never reads as "no data"', async ({ page }) => {
+    await serveAdminFixtures(page, { fail: ['metrics/pools'] });
+    await page.goto('/admin/stats');
+
+    // The page survives: Growth still has its numbers.
+    await expect(page.getByText('Signups per day')).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Pools' }).click();
+    // The tile degrades to `—`, which is NOT `0`.
+    const totalTile = page.getByText('Total pools', { exact: true }).locator('xpath=../..');
+    await expect(totalTile).toContainText('—');
+    await expect(totalTile).not.toContainText('0');
+
+    // And the charts say the source is untrustworthy, in those words.
+    await expect(page.getByText(/Could not load this panel/).first()).toBeVisible();
+    await expect(page.getByText('No data in this window.')).toHaveCount(0);
+  });
+
+  test('every metrics call failing is the one case that takes the whole page', async ({ page }) => {
+    await serveAdminFixtures(page, {
+      fail: [
+        'metrics/active-users',
+        'metrics/signups',
+        'metrics/activation',
+        'metrics/pools',
+        'metrics/transactions',
+        'metrics/engagement',
+        'metrics/points',
+        'analytics/funnels/auth',
+        'analytics/funnels/pool',
+        'analytics/funnels/discover',
+        'analytics/money-events',
+      ],
+    });
+    await page.goto('/admin/stats');
+
+    await expect(page.getByText('Could not load metrics')).toBeVisible();
+  });
+
+  test('an API older than #624 degrades per panel, not per page', async ({ page }) => {
+    // ⚠️ The #618 lesson, applied to #624: the env switch can point this page
+    // at an API that never heard of these fields. The figures it DOES serve
+    // must still render, and the rest must say they were not reported —
+    // never a column of dashes implying the platform has no pools.
+    await serveAdminFixtures(page, {
+      overrides: { 'metrics/pools': LEGACY_POOLS, 'metrics/signups': LEGACY_SIGNUPS },
+    });
+    await page.goto('/admin/stats');
+
+    // Present on both API versions: the figure renders, with NO delta beside it.
+    const signupTile = page.getByText('Signups (last 30d)', { exact: true }).locator('xpath=../..');
+    await expect(signupTile).toContainText('25');
+    await expect(signupTile).not.toContainText('vs the 30 days before');
+
+    await page.getByRole('tab', { name: 'Pools' }).click();
+    await expect(page.getByText('Total pools', { exact: true }).locator('xpath=../..')).toContainText(
+      '33',
+    );
+    // The #624-only panels name what this API version does not report.
+    await expect(page.getByText(/does not report pool categories/)).toBeVisible();
+    await expect(page.getByText(/does not report the size distribution/)).toBeVisible();
+  });
+
+  test('the two by-decision panels explain themselves', async ({ page }) => {
+    await serveAdminFixtures(page);
+    await page.goto('/admin/stats');
+
+    await page.getByRole('tab', { name: 'Activity' }).click();
+    await expect(page.getByText(/poolmobile#648/)).toBeVisible();
+    await expect(page.getByText('The API does not serve this yet.').first()).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Money' }).click();
+    await expect(page.getByText(/poolmobile#647/)).toBeVisible();
+  });
+
+  test('switching the range keeps you on the tab you were reading', async ({ page }) => {
+    // ⚠️ The regression this exists for: `<Tabs>` lives inside the loading
+    // ternary, so a reload unmounts it. Uncontrolled, that threw the reader
+    // back to Growth on every range change — maddening precisely when someone
+    // is comparing two windows on one tab.
+    await serveAdminFixtures(page);
+    await page.goto('/admin/stats');
+
+    await page.getByRole('tab', { name: 'Money' }).click();
+    await expect(page.getByRole('region', { name: 'Money' })).toBeVisible();
+
+    await page.getByRole('combobox', { name: 'Date range' }).click();
+    await page.getByRole('option', { name: 'Last 7 days' }).click();
+
+    await expect(page.getByRole('region', { name: 'Money' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Money' })).toContainText('Last 7 days');
+    await expect(page.getByRole('region', { name: 'Growth' })).toHaveCount(0);
+  });
+
+  test('a status gets its semantic colour, not a positional one', async ({ page }) => {
+    // ⚠️ The wire values are Prisma's (COMPLETED/PENDING/DECLINED), NOT the
+    // lowercase enum the shared package also exports. Keying the palette on the
+    // wrong one is silent — every slice just misses its colour — so the legend
+    // swatches are asserted against the palette roles here.
+    await serveAdminFixtures(page);
+    await page.goto('/admin/stats');
+    await page.getByRole('tab', { name: 'Money' }).click();
+
+    const donut = page.getByText('Transactions by status').locator('xpath=../../..');
+    const swatch = (label: string) =>
+      donut.locator('li', { hasText: label }).locator('span').first();
+
+    await expect(swatch('Completed')).toHaveCSS('background-color', 'rgb(12, 163, 12)');
+    await expect(swatch('Declined')).toHaveCSS('background-color', 'rgb(208, 59, 59)');
+    await expect(swatch('Pending')).toHaveCSS('background-color', 'rgb(250, 178, 25)');
+  });
+
+  test('an all-time panel with nothing in it does not blame the window', async ({ page }) => {
+    // On the freshly reset production database every all-time donut is empty.
+    // "No data in this window" would tell a founder the RANGE is empty when the
+    // fact is the platform is.
+    await serveAdminFixtures(page, {
+      overrides: {
+        'metrics/transactions': {
+          total: 0,
+          byStatus: { COMPLETED: 0, PENDING: 0, DECLINED: 0, APPROVED: 0 },
+          series: [],
+          window: { days: 30, since: '2026-08-19T00:00:00.000Z' },
+          totalInWindow: 0,
+          settlementsByStatus: { CONFIRMED: 0, PENDING: 0, REJECTED: 0 },
+          settlementsInWindow: 0,
+          depositsInWindow: 0,
+        },
+      },
+    });
+    await page.goto('/admin/stats');
+    await page.getByRole('tab', { name: 'Money' }).click();
+
+    // Scoped to the ALL-TIME cards. The windowed trend chart on the same tab
+    // says "No data in this window", and that is correct there — the point is
+    // that the two say DIFFERENT things, not that one phrase disappears.
+    for (const title of ['Settlements by status', 'Transactions by status']) {
+      const card = page.getByText(title, { exact: true }).locator('xpath=../../..');
+      await expect(card).toContainText('Nothing recorded yet.');
+      await expect(card).not.toContainText('No data in this window.');
+    }
+    const windowed = page.getByText('Transactions per day', { exact: true }).locator('xpath=../../..');
+    await expect(windowed).toContainText('No data in this window.');
+  });
+
+  test('stickiness is unanswerable, not 0%, with no monthly base', async ({ page }) => {
+    await serveAdminFixtures(page, {
+      overrides: {
+        'metrics/active-users': {
+          asOf: '2026-09-18T08:00:00.000Z',
+          dau: 0,
+          wau: 0,
+          mau: 0,
+          lastSeenDistribution: [],
+        },
+      },
+    });
+    await page.goto('/admin/stats');
+    await page.getByRole('tab', { name: 'Activity' }).click();
+
+    const tile = page.getByText('Stickiness (DAU/MAU)', { exact: true }).locator('xpath=../..');
+    await expect(tile).toContainText('—');
+    await expect(tile).toContainText('No monthly-active base to divide by');
+  });
+});

@@ -13,8 +13,8 @@ skipWithoutAdminSession();
  */
 test.describe('Waitlist (staging)', () => {
   test('is absent from the nav and 404s at its URL', async ({ page }) => {
-    await page.goto('/admin/overview');
-    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+    await page.goto('/admin/stats');
+    await expect(page.getByRole('heading', { name: 'Stats', level: 1 })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Waitlist' })).toHaveCount(0);
 
     // `notFound()` fires inside a streamed render (the root loading.tsx opens
@@ -27,8 +27,11 @@ test.describe('Waitlist (staging)', () => {
     await expect(page.getByText('Pre-registered')).toHaveCount(0);
   });
 
-  test('the stats page is gated the same way', async ({ page }) => {
-    await page.goto('/admin/stats');
+  test('the waitlist statistics page is gated the same way', async ({ page }) => {
+    // ⚠️ NOT `/admin/stats` — that is now the platform Stats page (poolweb
+    // #33), which every environment gets. The waitlist's own questionnaire
+    // statistics moved under the dashboard it belongs to, and kept the gate.
+    await page.goto('/admin/dashboard/stats');
     await expect(page.getByText('This page could not be found')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Survey Statistics' })).toHaveCount(0);
   });

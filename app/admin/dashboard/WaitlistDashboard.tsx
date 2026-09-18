@@ -340,7 +340,7 @@ export function WaitlistDashboard() {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => router.push('/admin/stats')}
+              onClick={() => router.push('/admin/dashboard/stats')}
             >
               <BarChart3 className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">View Stats</span>

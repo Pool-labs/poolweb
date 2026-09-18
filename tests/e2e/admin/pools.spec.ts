@@ -19,8 +19,8 @@ test.describe('Pools', () => {
     await expect(page.getByText('No pools found')).toHaveCount(0);
     await expect(page.getByText(/Showing 1–\d+ of \d+/)).toBeVisible();
 
-    // exact: true — role-name matching is substring by default ('View' would
-    // otherwise match the nav's 'Overview' link first).
+    // exact: true — role-name matching is substring by default, so a bare
+    // 'View' would match any nav link containing the word.
     await page.getByRole('link', { name: 'View', exact: true }).first().click();
     await page.waitForURL(/\/admin\/pools\/[^/]+$/);
 

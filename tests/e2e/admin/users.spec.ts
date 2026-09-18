@@ -20,8 +20,8 @@ test.describe('Users', () => {
     // "Showing 1–25 of N" (en dash) only renders over a non-empty page.
     await expect(page.getByText(/Showing 1–\d+ of \d+/)).toBeVisible();
 
-    // exact: true — role-name matching is substring by default, and a bare
-    // 'View' would match the nav's 'Overview' link first.
+    // exact: true — role-name matching is substring by default, so a bare
+    // 'View' would match any nav link containing the word.
     await page.getByRole('link', { name: 'View', exact: true }).first().click();
     await page.waitForURL(/\/admin\/users\/[^/]+$/);
 

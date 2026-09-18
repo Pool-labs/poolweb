@@ -22,7 +22,7 @@ import { adminLogout } from '@/lib/admin/adminApi';
 import { ENV_BADGE, ENV_DESCRIPTIONS, ENV_LABELS, type ApiEnv } from '@/lib/admin/adminEnv';
 
 const NAV_ITEMS = [
-  { href: '/admin/overview', label: 'Overview', icon: BarChart3 },
+  { href: '/admin/stats', label: 'Stats', icon: BarChart3 },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/pools', label: 'Pools', icon: Layers },
   // Moderation (#13, over poolmobile #158). Sits beside Users/Pools because it

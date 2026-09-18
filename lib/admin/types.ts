@@ -30,6 +30,23 @@ export enum PoolVisibility {
   Public = 'PUBLIC',
 }
 
+/**
+ * Transaction row status.
+ *
+ * ⚠️ THESE ARE THE PRISMA VALUES, NOT `packages/shared`'s `TransactionStatus`.
+ * The shared package also exports a lowercase `pending | verified | disputed`
+ * enum — but the admin metrics service imports `TransactionStatus` from
+ * `@prisma/client` (`admin-metrics.service.ts`) and seeds `byStatus` from
+ * THOSE values, so the lowercase set never appears on this wire. Mirroring the
+ * wrong one is silent: every key simply misses its colour.
+ */
+export enum TransactionStatus {
+  Pending = 'PENDING',
+  Approved = 'APPROVED',
+  Declined = 'DECLINED',
+  Completed = 'COMPLETED',
+}
+
 export enum SettlementMethod {
   Venmo = 'VENMO',
   Cashapp = 'CASHAPP',
@@ -122,6 +139,28 @@ export interface TimeSeriesPoint {
   count: number;
 }
 
+/** The rolling window a windowed metric covers — `[since, now)`. */
+export interface AdminMetricsWindow {
+  days: number;
+  since: string;
+}
+
+/**
+ * The window IMMEDIATELY BEFORE the current one, of the same length (#624).
+ *
+ * ⚠️ THE DELTA NEEDS NO SECOND REQUEST. Every windowed metric returns its
+ * `previous…` twins in the SAME response over this window, so a tile's
+ * comparison is a subtraction on data the page already holds — there is no
+ * `compare` flag to pass and no second `days` value to keep in sync. Snapshot
+ * metrics (active users, engagement) carry no previous window at all: a single
+ * mutable column has no past, which is also why the DAU/WAU/MAU TREND is not
+ * servable (poolmobile#648) and only the snapshot tile exists.
+ */
+export interface AdminPreviousWindow {
+  since: string;
+  until: string;
+}
+
 export interface AdminActiveUsersMetrics {
   asOf: string;
   dau: number;
@@ -136,11 +175,25 @@ export interface AdminSignupSeriesPoint {
   cumulative: number;
 }
 
+/**
+ * ⚠️ EVERY #624 FIELD BELOW IS OPTIONAL, for the #618 reason at line 273: the
+ * #112 switch can point this page at any Pool API — including a developer's
+ * `local` one — and a required field would turn "this API predates #624" into a
+ * page that renders `undefined` where a number belongs. Optional lets each
+ * panel say what it could not get and keep the rest of the page alive, which is
+ * the Stats page's own acceptance criterion.
+ *
+ * Both deployed environments DO serve #624 as of 2026-09-18 (poolmobile#651
+ * merged as `327f8ee`, an ancestor of the `95feb39` image production runs), so
+ * these are optional against a future/older API, not against today's.
+ */
 export interface AdminSignupsMetrics {
   window: { days: number; since: string };
   totalInWindow: number;
   totalAllTime: number;
   series: AdminSignupSeriesPoint[];
+  previousWindow?: AdminPreviousWindow;
+  previousTotalInWindow?: number;
 }
 
 /**
@@ -172,6 +225,23 @@ export interface AdminActivationMetrics {
    * account blocked on several is counted under each.
    */
   blockedByRequirement: Record<string, number>;
+  previousWindow?: AdminPreviousWindow;
+  /**
+   * The previous window's COHORT, judged NOW (#624). Activation is a property
+   * of an account's current state — there is no activation timestamp — so this
+   * answers "how did last window's signups turn out", not "what would this
+   * panel have said a window ago".
+   */
+  previousSignupsInWindow?: number;
+  previousActivatedInWindow?: number;
+  previousActivationRateInWindow?: number;
+}
+
+/** One day of new pools split by visibility (#624). */
+export interface AdminPoolVisibilitySeriesPoint {
+  date: string;
+  public: number;
+  private: number;
 }
 
 export interface AdminPoolMetrics {
@@ -180,12 +250,49 @@ export interface AdminPoolMetrics {
   byVisibility: Record<string, number>;
   byStatus: Record<string, number>;
   newPoolsSeries: TimeSeriesPoint[];
+  window?: AdminMetricsWindow;
+  /**
+   * #624 — pools with `deletedAt` set (the #83 admin suspend). The ONE figure
+   * here that counts soft-deleted pools; every other distribution excludes
+   * them, so `suspended` does not sum with `byStatus`.
+   */
+  suspended?: number;
+  /**
+   * #624 — by #236 category, every `PoolCategory` seeded to 0 plus
+   * `uncategorized` for pools created before #236.
+   */
+  byCategory?: Record<string, number>;
+  /** #624 — pools by ACTIVE-member count, in bucket order, every bucket present. */
+  byMemberCount?: MetricBucket[];
+  /** #624 — new pools per day, split PUBLIC / PRIVATE. */
+  newPoolsByVisibilitySeries?: AdminPoolVisibilitySeriesPoint[];
+  newInWindow?: number;
+  previousWindow?: AdminPreviousWindow;
+  previousNewInWindow?: number;
 }
 
+/**
+ * Transaction ROW COUNTS. ⚠️ THERE ARE NO AMOUNTS HERE AND THERE WILL NOT BE:
+ * aggregate money volume in cents is out by founder decision D1
+ * (poolmobile#647), because it would be the first cached admin response to
+ * carry cents and needs its own review first. The Money tab therefore counts
+ * events and never sums them.
+ */
 export interface AdminTransactionMetrics {
   total: number;
   byStatus: Record<string, number>;
   series: TimeSeriesPoint[];
+  window?: AdminMetricsWindow;
+  totalInWindow?: number;
+  /** #624 — settlements by #38 status, all time, every status seeded to 0. */
+  settlementsByStatus?: Record<string, number>;
+  settlementsInWindow?: number;
+  /** #624 — COMPLETED deposit rows created in the window. */
+  depositsInWindow?: number;
+  previousWindow?: AdminPreviousWindow;
+  previousTotalInWindow?: number;
+  previousSettlementsInWindow?: number;
+  previousDepositsInWindow?: number;
 }
 
 export interface AdminEngagementMetrics {
@@ -197,6 +304,48 @@ export interface AdminEngagementMetrics {
   streak: {
     current: MetricBucket[];
     longestMax: number;
+  };
+}
+
+/**
+ * The Pool Points economy (#251), derived from `point_transactions` — the
+ * ledger, never `analytics_events`. No money anywhere in this shape: points are
+ * a bare integer and there is no `…Cents` field to add.
+ */
+export interface AdminPointReasonMetric {
+  reason: string;
+  awards: number;
+  points: number;
+  /** ⚠️ An earning rule nobody reaches is a DEAD RULE — that is what this counts. */
+  distinctEarners: number;
+}
+
+export interface AdminPointsTotals {
+  awards: number;
+  points: number;
+  distinctEarners: number;
+}
+
+export interface AdminPointsMetrics {
+  windowDays: number;
+  /**
+   * One row per reason, earners first and points-descending; since #624 every
+   * ACTIVE reason that earned nothing is appended as a zero row, so a rule
+   * nobody reaches reads as a zero rather than as an absence.
+   */
+  byReason: AdminPointReasonMetric[];
+  totals: AdminPointsTotals;
+  previousWindow?: AdminPreviousWindow;
+  previousTotals?: AdminPointsTotals;
+  daily: {
+    medianPerEarnerPerDay: number;
+    p90PerEarnerPerDay: number;
+    /**
+     * Share (0–1) of user-days that hit the daily grindable cap. A rate that is
+     * not near zero means the backstop has become the binding constraint.
+     */
+    grindableCapHitRate: number;
+    earnerDays: number;
   };
 }
 
