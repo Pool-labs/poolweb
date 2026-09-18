@@ -454,6 +454,49 @@ export interface AdminGeographyMetrics {
   exactVenuePoolsTruncated: boolean;
 }
 
+// ─── Leaderboard headlines (#681, source: leaderboards.types.ts) ────────────
+
+/** The five global boards, in the server's own display order. */
+export enum GlobalLeaderboardBoard {
+  TopPoolsByTransactions = 'topPoolsByTransactions',
+  MostActive = 'mostActive',
+  MostMembers = 'mostMembers',
+  LongestRunning = 'longestRunning',
+  FastestGrowing = 'fastestGrowing',
+}
+
+export enum LeaderboardPeriod {
+  Day = 'day',
+  Week = 'week',
+  Month = 'month',
+  Year = 'year',
+}
+
+/**
+ * Rank 1 of one board.
+ *
+ * ⚠️ NULL FIELDS MEAN THE BOARD IS EMPTY — no pool qualifies — which is a
+ * different fact from a pool sitting at zero, and the panel must not render
+ * them the same way. The server reports every board rather than omitting an
+ * empty one precisely so this stays visible.
+ *
+ * ⚠️ THERE IS NO MONEY HERE ON PURPOSE. `value` is the board's own ranking
+ * metric — a count on four boards, days on `longestRunning`. The global
+ * boards' one cents field is deliberately not projected onto `/admin` (#647).
+ */
+export interface LeaderboardHeadline {
+  board: GlobalLeaderboardBoard;
+  poolId: string | null;
+  poolName: string | null;
+  value: number | null;
+}
+
+/** GET /admin/metrics/leaderboards — inner `data`. */
+export interface LeaderboardHeadlines {
+  period: LeaderboardPeriod;
+  boards: LeaderboardHeadline[];
+}
+
 // ─── In-app support (#683, source: messaging.types.ts) ──────────────────────
 //
 // ⚠️ THESE ARE THE MEMBER-FACING SHAPES, NOT ADMIN ONES, and that is the point.

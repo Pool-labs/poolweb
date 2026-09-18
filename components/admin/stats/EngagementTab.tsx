@@ -7,11 +7,15 @@ import {
   HorizontalBarChart,
   StatTile,
 } from '@/components/admin/charts';
+import Link from 'next/link';
+
 import { previousWindowLabel } from '@/lib/admin/charts';
+import { humanizeEnum } from '@/lib/admin/format';
 import {
   bucketsToRows,
   deltaFor,
   formatRate,
+  LEADERBOARD_BOARD_COPY,
   pointsAwardRows,
   SNAPSHOT_SCOPE,
 } from '@/lib/admin/stats';
@@ -129,14 +133,61 @@ export function EngagementTab({ data, days }: StatsTabProps) {
           )}
         </ChartCard>
 
-        <ChartCard title="Leaderboard headline" description="Which pool is #1 on each board">
-          <ChartEmpty
-            reason="not-servable"
-            detail={
-              'The leaderboards are a member-facing surface: there is no admin endpoint that returns a board, so the only way to fill this panel would be to re-derive the ranking in the browser from list pages — which would produce a number that disagrees with the app. Filed as a server enabler instead (poolmobile#681); until it exists this panel stays honestly empty.'
-            }
-            height={160}
-          />
+        <ChartCard
+          title="Leaderboard headline"
+          description={
+            data.leaderboards
+              ? `Which pool is #1 on each board — ${data.leaderboards.period} boards`
+              : 'Which pool is #1 on each board'
+          }
+        >
+          {!data.leaderboards ? (
+            <ChartEmpty
+              reason="unavailable"
+              detail="The leaderboards metric did not answer for this environment."
+              height={160}
+            />
+          ) : (
+            <ul className="space-y-2">
+              {data.leaderboards.boards.map((headline) => {
+                const copy = LEADERBOARD_BOARD_COPY[headline.board];
+                return (
+                  <li
+                    key={headline.board}
+                    className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm"
+                  >
+                    <span className="text-muted-foreground">
+                      {copy?.label ?? humanizeEnum(headline.board)}
+                    </span>
+                    {headline.poolId === null ? (
+                      /* ⚠️ An EMPTY board, which the server reports rather than
+                         omitting. Not the same fact as a pool scoring zero, and
+                         it must not read like one. */
+                      <span className="text-xs italic text-muted-foreground">
+                        No pool qualifies yet
+                      </span>
+                    ) : (
+                      <span className="flex items-baseline gap-2">
+                        <Link
+                          href={`/admin/pools/${headline.poolId}`}
+                          className="font-medium underline underline-offset-2"
+                        >
+                          {headline.poolName ?? headline.poolId}
+                        </Link>
+                        {headline.value !== null && (
+                          // The unit is part of the fact: `value` counts
+                          // expenses on one board and DAYS on another.
+                          <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                            {headline.value.toLocaleString('en-US')} {copy?.unit ?? ''}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </ChartCard>
       </div>
     </div>
