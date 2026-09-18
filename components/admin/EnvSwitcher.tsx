@@ -87,7 +87,7 @@ export function EnvSwitcher({
       }
       // Full reload: the layout resolves the environment server-side and every
       // screen must re-query the newly selected API.
-      window.location.href = body.authenticated ? '/admin/overview' : '/admin/login';
+      window.location.href = body.authenticated ? '/admin/stats' : '/admin/login';
     } catch {
       setError('Network error. Try again.');
       setPending(null);

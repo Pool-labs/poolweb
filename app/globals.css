@@ -36,6 +36,26 @@
     --input: 224 30% 80%;
     --ring: 224 57% 18%;
     --radius: 1rem;
+
+    /* ---- Admin chart palette (poolweb #33) ----
+     * ⚠️ MIRRORS `CHART_PALETTE.light` in lib/admin/charts.ts, which is the
+     * source of truth and carries the reasoning and the validator results.
+     * `tests/unit/admin/chart-palette.test.ts` fails if the two ever drift.
+     * Raw hex, not the `H S% L%` triples above: charts consume these straight
+     * as SVG fills, never through `hsl()`. */
+    --chart-series-1: #2a78d6;
+    --chart-series-2: #eb6834;
+    --chart-series-3: #1baf7a;
+    --chart-series-4: #eda100;
+    --chart-series-5: #e87ba4;
+    --chart-series-6: #008300;
+    --chart-series-7: #4a3aa7;
+    --chart-series-8: #e34948;
+    --chart-good: #0ca30c;
+    --chart-warning: #fab219;
+    --chart-serious: #ec835a;
+    --chart-critical: #d03b3b;
+    --chart-neutral: #7c8899;
   }
 
   .dark {
@@ -58,6 +78,24 @@
     --border: 224 40% 26%;
     --input: 224 40% 26%;
     --ring: 197 89% 63%;
+
+    /* ---- Admin chart palette, dark steps (poolweb #33) ----
+     * The SAME eight hues re-stepped for the dark card surface, not a second
+     * palette — mirrors `CHART_PALETTE.dark`. All eight clear 3:1 here, which
+     * the light steps deliberately do not (see charts.ts on the relief rule). */
+    --chart-series-1: #3987e5;
+    --chart-series-2: #d95926;
+    --chart-series-3: #199e70;
+    --chart-series-4: #c98500;
+    --chart-series-5: #d55181;
+    --chart-series-6: #008300;
+    --chart-series-7: #9085e9;
+    --chart-series-8: #e66767;
+    --chart-good: #0ca30c;
+    --chart-warning: #fab219;
+    --chart-serious: #ec835a;
+    --chart-critical: #d03b3b;
+    --chart-neutral: #7c8899;
   }
 }
 

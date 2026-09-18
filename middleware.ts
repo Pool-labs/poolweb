@@ -15,7 +15,7 @@ import { adminCookies } from '@/lib/admin/authCookies';
  * /admin/login and the /admin/api/* handlers are excluded, so an unauthenticated
  * user is bounced to login without the layout itself trying to redirect the
  * login page. An already-authenticated user hitting /admin/login is sent on to
- * the overview.
+ * Stats.
  *
  * ⚠️ PER-ENVIRONMENT (poolmobile #112). The gate asks "is there a session for
  * the SELECTED environment", never "is there a session at all" — so switching to
@@ -66,7 +66,7 @@ export function middleware(req: NextRequest) {
 
   if (hasSession && isLogin) {
     const url = req.nextUrl.clone();
-    url.pathname = '/admin/overview';
+    url.pathname = '/admin/stats';
     url.search = '';
     return NextResponse.redirect(url);
   }

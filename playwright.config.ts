@@ -53,6 +53,21 @@ export default defineConfig({
       name: 'marketing',
       testMatch: /marketing\/.*\.spec\.ts/,
     },
+    {
+      /**
+       * Admin pages driven entirely from FIXTURES (poolweb #33) — no session,
+       * no Mailtrap, no environment. Every `/admin/api/**` call is fulfilled in
+       * the browser, and an un-stubbed one is aborted rather than forwarded, so
+       * these specs cannot reach staging even by mistake.
+       *
+       * They cover the states a healthy environment cannot produce: a known
+       * number (so the delta arithmetic is checkable), a source that FAILED,
+       * and a payload from an API older than #624. See helpers/offlineAdmin.ts
+       * for why the planted cookie weakens nothing.
+       */
+      name: 'admin-offline',
+      testMatch: /admin-offline\/.*\.spec\.ts/,
+    },
   ],
   webServer: {
     // `next build` is NOT run here — playwright would rebuild on every

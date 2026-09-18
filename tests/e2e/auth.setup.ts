@@ -95,7 +95,7 @@ setup('admin login (staging)', async ({ page, baseURL }) => {
   // auto-submit via the page's own onChange handler.
   await page.locator('input[autocomplete="one-time-code"], [data-input-otp]').first().fill(code);
 
-  await page.waitForURL('**/admin/overview');
+  await page.waitForURL('**/admin/stats');
   await expect(
     page.getByRole('region', { name: 'Current Pool environment: STAGING' }),
   ).toBeVisible();

@@ -66,7 +66,7 @@ export function QaConsole() {
   }, [load]);
 
   useEffect(() => {
-    if (disabled) router.replace('/admin/overview');
+    if (disabled) router.replace('/admin/stats');
   }, [disabled, router]);
 
   if (disabled) return null;

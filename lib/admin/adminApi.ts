@@ -33,6 +33,7 @@ import type {
   AdminReportListResponse,
   AdminReviewReportInput,
   AdminActivationMetrics,
+  AdminPointsMetrics,
   AdminSignupsMetrics,
   AdminTransactionMetrics,
   AdminUserActionResponse,
@@ -166,6 +167,8 @@ export const metricsApi = {
     request<AdminTransactionMetrics>(`/metrics/transactions${query({ days })}`),
   engagement: (days?: number) =>
     request<AdminEngagementMetrics>(`/metrics/engagement${query({ days })}`),
+  /** The #251 points economy — awards by reason, and the daily-cap hit rate. */
+  points: (days?: number) => request<AdminPointsMetrics>(`/metrics/points${query({ days })}`),
 };
 
 // ─── Funnels / money events (#81) ─────────────────────────────────────────────

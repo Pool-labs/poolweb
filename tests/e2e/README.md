@@ -57,6 +57,27 @@ Mailtrap capture inbox. The setup project (`auth.setup.ts`):
    reuses. A still-valid state from a previous run is reused without a fresh
    OTP (each OTP login mints a trusted-device row server-side).
 
+## The fixture-driven project (`admin-offline`, poolweb #33)
+
+`pnpm exec playwright test --project=admin-offline` needs **no session, no
+Mailtrap credentials and no environment**. Every `/admin/api/**` call is
+fulfilled in the browser from `tests/e2e/fixtures/`, and an un-stubbed path is
+ABORTED rather than forwarded, so these specs cannot reach staging by accident.
+
+It exists for the three states a healthy environment cannot produce:
+
+1. **Known numbers**, so the page's only arithmetic — this window against the
+   previous one — is checkable ("25 against 20" must render "+25% (+5)").
+2. **A source that FAILED**, so the rule that a dead panel never renders as
+   "no data" is exercised rather than asserted in a comment.
+3. **A payload from an API older than #624**, which is what the #112 switch can
+   legitimately point the page at, and which no green environment serves.
+
+⚠️ The session cookie it plants is an opaque string that satisfies only
+`middleware.ts`'s PRESENCE check — the check CLAUDE.md describes as conferring
+no authority. Nothing here weakens the login: the API-backed specs next door
+still log in for real, against staging only. See `helpers/offlineAdmin.ts`.
+
 ## What is deliberately NOT exercised
 
 - **QA console**: rendered, never touched — every control there mutates
