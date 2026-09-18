@@ -1,7 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import maplibregl, { type Map as MapLibreMap } from 'maplibre-gl';
+import {
+  GeoJSONSource,
+  Map as MapLibre,
+  NavigationControl,
+  Popup,
+  addProtocol,
+  type MapLayerMouseEvent,
+} from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 
 import {
@@ -30,10 +37,18 @@ import 'maplibre-gl/dist/maplibre-gl.css';
  * imports this through `next/dynamic` with `ssr: false`. Importing it directly
  * from a server component breaks the build, not just the page.
  *
- * ⚠️ THE PMTILES PROTOCOL IS REGISTERED ONCE PER PAGE, GLOBALLY. `maplibregl`
- * keeps protocol handlers on the module singleton, so registering per mount
- * would stack duplicate handlers across remounts — and a double-registration
- * throws rather than being ignored. Hence the module-level guard: the map
+ * ⚠️ NAMED IMPORTS, NEVER A DEFAULT. `maplibre-gl` v6 is pure ESM and exports
+ * NO default — `import maplibregl from 'maplibre-gl'` gives `undefined` at
+ * runtime. It type-checks perfectly, because `allowSyntheticDefaultImports`
+ * invents the default for the compiler, so the first sign of trouble is
+ * `Cannot read properties of undefined (reading 'addProtocol')` in the browser,
+ * which takes the whole React subtree down with it — the Geography tab's charts
+ * vanished too. Measured here, not theorised: `pnpm typecheck` was green while
+ * the page was broken.
+ *
+ * ⚠️ THE PMTILES PROTOCOL IS REGISTERED ONCE PER PAGE, GLOBALLY. MapLibre keeps
+ * protocol handlers in module state, so registering per mount would stack
+ * duplicate handlers across remounts. Hence the module-level guard: the map
  * reads the archive by HTTP range request, with no tile server in between.
  *
  * ⚠️ A FAILED BASEMAP MUST NOT TAKE THE DATA WITH IT. The circles are the
@@ -48,7 +63,7 @@ let protocolRegistered = false;
 function registerPmtilesProtocol(): void {
   if (protocolRegistered) return;
   const protocol = new Protocol();
-  maplibregl.addProtocol('pmtiles', protocol.tile);
+  addProtocol('pmtiles', protocol.tile);
   protocolRegistered = true;
 }
 
@@ -95,7 +110,7 @@ export function GeographyMap({
   height,
 }: GeographyMapProps) {
   const container = useRef<HTMLDivElement | null>(null);
-  const map = useRef<MapLibreMap | null>(null);
+  const map = useRef<MapLibre | null>(null);
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -105,9 +120,9 @@ export function GeographyMap({
     if (!container.current || map.current) return;
     registerPmtilesProtocol();
 
-    let instance: MapLibreMap;
+    let instance: MapLibre;
     try {
-      instance = new maplibregl.Map({
+      instance = new MapLibre({
         container: container.current,
         style: buildAdminMapStyle(baseUrl, readPalette(document.documentElement)) as never,
         center: MAP_CAMERA.CENTER,
@@ -127,7 +142,7 @@ export function GeographyMap({
     }
 
     map.current = instance;
-    instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    instance.addControl(new NavigationControl({ showCompass: false }), 'top-right');
 
     // ⚠️ `error` covers the case that matters: the tiles or glyphs being
     // unreachable. MapLibre reports it and carries on with a blank canvas,
@@ -155,7 +170,7 @@ export function GeographyMap({
     const upsert = (id: string, data: unknown): void => {
       const existing = instance.getSource(id);
       if (existing) {
-        (existing as maplibregl.GeoJSONSource).setData(data as never);
+        (existing as GeoJSONSource).setData(data as never);
         return;
       }
       instance.addSource(id, { type: 'geojson', data: data as never });
@@ -219,13 +234,13 @@ export function GeographyMap({
     // Hover readout. A circle whose size is its only encoding is unreadable
     // without the number — the dataviz rule that a mark carrying a value ships
     // a way to read that value exactly.
-    const popup = new maplibregl.Popup({
+    const popup = new Popup({
       closeButton: false,
       closeOnClick: false,
       offset: 12,
     });
 
-    const onEnter = (event: maplibregl.MapLayerMouseEvent): void => {
+    const onEnter = (event: MapLayerMouseEvent): void => {
       const feature = event.features?.[0];
       if (!feature) return;
       const props = feature.properties as { display?: string; count?: number };

@@ -41,22 +41,49 @@ test.describe('Geography tab (fixtures)', () => {
     await expect(tile).toContainText('not an error');
   });
 
-  test('the map panel blames the missing renderer, not the data', async ({ page }) => {
-    // ⚠️ The whole point of the panel. "No data" would be false — two of the
-    // three cities have a point and there is a venue pin ready.
+  test('the map panel states what it could NOT plot', async ({ page }) => {
+    // ⚠️ THE WHOLE POINT OF THIS PANEL. A map looks complete by its nature, so
+    // a city the server could not place — no curated anchor, no public pool to
+    // average — disappears from it silently and reads as an absence of users.
+    // Two of the fixture's three cities have a point; the third must be
+    // ACCOUNTED FOR in words, right under the canvas.
     await serveAdminFixtures(page);
     await page.goto('/admin/stats');
     await page.getByRole('tab', { name: 'Geography' }).click();
 
     const map = page.getByText('Map', { exact: true }).locator('xpath=../../..');
-    await expect(map).toContainText('not built yet');
-    await expect(map).toContainText('maplibre-gl');
-    await expect(map).toContainText('2');
+    await expect(map).toContainText('Plotted:');
+    await expect(map).toContainText('not on the map');
+    await expect(map).toContainText('the table below lists more than you can see');
     await expect(map).toContainText('exact-venue');
     await expect(map).not.toContainText('No data');
-    // ⚠️ poolmobile#649 SHIPPED. The panel may say the block is history; it
-    // may not still claim the tiles are unreadable, which is now false.
+
+    // ⚠️ The stale copy this replaced. poolmobile#649 shipped the tiles CORS
+    // rule and the renderer now exists, so neither the "blocked" nor the "not
+    // built" wording may come back — both are false, and both would send the
+    // next reader to fix something that is already done.
     await expect(map).not.toContainText('not readable from a browser yet');
+    await expect(map).not.toContainText('not built yet');
+  });
+
+  test('a basemap that cannot load says so, and never renders a silent blank', async ({
+    page,
+  }) => {
+    // ⚠️ The failure this test exists for is INVISIBLE: MapLibre reports a
+    // failed style and carries on painting an empty canvas, which on a map of
+    // where your users are reads as "nowhere". The offline helper refuses the
+    // tiles, which is exactly that case (and also what a browser with no WebGL
+    // produces).
+    await serveAdminFixtures(page);
+    await page.goto('/admin/stats');
+    await page.getByRole('tab', { name: 'Geography' }).click();
+
+    const map = page.getByText('Map', { exact: true }).locator('xpath=../../..');
+    await expect(map.getByText('The map could not be drawn.')).toBeVisible();
+    await expect(map).toContainText('says nothing about where your users are');
+
+    // And the data beside it is untouched — the failure is scoped to the canvas.
+    await expect(page.getByText('Columbia, MO').first()).toBeVisible();
   });
 
   test('a city row links to the list with the key passed through EXACTLY', async ({ page }) => {
