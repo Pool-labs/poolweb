@@ -780,7 +780,12 @@ export function WaitlistDashboard() {
                   : entriesForSchema(filledEntries, LEGACY_META);
                 const counts = countAnsweredQuestions(selectedUser.surveyData);
 
+                // A curried render callback for `.map`, not a component — the
+                // `react/display-name` heuristic cannot tell the two apart, and
+                // restructuring working code to satisfy it would be the tail
+                // wagging the dog.
                 const renderEntry = (schema: Record<string, QuestionMeta>) =>
+                  // eslint-disable-next-line react/display-name
                   ([key, value]: [string, unknown]) => {
                     const meta = schema[key];
                     return (

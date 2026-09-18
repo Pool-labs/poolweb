@@ -1,0 +1,74 @@
+name: CI
+
+# The first automated gate this repo has ever had (poolweb#7).
+#
+# ⚠️ WHY IT MATTERS MORE THAN IT LOOKS: `next.config.mjs` sets
+# `eslint.ignoreDuringBuilds` and `typescript.ignoreBuildErrors`, so `pnpm build`
+# passes with type errors AND lint failures. Until this workflow existed the only
+# real check on the repo — which serves an admin console that can suspend
+# accounts and drive staging jobs — was somebody remembering to run `tsc` by
+# hand.
+#
+# The Playwright suite is deliberately NOT here. Its admin half logs into
+# STAGING with a real OTP read from a capture inbox, which needs credentials
+# this workflow must not hold and would drive a shared environment on every
+# push. The offline project could run here (it touches no environment) once the
+# browser download is worth the CI minutes — tracked separately rather than
+# bolted on.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# A second push to the same PR makes the first run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Each step runs even if an earlier one failed, so one push reports every
+      # problem instead of hiding the next behind the first.
+      - name: Typecheck
+        id: typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: pnpm lint
+
+      - name: Unit tests
+        if: ${{ !cancelled() }}
+        run: pnpm test
+
+      - name: Build
+        if: ${{ !cancelled() }}
+        # Not a correctness gate on its own (see the note at the top) — it
+        # catches what only shows up at build time, like a client component
+        # reaching for something server-only.
+        run: pnpm build
+        env:
+          # The build must not depend on a real credential. The admin surface
+          # resolves its API base URL at request time, and the waitlist routes
+          # fail closed without their service account, which is the correct
+          # behaviour to compile against.
+          POOL_API_BASE_URL: https://api-staging.poolapp.co
