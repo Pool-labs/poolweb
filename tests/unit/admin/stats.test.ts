@@ -12,11 +12,13 @@ import {
   formatRate,
   funnelSteps,
   poolCategoryLabel,
+  moneySeriesToRows,
   recordToRows,
   seriesToRows,
   stickiness,
   topNWithOther,
 } from '@/lib/admin/stats';
+import { formatMoney } from '@/lib/admin/format';
 import type { AdminActiveUsersMetrics, FunnelReport } from '@/lib/admin/types';
 
 describe('computeDelta / formatDelta', () => {
@@ -197,5 +199,69 @@ describe('categoryColor', () => {
 
   it('greys a value the caller did not declare at all', () => {
     expect(categoryColor('MYSTERY', {}, domain)).toBe('var(--chart-neutral)');
+  });
+});
+
+describe('moneySeriesToRows (poolmobile#647)', () => {
+  it('keeps the figures in INTEGER CENTS', () => {
+    // ⚠️ The rule this test defends: money never becomes a float on its way to
+    // a chart. Dividing by 100 here would put 42100.00 in the row and the very
+    // next refactor would do arithmetic on it. The chart formats at the edge.
+    const rows = moneySeriesToRows([
+      { date: '2026-09-16', depositedCents: 2_100_000, spentCents: 1_337_500 },
+    ]);
+
+    expect(rows).toEqual([
+      { label: '2026-09-16', value: 2_100_000, deposited: 2_100_000, spent: 1_337_500 },
+    ]);
+    expect(Number.isInteger(rows[0].deposited as number)).toBe(true);
+    // And formatting it is what produces dollars — in one place, at the edge.
+    expect(formatMoney(rows[0].deposited as number)).toBe('$21,000.00');
+  });
+
+  it('preserves a real ZERO on one side', () => {
+    // A day present with `spentCents: 0` saw no spend. That is a measurement,
+    // not a gap, and dropping the key would make the line skip the point.
+    const [row] = moneySeriesToRows([
+      { date: '2026-09-17', depositedCents: 2_110_000, spentCents: 0 },
+    ]);
+    expect(row.spent).toBe(0);
+  });
+
+  it('does NOT zero-fill the gap between non-consecutive days', () => {
+    // The server omits a day with no movement at all, and so does this. A
+    // zero-filled calendar would make a quiet platform and a broken query
+    // render identically.
+    const rows = moneySeriesToRows([
+      { date: '2026-09-10', depositedCents: 100, spentCents: 0 },
+      { date: '2026-09-17', depositedCents: 200, spentCents: 0 },
+    ]);
+    expect(rows.map((r) => r.label)).toEqual(['2026-09-10', '2026-09-17']);
+  });
+
+  it('reads a missing series as no rows, never as a zero row', () => {
+    expect(moneySeriesToRows(undefined)).toEqual([]);
+  });
+});
+
+describe('formatDelta on a money figure', () => {
+  it('formats the ABSOLUTE half with the same units as the tile', () => {
+    // ⚠️ The regression. Without the formatter the percentage still looks
+    // right — it is unit-free — while the absolute renders raw cents beside a
+    // dollar value, stating one change twice in two units.
+    const delta = computeDelta(4_210_000, 5_262_500);
+    expect(formatDelta(delta)).toBe('−20% (−1,052,500)');
+    expect(formatDelta(delta, formatMoney)).toBe('−20% (−$10,525.00)');
+  });
+
+  it('formats a delta with no comparable base too', () => {
+    // `previous === 0` leaves no ratio, so the bare change is ALL the reader
+    // gets — the one case where an unformatted number is the whole message.
+    const delta = computeDelta(12_345, 0);
+    expect(formatDelta(delta, formatMoney)).toBe('+$123.45');
+  });
+
+  it('leaves "No change" alone', () => {
+    expect(formatDelta(computeDelta(100, 100), formatMoney)).toBe('No change');
   });
 });

@@ -126,6 +126,32 @@ export const TRANSACTIONS = {
   previousDepositsInWindow: 12,
 };
 
+/**
+ * Platform money volume (poolmobile#647) — the ONE payload here carrying cents.
+ *
+ * ⚠️ EVERY FIGURE IS INTEGER CENTS, and they are chosen so a 100× display bug
+ * cannot hide: 4,210,000 cents is $42,100.00, a number nobody would mistake
+ * for the raw integer. The window/previous pair is a clean −20%, so the delta
+ * arithmetic on the tiles is checkable by eye.
+ *
+ * ⚠️ `2026-09-17` CARRIES A REAL `spentCents: 0`. A day present in the series
+ * with a zero on one side saw no movement on that side — which is a different
+ * fact from the day being absent, and the panel must not render them alike.
+ */
+export const MONEY = {
+  window: WINDOW,
+  previousWindow: PREVIOUS_WINDOW,
+  depositedCentsInWindow: 4_210_000,
+  spentCentsInWindow: 1_337_500,
+  previousDepositedCentsInWindow: 5_262_500,
+  previousSpentCentsInWindow: 1_000_000,
+  series: [
+    { date: '2026-09-16', depositedCents: 2_100_000, spentCents: 1_337_500 },
+    { date: '2026-09-17', depositedCents: 2_110_000, spentCents: 0 },
+  ],
+  netAdjustmentsCentsAllTime: -2_500,
+};
+
 export const ENGAGEMENT = {
   points: {
     basis: 'pointBalance' as const,
@@ -351,6 +377,7 @@ export const STATS_ROUTES: Record<string, unknown> = {
   'metrics/activation': ACTIVATION,
   'metrics/pools': POOLS,
   'metrics/transactions': TRANSACTIONS,
+  'metrics/money': MONEY,
   'metrics/engagement': ENGAGEMENT,
   'metrics/points': POINTS,
   'analytics/funnels/auth': AUTH_FUNNEL,

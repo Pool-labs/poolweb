@@ -103,7 +103,7 @@ test.describe('Stats (fixtures)', () => {
     await expect(page.getByText(/does not report the size distribution/)).toBeVisible();
   });
 
-  test('the two by-decision panels explain themselves', async ({ page }) => {
+  test('the last by-decision panel explains itself', async ({ page }) => {
     await serveAdminFixtures(page);
     await page.goto('/admin/stats');
 
@@ -111,8 +111,66 @@ test.describe('Stats (fixtures)', () => {
     await expect(page.getByText(/poolmobile#648/)).toBeVisible();
     await expect(page.getByText('The API does not serve this yet.').first()).toBeVisible();
 
+    // ⚠️ poolmobile#647 SHIPPED, so the Money tab's volume panel is no longer
+    // one of these. Its old "deliberately not served" copy must be GONE — a
+    // panel that still refuses to show a figure the API now returns is worse
+    // than one that never had it, because nobody goes looking.
     await page.getByRole('tab', { name: 'Money' }).click();
-    await expect(page.getByText(/poolmobile#647/)).toBeVisible();
+    await expect(page.getByText(/deliberately not served/)).toHaveCount(0);
+  });
+
+  test('money volume renders as DOLLARS, never as raw cents', async ({ page }) => {
+    // ⚠️ THE FAILURE THIS EXISTS FOR IS SILENT AND PLAUSIBLE. Every figure on
+    // the wire is integer cents; rendered unformatted, $42,100.00 reads as
+    // "4210000" — a number that looks like a perfectly good answer and is
+    // wrong by a factor of 100. The fixture's amounts are chosen so the two
+    // cannot be confused.
+    await serveAdminFixtures(page);
+    await page.goto('/admin/stats');
+    await page.getByRole('tab', { name: 'Money' }).click();
+
+    const deposited = page.getByText('Deposited (last 30d)', { exact: true }).locator('xpath=../..');
+    await expect(deposited).toContainText('$42,100.00');
+    await expect(deposited).not.toContainText('4210000');
+    // 4,210,000 against 5,262,500 before — a fall of exactly 20%.
+    // ⚠️ The ABSOLUTE half of the delta is money too. This first ran with the
+    // raw cents there — "−1,052,500" under a tile reading "$42,100.00", one
+    // change stated twice in two units — which is exactly the mistake the
+    // percentage alone cannot show you.
+    await expect(deposited).toContainText('−20% (−$10,525.00)');
+    await expect(deposited).toContainText('▼');
+
+    const spent = page.getByText('Spent (last 30d)', { exact: true }).locator('xpath=../..');
+    await expect(spent).toContainText('$13,375.00');
+
+    // Deposited − spent, computed on CENTS and formatted once.
+    const net = page.getByText('Net movement (last 30d)', { exact: true }).locator('xpath=../..');
+    await expect(net).toContainText('$28,725.00');
+
+    // A NEGATIVE net adjustment keeps its sign — a debit is not a credit.
+    const adjustments = page
+      .getByText('Net adjustments (all time)', { exact: true })
+      .locator('xpath=../..');
+    await expect(adjustments).toContainText('-$25.00');
+  });
+
+  test('a dead money call greys ONE panel and never reads as zero', async ({ page }) => {
+    // ⚠️ `—` and `$0.00` are different claims and the #116 rule is that they
+    // must look different. "No money moved" is a headline; "we could not read
+    // it" is a bug — and on a money panel the wrong one is very expensive.
+    await serveAdminFixtures(page, { fail: ['metrics/money'] });
+    await page.goto('/admin/stats');
+    await page.getByRole('tab', { name: 'Money' }).click();
+
+    const deposited = page.getByText('Deposited (last 30d)', { exact: true }).locator('xpath=../..');
+    await expect(deposited).toContainText('—');
+    await expect(deposited).not.toContainText('$0.00');
+
+    // The panels fed by the OTHER call are untouched — failure is per panel.
+    const tx = page.getByText('Transactions (last 30d)', { exact: true }).locator('xpath=../..');
+    await expect(tx).toContainText('40');
+
+    await expect(page.getByText(/did not answer for this environment/).first()).toBeVisible();
   });
 
   test('switching the range keeps you on the tab you were reading', async ({ page }) => {

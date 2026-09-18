@@ -38,12 +38,14 @@ const CITY_BARS = 25;
  * detail page, which is why this aggregate is allowed to be un-audited: it
  * names nobody.
  *
- * ⚠️ THE MAP IS NOT BUILT YET, AND THE PANEL SAYS WHY. The tiles CDN serves
- * ranged reads correctly but carries no `Access-Control-Allow-Origin`, and its
- * OPTIONS preflight 403s — so `maplibre-gl` in a browser would be blocked
- * whatever we wrote. It needs a `terraform apply` on `infra/map-tiles/`
- * (poolmobile#649). Until then the panel reports how much data is READY to
- * plot, which is a different statement from "no data" and the only honest one.
+ * ⚠️ THE MAP IS NOT BUILT YET, AND THE PANEL SAYS SO WITHOUT BLAMING ANYTHING.
+ * It used to be BLOCKED: the tiles CDN served ranged reads correctly but
+ * carried no `Access-Control-Allow-Origin` and its preflight 403'd, so any
+ * browser map would have failed whatever we wrote. poolmobile#649 shipped that
+ * CORS rule, so the block is gone and only the work is left — `maplibre-gl` is
+ * still not a dependency of this repo. Until it is, the panel reports how much
+ * data is READY to plot, which is a different statement from "no data" and the
+ * only honest one.
  */
 export function GeographyTab({ data, days }: StatsTabProps) {
   const { geography } = data;
@@ -262,15 +264,18 @@ export function GeographyTab({ data, days }: StatsTabProps) {
  * The map, as an explained empty state.
  *
  * ⚠️ This is NOT "no data" and must never read as it. The data is here and the
- * counts below prove it; what is missing is a CORS rule on the tiles CDN
- * (poolmobile#649), which is a `terraform apply` on `infra/map-tiles/`. The
- * measurement, for whoever picks this up: a ranged `GET` on
- * `basemap/us.pmtiles` returns **206** with a correct `content-range`, so
- * pmtiles itself is fine — but that response carries no
- * `Access-Control-Allow-Origin`, and the `OPTIONS` preflight returns **403**.
- * `maplibre-gl` is deliberately NOT a dependency of this repo yet: adding it
- * before the tiles are readable would ship a blank canvas that fails in the
- * console instead of a panel that explains itself.
+ * counts below prove it; what is missing is the RENDERER. `maplibre-gl` is not
+ * a dependency of this repo, so there is nothing yet to draw the markers with.
+ *
+ * ⚠️ AND IT IS NO LONGER BLOCKED — do not restore the old copy. This panel used
+ * to say the tiles were unreadable from a browser, and that was true: a ranged
+ * `GET` on `basemap/us.pmtiles` returned 206 with a correct `content-range`,
+ * but carried no `Access-Control-Allow-Origin`, and the `OPTIONS` preflight
+ * returned 403. poolmobile#649 shipped the CORS configuration and the fix is
+ * live — the same ranged `GET` now returns 206 WITH `access-control-allow-
+ * origin: *` and `access-control-expose-headers` naming `Content-Range`
+ * (pmtiles needs that one to read a byte range at all), and the preflight
+ * answers 200. Whoever builds this can add the dependency and go.
  */
 function MapPanel({
   withPoint,
@@ -291,7 +296,7 @@ function MapPanel({
       description="One marker per city, sized by count, plus exact pins for pools that opted into showing their venue"
       aside={
         <span className="whitespace-nowrap rounded-full border border-amber-500/50 bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
-          Tiles not readable
+          Renderer not built
         </span>
       }
     >
@@ -304,20 +309,20 @@ function MapPanel({
         <div className="flex flex-col items-center gap-3 py-8 text-center">
           <MapPin className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
           <p className="max-w-prose text-sm font-medium text-amber-700 dark:text-amber-400">
-            The map tiles are not readable from a browser yet — this is a CORS
-            rule on the tiles CDN, not missing data.
+            The map itself is not built yet — this is missing work, not missing
+            data and no longer a blocked dependency.
           </p>
           <p className="max-w-prose text-xs text-muted-foreground">
-            A ranged request for the basemap succeeds (206, correct
-            content-range), but the response carries no
+            The tiles CDN used to refuse browser reads, which is why this panel
+            existed. poolmobile#649 shipped the CORS rule and it is live: a
+            ranged request for the basemap returns 206 with
             <code className="mx-1">Access-Control-Allow-Origin</code>
-            and the preflight is refused — so any browser map would be blocked
-            whatever renderer we used. It needs a <code>terraform apply</code> on{' '}
-            <code>infra/map-tiles/</code> (poolmobile#649). The native app reads
-            the same tiles directly and is unaffected.
+            and the preflight succeeds. What is left is the renderer —{' '}
+            <code>maplibre-gl</code> is not a dependency of this app yet. The
+            native app reads the same tiles directly and was never affected.
           </p>
           <p className="text-xs text-muted-foreground">
-            Ready to plot the moment it lands:{' '}
+            Ready to plot the moment it is drawn:{' '}
             <strong className="tabular-nums">{withPoint}</strong>{' '}
             {withPoint === 1 ? 'city has' : 'cities have'} a point
             {withoutPoint > 0 && (

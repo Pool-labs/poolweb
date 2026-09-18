@@ -258,13 +258,24 @@ export function computeDelta(current: number, previous: number): WindowDelta {
  * The delta as one short string: a percentage when there is a base to compare
  * against, otherwise the bare change ("+12"). "No change" is spelled out rather
  * than shown as "0%", which reads as a measurement failure.
+ *
+ * ⚠️ `formatAbsolute` IS REQUIRED WHENEVER THE FIGURE IS MONEY, and leaving it
+ * out is a bug a reader cannot detect. The percentage is unit-free and looks
+ * right either way, but the absolute half carries the raw number — so a delta
+ * on a cents figure rendered "−1,052,500" beside a tile reading "$42,100.00",
+ * which is the same change stated twice, once in dollars and once in cents,
+ * with nothing to say which. Caught by the e2e spec, not by reasoning.
  */
-export function formatDelta(delta: WindowDelta): string {
+export function formatDelta(
+  delta: WindowDelta,
+  formatAbsolute: (magnitude: number) => string = (magnitude) =>
+    magnitude.toLocaleString('en-US'),
+): string {
   if (delta.direction === 'flat') return 'No change';
   const sign = delta.absolute > 0 ? '+' : '−';
-  const magnitude = Math.abs(delta.absolute);
-  if (delta.ratio === null) return `${sign}${magnitude.toLocaleString('en-US')}`;
-  return `${sign}${Math.abs(delta.ratio * 100).toFixed(0)}% (${sign}${magnitude.toLocaleString('en-US')})`;
+  const magnitude = formatAbsolute(Math.abs(delta.absolute));
+  if (delta.ratio === null) return `${sign}${magnitude}`;
+  return `${sign}${Math.abs(delta.ratio * 100).toFixed(0)}% (${sign}${magnitude})`;
 }
 
 /** "vs the 30 days before" — the comparison window, named on the tile. */

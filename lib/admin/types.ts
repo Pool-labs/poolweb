@@ -281,11 +281,11 @@ export interface AdminPoolMetrics {
 }
 
 /**
- * Transaction ROW COUNTS. ⚠️ THERE ARE NO AMOUNTS HERE AND THERE WILL NOT BE:
- * aggregate money volume in cents is out by founder decision D1
- * (poolmobile#647), because it would be the first cached admin response to
- * carry cents and needs its own review first. The Money tab therefore counts
- * events and never sums them.
+ * Transaction ROW COUNTS. ⚠️ THERE ARE NO AMOUNTS HERE, AND THERE STILL WILL
+ * NOT BE: money volume now has its own endpoint and its own type
+ * (`AdminMoneyMetrics`, poolmobile#647), because that one is deliberately
+ * UNCACHED while this one is cached. Keeping them apart is the decision — do
+ * not "simplify" by folding cents into this shape.
  */
 export interface AdminTransactionMetrics {
   total: number;
@@ -302,6 +302,54 @@ export interface AdminTransactionMetrics {
   previousTotalInWindow?: number;
   previousSettlementsInWindow?: number;
   previousDepositsInWindow?: number;
+}
+
+/**
+ * Platform-wide money volume (poolmobile#647) — the ONE admin response that
+ * carries cents.
+ *
+ * ⚠️ IT IS NOT CACHED SERVER-SIDE, AND THAT IS THE POINT. Founder decision D1
+ * deferred this until the caching question had an answer; the answer taken was
+ * to serve the figures from a SEPARATE, uncached endpoint rather than adding
+ * cents to the cached `/metrics/transactions`. If this ever gets folded into
+ * that shape, it silently becomes the first cached admin response carrying
+ * money — the exact thing D1 was holding the line on.
+ *
+ * ⚠️ AGGREGATE ONLY. Never a person's figure and never a pool's balance; those
+ * live on the audited pool-ledger pages, where an admin reading them leaves a
+ * record. Nothing here names anybody.
+ *
+ * Every field is INTEGER CENTS. Format with `formatMoney`; never do float math.
+ */
+export interface AdminMoneyDayPoint {
+  /** UTC `YYYY-MM-DD`. */
+  date: string;
+  depositedCents: number;
+  spentCents: number;
+}
+
+/** GET /admin/metrics/money — inner `data`. */
+export interface AdminMoneyMetrics {
+  window: AdminMetricsWindow;
+  previousWindow: AdminPreviousWindow;
+  /** COMPLETED deposits created in the window. */
+  depositedCentsInWindow: number;
+  /** COMPLETED, non-deleted expense spend created in the window. */
+  spentCentsInWindow: number;
+  previousDepositedCentsInWindow: number;
+  previousSpentCentsInWindow: number;
+  /**
+   * Per-day, for the trend. ⚠️ A day with NO movement on either side is
+   * ABSENT rather than a zero row, so never index this by day offset — and a
+   * day present with `spentCents: 0` really did see no spend.
+   */
+  series: AdminMoneyDayPoint[];
+  /**
+   * The signed net of EVERY ledger adjustment, all time (credits positive,
+   * debits negative). All-time rather than windowed on purpose: it is a
+   * reconciliation term, not an activity figure.
+   */
+  netAdjustmentsCentsAllTime: number;
 }
 
 export interface AdminEngagementMetrics {
