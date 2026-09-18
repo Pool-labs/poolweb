@@ -454,6 +454,81 @@ export interface AdminGeographyMetrics {
   exactVenuePoolsTruncated: boolean;
 }
 
+// ─── In-app support (#683, source: messaging.types.ts) ──────────────────────
+//
+// ⚠️ THESE ARE THE MEMBER-FACING SHAPES, NOT ADMIN ONES, and that is the point.
+// The admin endpoints delegate to the same `listConversations` / `listMessages`
+// / `sendMessage` a member calls, passing the SUPPORT ACCOUNT's id — so they
+// return exactly what the app receives. Minting an `AdminSupportThread` DTO
+// here would be a second shape for one fact, i.e. the #618/#623 drift, for no
+// gain: the admin surface wants the same fields.
+
+/** A participant on a support thread. Carries NO email (`messaging.types.ts`). */
+export interface ConversationParticipant {
+  userId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+}
+
+/**
+ * One message.
+ *
+ * ⚠️ `body` IS EMPTY when `deletedAt` is set (an admin redaction, #158 D9) or
+ * `hiddenByBlock` is true — stripped SERVER-SIDE before the row leaves the API.
+ * The UI renders the state, never a fallback to some other field.
+ */
+export interface ConversationMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+  deletedAt: string | null;
+  hiddenByBlock: boolean;
+}
+
+/** One support thread. */
+export interface SupportConversation {
+  id: string;
+  kind: string;
+  poolId: string | null;
+  poolName: string | null;
+  title: string | null;
+  createdById: string;
+  requestState: string;
+  requestedById: string | null;
+  participants: ConversationParticipant[];
+  lastMessage: ConversationMessage | null;
+  lastMessageAt: string;
+  /**
+   * Unread FOR THE SUPPORT ACCOUNT — i.e. "this person is waiting on an
+   * answer". The one figure on this surface that is genuinely a work queue.
+   */
+  unreadCount: number;
+  isMuted: boolean;
+  createdAt: string;
+  isSupport: boolean;
+}
+
+/** GET /admin/support/conversations — inner `data`. */
+export interface SupportConversationListResponse {
+  items: SupportConversation[];
+  nextCursor: string | null;
+  totalUnreadCount: number;
+  pendingRequestCount: number;
+}
+
+/** GET /admin/support/conversations/:id/messages — inner `data`. */
+export interface SupportMessageListResponse {
+  items: ConversationMessage[];
+  nextCursor: string | null;
+}
+
+/** POST /admin/support/conversations/:id/messages — inner `data`. */
+export interface SupportReplyResponse {
+  message: ConversationMessage;
+}
+
 // ─── #81 funnels / money-event counts (source: analytics.types.ts) ───────────
 
 export interface FunnelStageCount {

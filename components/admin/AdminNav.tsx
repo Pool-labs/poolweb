@@ -12,6 +12,7 @@ import {
   ClipboardList,
   HeartPulse,
   ScrollText,
+  MessageSquare,
   ShieldAlert,
   ShieldCheck,
   Smartphone,
@@ -33,6 +34,11 @@ const NAV_ITEMS = [
   // available in EVERY environment: a report queue that only exists on staging
   // would not be the "demonstrable action on reports" a store review asks for.
   { href: '/admin/moderation', label: 'Moderation', icon: ShieldAlert },
+  // Support (#45, over poolmobile#683). Sits beside Moderation because it is
+  // the same kind of work — a queue of people waiting on us — and it is
+  // available in EVERY environment for the same reason: the one that matters
+  // is production. It renders its own explanation when messaging is off.
+  { href: '/admin/support', label: 'Support', icon: MessageSquare },
   // Errors / Health (#192) — the read surface over #116. Available in EVERY
   // environment, unlike the QA console: knowing what is failing in production
   // is the whole point, and the API scopes the feed to its own log group, so
