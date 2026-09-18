@@ -1,0 +1,284 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import maplibregl, { type Map as MapLibreMap } from 'maplibre-gl';
+import { Protocol } from 'pmtiles';
+
+import {
+  CITY_CIRCLE,
+  CITY_SOURCE_ID,
+  MAP_CAMERA,
+  MAP_FONTS,
+  VENUE_SOURCE_ID,
+  buildAdminMapStyle,
+  circleRadiusExpression,
+  cityFeatures,
+  maxCount,
+  venueFeatures,
+  type MapPalette,
+} from '@/lib/admin/mapStyle';
+import { GEOGRAPHY_MEASURE_LABEL, type GeographyMeasure } from '@/lib/admin/stats';
+import type { AdminGeographyCity, AdminGeographyVenuePin } from '@/lib/admin/types';
+
+import 'maplibre-gl/dist/maplibre-gl.css';
+
+/**
+ * The Geography map (poolweb#33), unblocked by poolmobile#649.
+ *
+ * ⚠️ CLIENT-ONLY, AND IT MUST STAY THAT WAY. `maplibre-gl` touches `window`
+ * and WebGL at module scope, so it cannot be server-rendered; the parent
+ * imports this through `next/dynamic` with `ssr: false`. Importing it directly
+ * from a server component breaks the build, not just the page.
+ *
+ * ⚠️ THE PMTILES PROTOCOL IS REGISTERED ONCE PER PAGE, GLOBALLY. `maplibregl`
+ * keeps protocol handlers on the module singleton, so registering per mount
+ * would stack duplicate handlers across remounts — and a double-registration
+ * throws rather than being ignored. Hence the module-level guard: the map
+ * reads the archive by HTTP range request, with no tile server in between.
+ *
+ * ⚠️ A FAILED BASEMAP MUST NOT TAKE THE DATA WITH IT. The circles are the
+ * answer; the cartography is context. If the CDN is unreachable, the style
+ * fails and MapLibre emits `error` — the panel then says so in words rather
+ * than showing an empty grey rectangle that reads as "no users anywhere".
+ */
+
+/** Registered at most once per page — see the note above. */
+let protocolRegistered = false;
+
+function registerPmtilesProtocol(): void {
+  if (protocolRegistered) return;
+  const protocol = new Protocol();
+  maplibregl.addProtocol('pmtiles', protocol.tile);
+  protocolRegistered = true;
+}
+
+/**
+ * Read the resolved map palette off the document.
+ *
+ * WebGL cannot resolve `var(--map-land)`, so the values are computed here and
+ * baked into the style document. Called on mount and again whenever the theme
+ * changes, because the resolved values change with it.
+ */
+function readPalette(element: HTMLElement): MapPalette {
+  const styles = getComputedStyle(element);
+  const read = (name: string, fallback: string): string =>
+    styles.getPropertyValue(name).trim() || fallback;
+  return {
+    land: read('--map-land', '#f6f4ef'),
+    water: read('--map-water', '#dbe7f2'),
+    green: read('--map-green', '#e8efe4'),
+    boundary: read('--map-boundary', '#c3cbd6'),
+    label: read('--map-label', '#6b7789'),
+    labelHalo: read('--map-label-halo', '#ffffff'),
+  };
+}
+
+interface GeographyMapProps {
+  baseUrl: string;
+  cities: AdminGeographyCity[] | undefined;
+  venuePins: AdminGeographyVenuePin[] | undefined;
+  measure: GeographyMeasure;
+  /** Circle fill — the same hue the bar chart uses for this measure. */
+  accent: string;
+  /** Venue-pin fill, deliberately a different hue from the circles. */
+  venueAccent: string;
+  height: number;
+}
+
+export function GeographyMap({
+  baseUrl,
+  cities,
+  venuePins,
+  measure,
+  accent,
+  venueAccent,
+  height,
+}: GeographyMapProps) {
+  const container = useRef<HTMLDivElement | null>(null);
+  const map = useRef<MapLibreMap | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  // Mount once. The data effect below updates sources in place, because
+  // rebuilding the map on every filter change would refetch the basemap.
+  useEffect(() => {
+    if (!container.current || map.current) return;
+    registerPmtilesProtocol();
+
+    let instance: MapLibreMap;
+    try {
+      instance = new maplibregl.Map({
+        container: container.current,
+        style: buildAdminMapStyle(baseUrl, readPalette(document.documentElement)) as never,
+        center: MAP_CAMERA.CENTER,
+        zoom: MAP_CAMERA.ZOOM,
+        minZoom: MAP_CAMERA.MIN_ZOOM,
+        maxZoom: MAP_CAMERA.MAX_ZOOM,
+        // Nothing here is worth a rotated frame, and a tilted admin map is
+        // harder to compare across sessions.
+        pitchWithRotate: false,
+        dragRotate: false,
+        attributionControl: { compact: true },
+      });
+    } catch {
+      // WebGL unavailable (a headless browser, a blocked GPU, an old machine).
+      setFailed(true);
+      return;
+    }
+
+    map.current = instance;
+    instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+    // ⚠️ `error` covers the case that matters: the tiles or glyphs being
+    // unreachable. MapLibre reports it and carries on with a blank canvas,
+    // which is precisely the silent-empty state this panel exists to prevent.
+    instance.on('error', () => setFailed(true));
+    instance.on('load', () => setReady(true));
+
+    return () => {
+      instance.remove();
+      map.current = null;
+    };
+    // `baseUrl` is build-time constant; re-running would rebuild the map.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Data: replace the two sources whenever the rows or the measure change.
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance || !ready) return;
+
+    const cityCollection = cityFeatures(cities, measure);
+    const venueCollection = venueFeatures(venuePins);
+    const radius = circleRadiusExpression(maxCount(cityCollection));
+
+    const upsert = (id: string, data: unknown): void => {
+      const existing = instance.getSource(id);
+      if (existing) {
+        (existing as maplibregl.GeoJSONSource).setData(data as never);
+        return;
+      }
+      instance.addSource(id, { type: 'geojson', data: data as never });
+    };
+
+    upsert(CITY_SOURCE_ID, cityCollection);
+    upsert(VENUE_SOURCE_ID, venueCollection);
+
+    if (!instance.getLayer('city-circles')) {
+      instance.addLayer({
+        id: 'city-circles',
+        type: 'circle',
+        source: CITY_SOURCE_ID,
+        paint: {
+          'circle-color': accent,
+          'circle-opacity': 0.55,
+          // A ring in the surface colour, so two overlapping circles read as
+          // two rather than merging into one larger blob.
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1.5,
+          'circle-radius': radius as never,
+        },
+      });
+      instance.addLayer({
+        id: 'city-labels',
+        type: 'symbol',
+        source: CITY_SOURCE_ID,
+        minzoom: CITY_CIRCLE.LABEL_MIN_ZOOM,
+        layout: {
+          'text-field': ['get', 'display'],
+          'text-font': [MAP_FONTS.REGULAR],
+          'text-size': 11,
+          'text-offset': [0, 1.4],
+          'text-anchor': 'top',
+          // Never invent a label position: where they collide, one is dropped
+          // rather than moved somewhere it does not belong.
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': readPalette(document.documentElement).label,
+          'text-halo-color': readPalette(document.documentElement).labelHalo,
+          'text-halo-width': 1.5,
+        },
+      });
+      instance.addLayer({
+        id: 'venue-pins',
+        type: 'circle',
+        source: VENUE_SOURCE_ID,
+        paint: {
+          'circle-color': venueAccent,
+          'circle-radius': 4,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1.5,
+        },
+      });
+    } else {
+      instance.setPaintProperty('city-circles', 'circle-radius', radius as never);
+      instance.setPaintProperty('city-circles', 'circle-color', accent);
+    }
+
+    // Hover readout. A circle whose size is its only encoding is unreadable
+    // without the number — the dataviz rule that a mark carrying a value ships
+    // a way to read that value exactly.
+    const popup = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      offset: 12,
+    });
+
+    const onEnter = (event: maplibregl.MapLayerMouseEvent): void => {
+      const feature = event.features?.[0];
+      if (!feature) return;
+      const props = feature.properties as { display?: string; count?: number };
+      instance.getCanvas().style.cursor = 'pointer';
+      popup
+        .setLngLat(event.lngLat)
+        .setText(
+          `${props.display ?? ''} — ${props.count ?? 0} ${GEOGRAPHY_MEASURE_LABEL[measure].toLowerCase()}`,
+        )
+        .addTo(instance);
+    };
+    const onLeave = (): void => {
+      instance.getCanvas().style.cursor = '';
+      popup.remove();
+    };
+
+    instance.on('mousemove', 'city-circles', onEnter);
+    instance.on('mouseleave', 'city-circles', onLeave);
+
+    return () => {
+      instance.off('mousemove', 'city-circles', onEnter);
+      instance.off('mouseleave', 'city-circles', onLeave);
+      popup.remove();
+    };
+  }, [ready, cities, venuePins, measure, accent, venueAccent]);
+
+  if (failed) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed p-6 text-center"
+        style={{ height }}
+      >
+        <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+          The map could not be drawn.
+        </p>
+        <p className="max-w-prose text-xs text-muted-foreground">
+          The basemap tiles or the browser&apos;s WebGL context were unavailable.
+          This says nothing about where your users are — the city table and the
+          roll-ups below are unaffected and remain the complete answer.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={container}
+      style={{ height }}
+      className="overflow-hidden rounded-md border"
+      // The canvas carries no text, so the figure is named for a screen reader
+      // and the table below is the real accessible route to the same data.
+      role="img"
+      aria-label={`Map of ${GEOGRAPHY_MEASURE_LABEL[measure].toLowerCase()} by city. The table below lists the same figures.`}
+    />
+  );
+}
