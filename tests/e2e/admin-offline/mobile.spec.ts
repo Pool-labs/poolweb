@@ -144,6 +144,25 @@ test.describe('Lists at phone width', () => {
     await expectNoPageOverflow(page);
   });
 
+  test('the create dialogs fit a phone', async ({ page }) => {
+    // New UI is new chances to overflow, and these are modal — a control that
+    // lands off-screen in a dialog has no page scroll to rescue it.
+    await serveAdminFixtures(page);
+    await page.route('**/admin/api/users*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: USERS_LIST }),
+      });
+    });
+
+    await page.goto('/admin/users');
+    await page.getByRole('button', { name: 'New user' }).click();
+    await expect(page.getByLabel('Email')).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Create account' })).toBeInViewport();
+    await expectNoPageOverflow(page);
+  });
+
   test('a Pools row keeps its balance and its link', async ({ page }) => {
     await serveAdminFixtures(page);
     await page.route('**/admin/api/pools*', async (route) => {

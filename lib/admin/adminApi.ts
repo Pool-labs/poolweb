@@ -33,6 +33,10 @@ import type {
   AdminReportListResponse,
   AdminReviewReportInput,
   AdminActivationMetrics,
+  AdminCreatePoolBody,
+  AdminCreatePoolResponse,
+  AdminCreateUserBody,
+  AdminCreateUserResponse,
   AdminGeographyMetrics,
   AdminPointsMetrics,
   AdminSignupsMetrics,
@@ -215,6 +219,18 @@ export interface UserSearchParams {
 export const usersApi = {
   list: (params: UserSearchParams = {}) =>
     request<AdminUserListResponse>(`/users${query({ ...params })}`),
+  /**
+   * Pre-create an account somebody will claim by Email-OTP (poolmobile#684).
+   *
+   * ⚠️ 404s ON EVERY ENVIRONMENT TODAY — the endpoint does not exist yet. The
+   * dialog maps that to its own words rather than a generic failure; see
+   * `describeCreateFailure`.
+   */
+  create: (body: AdminCreateUserBody) =>
+    request<AdminCreateUserResponse>('/users', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   get: (id: string) => request<AdminUserDetailResponse>(`/users/${id}`),
   setFeatureFlag: (id: string, key: UserFeatureFlagKey, value: boolean) =>
     request<AdminFeatureFlagUpdateResponse>(`/users/${id}/feature-flags`, {
@@ -246,6 +262,12 @@ export interface PoolSearchParams {
 export const poolsApi = {
   list: (params: PoolSearchParams = {}) =>
     request<AdminPoolListResponse>(`/pools${query({ ...params })}`),
+  /** Create a pool owned by an explicitly chosen user (poolmobile#684). 404s today. */
+  create: (body: AdminCreatePoolBody) =>
+    request<AdminCreatePoolResponse>('/pools', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   get: (id: string) => request<AdminPoolDetailResponse>(`/pools/${id}`),
   suspend: (id: string, opts: { reason?: string; override?: boolean } = {}) =>
     request<AdminPoolActionResponse>(`/pools/${id}/suspend`, {
