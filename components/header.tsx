@@ -9,16 +9,25 @@ import { Menu, X } from "lucide-react"
  * be shared deliberately rather than a headline destination. The page still
  * exists and still works for anyone holding the URL.
  *
- * `/preregister` IS a public entry point again (founder decision 2026-09-16):
- * people who land on the site before the app is in the stores can register
- * their interest. Its API writes through the server-side Admin SDK, so the
- * Firestore rules stay deny-all for browsers.
+ * `/preregister` is ABSENT from the nav again (founder decision 2026-09-18),
+ * and the reason is that its own justification expired. It was re-added on
+ * 2026-09-16 so that "people who land on the site BEFORE the app is in the
+ * stores can register their interest" — Pool shipped on the App Store on
+ * 2026-09-18, so the condition that sentence named is no longer true. A
+ * waiting list one click from a real download costs a download.
+ *
+ * ⚠️ THE PAGE AND ITS API STAY LIVE, like `/questionnaire` above: reachable by
+ * URL, absent from the nav. The Android list is still worth collecting (#602's
+ * decision that the waitlist is still collected is unchanged), the admin
+ * waitlist dashboard still reads it, and existing inbound links keep working.
+ * The page now leads with the App Store card for anyone who arrives on iOS.
+ * Its API writes through the server-side Admin SDK, so the Firestore rules
+ * stay deny-all for browsers.
  */
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/download", label: "Download" },
   { href: "/faq", label: "FAQ" },
-  { href: "/preregister", label: "Preregister" },
   { href: "/contact", label: "Contact" },
 ]
 

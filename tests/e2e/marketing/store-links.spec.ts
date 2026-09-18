@@ -111,6 +111,31 @@ test.describe('App Store link', () => {
     expect(cardBox!.y).toBeLessThan(formBox!.y);
   });
 
+  test('the nav no longer offers a waiting list beside a real download', async ({ page }) => {
+    // ⚠️ `/preregister` was re-added to the nav on 2026-09-16 for people
+    // arriving "before the app is in the stores". It is in the stores now, so
+    // that justification expired — a waiting list one click from a download
+    // costs the download. The PAGE stays reachable (the Android list is still
+    // collected and the admin dashboard still reads it); only the nav entry is
+    // gone, exactly like `/questionnaire`.
+    await page.goto('/');
+
+    // ⚠️ Scoped to the real element, not a `navigation` role: the header is a
+    // bare `<header class="hp-nav">` with no `<nav>` inside it. An earlier
+    // draft scoped to `getByRole('navigation')` and PASSED — against nothing.
+    // The positive assertion below is what caught that, which is the whole
+    // reason it is here: a "this is absent" check is worthless without one.
+    const header = page.locator('header.hp-nav');
+
+    await expect(header.getByRole('link', { name: 'Preregister' })).toHaveCount(0);
+    await expect(header.getByRole('link', { name: 'Download' }).first()).toBeVisible();
+    await expect(header.getByRole('link', { name: 'FAQ' }).first()).toBeVisible();
+
+    // Still reachable by URL for anyone holding a link.
+    const direct = await page.goto('/preregister');
+    expect(direct?.status()).toBeLessThan(400);
+  });
+
   test('the FAQ answers "where can I get it" with the link, not a promise', async ({ page }) => {
     await page.goto('/faq');
     await page.getByRole('button', { name: 'Where can I get the app?' }).click();
