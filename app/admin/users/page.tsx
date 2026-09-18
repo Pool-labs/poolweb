@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Loader2, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -10,16 +11,41 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { CityFilter } from '@/components/admin/CityFilter';
 import { usersApi } from '@/lib/admin/adminApi';
 import { formatDate } from '@/lib/admin/format';
 import type { AdminUserSummary } from '@/lib/admin/types';
 
 const PAGE_SIZE = 25;
 
+/**
+ * `useSearchParams` needs a Suspense boundary (Next 15). The parameter matters:
+ * the Stats → Geography table links here with `?city=<key>`, so arriving with a
+ * filter already applied is a normal entry to this page, not an edge case.
+ */
 export default function AdminUsersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <UsersList />
+    </Suspense>
+  );
+}
+
+function UsersList() {
+  const searchParams = useSearchParams();
   const [q, setQ] = useState('');
   const [submittedQ, setSubmittedQ] = useState('');
   const [includeDeleted, setIncludeDeleted] = useState(false);
+  // ⚠️ The key arrives from the URL and is passed through UNCHANGED. It is the
+  // server's own opaque key (#128/#469), matched by equality and deliberately
+  // never normalized — tidying it would silently unfilter legacy cities.
+  const [city, setCity] = useState<string | null>(() => searchParams.get('city'));
   const [offset, setOffset] = useState(0);
   const [users, setUsers] = useState<AdminUserSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -32,6 +58,7 @@ export default function AdminUsersPage() {
     try {
       const res = await usersApi.list({
         q: submittedQ || undefined,
+        city: city ?? undefined,
         includeDeleted,
         limit: PAGE_SIZE,
         offset,
@@ -43,7 +70,7 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [submittedQ, includeDeleted, offset]);
+  }, [submittedQ, city, includeDeleted, offset]);
 
   useEffect(() => {
     void load();
@@ -95,6 +122,15 @@ export default function AdminUsersPage() {
         </Button>
       </div>
 
+      <CityFilter
+        value={city}
+        onChange={(key) => {
+          setOffset(0);
+          setCity(key);
+        }}
+        className="sm:max-w-sm"
+      />
+
       <Card>
         <CardContent className="p-0 sm:p-4">
           {loading ? (
@@ -104,7 +140,9 @@ export default function AdminUsersPage() {
           ) : error ? (
             <div className="py-12 text-center text-sm text-destructive">{error}</div>
           ) : users.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">No users found</div>
+            <div className="py-12 text-center text-muted-foreground">
+              {city ? 'No users in this city' : 'No users found'}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -112,6 +150,7 @@ export default function AdminUsersPage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>City</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -122,6 +161,15 @@ export default function AdminUsersPage() {
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">{name(u)}</TableCell>
                       <TableCell className="text-muted-foreground">{u.email ?? '—'}</TableCell>
+                      {/*
+                        City-level only, and that is the whole exposure here: a
+                        list row carries no coordinates (those stay on the
+                        audited detail page). `title` shows the canonical key,
+                        which is what the filter and the API match on.
+                      */}
+                      <TableCell className="text-muted-foreground" title={u.locationCityKey ?? undefined}>
+                        {u.locationCity ?? '—'}
+                      </TableCell>
                       <TableCell>
                         {u.isSuspended ? (
                           <Badge variant="destructive">Suspended</Badge>
@@ -147,8 +195,10 @@ export default function AdminUsersPage() {
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
           {total > 0
-            ? `Showing ${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} of ${total}`
-            : '0 users'}
+            ? `Showing ${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} of ${total}${city ? ' in this city' : ''}`
+            : city
+              ? '0 users in this city'
+              : '0 users'}
         </span>
         <div className="flex gap-2">
           <Button

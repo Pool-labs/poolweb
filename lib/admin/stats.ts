@@ -9,8 +9,13 @@
 
 import { computeDelta, type WindowDelta } from './charts';
 import { humanizeEnum } from './format';
+import { countryDisplayName } from './cityKey';
 import type {
   AdminActivationMetrics,
+  AdminGeographyCity,
+  AdminGeographyCountry,
+  AdminGeographyMetrics,
+  AdminGeographyRegion,
   AdminActiveUsersMetrics,
   AdminAlertState,
   AdminEngagementMetrics,
@@ -38,6 +43,7 @@ export interface StatsData {
   poolFunnel: PoolFunnelReport | null;
   discoverFunnel: FunnelReport | null;
   moneyEvents: MoneyEventCountsReport | null;
+  geography: AdminGeographyMetrics | null;
   alerts: AdminAlertState | null;
 }
 
@@ -188,3 +194,77 @@ export function pointsAwardRows(points: AdminPointsMetrics | null): LabelledRow[
  * than let a range control imply it filtered something.
  */
 export const SNAPSHOT_SCOPE = 'Snapshot — the whole user base, not the range';
+
+// ─── Geography (#624) ────────────────────────────────────────────────────────
+
+/** Which population a geography panel is counting. */
+export type GeographyMeasure = 'users' | 'pools';
+
+export const GEOGRAPHY_MEASURE_LABEL: Record<GeographyMeasure, string> = {
+  users: 'Users',
+  pools: 'Pools',
+};
+
+/** The count for the selected measure, so panels stop re-deciding it. */
+export function cityCount(city: AdminGeographyCity, measure: GeographyMeasure): number {
+  return measure === 'users' ? city.userCount : city.poolCount;
+}
+
+export function countryCount(
+  country: AdminGeographyCountry,
+  measure: GeographyMeasure,
+): number {
+  return measure === 'users' ? country.userCount : country.poolCount;
+}
+
+export function regionCount(region: AdminGeographyRegion, measure: GeographyMeasure): number {
+  return measure === 'users' ? region.userCount : region.poolCount;
+}
+
+/**
+ * Cities as chart rows for one measure, largest first.
+ *
+ * ⚠️ ROWS WITH A ZERO COUNT ARE DROPPED. The response is sorted by
+ * `userCount + poolCount`, so a city that holds pools but no users is in the
+ * list — and plotting it on the USERS chart as a zero-length bar adds a label
+ * for a city with nobody in it. The tie-break is the key, so the order is
+ * stable between reloads rather than dependent on the sort's stability.
+ */
+export function cityRows(
+  cities: AdminGeographyCity[] | undefined,
+  measure: GeographyMeasure,
+): LabelledRow[] {
+  return (cities ?? [])
+    .map((c) => ({ label: c.display, value: cityCount(c, measure), key: c.key }))
+    .filter((r) => r.value > 0)
+    .sort((a, b) => b.value - a.value || a.key.localeCompare(b.key));
+}
+
+/** "United States" from an alpha-2, or an explicit "no country in the key". */
+export function countryLabel(code: string | null): string {
+  return code === null ? 'No country recorded' : countryDisplayName(code);
+}
+
+/** "MO · United States" — a region is meaningless without its country. */
+export function regionLabel(region: AdminGeographyRegion): string {
+  const country = countryDisplayName(region.countryCode);
+  return region.regionName
+    ? `${region.regionName}, ${country}`
+    : `${region.regionCode} · ${country}`;
+}
+
+/**
+ * How many cities carry a plottable point, and how many do not.
+ *
+ * The map is blocked on the tiles CDN (poolmobile#649), so this is what the map
+ * panel reports instead of pretending to be empty: the data IS here, and this
+ * says exactly how much of it would render the moment the tiles are readable.
+ */
+export function mappableCities(cities: AdminGeographyCity[] | undefined): {
+  withPoint: number;
+  withoutPoint: number;
+} {
+  const all = cities ?? [];
+  const withPoint = all.filter((c) => c.lat !== null && c.lng !== null).length;
+  return { withPoint, withoutPoint: all.length - withPoint };
+}

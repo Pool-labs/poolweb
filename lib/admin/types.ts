@@ -349,6 +349,102 @@ export interface AdminPointsMetrics {
   };
 }
 
+// ─── Geography (#624, source: admin-metrics.types.ts) ────────────────────────
+//
+// `GET /admin/metrics/geography?days=` — where users and pools ARE, grouped by
+// the canonical city key (#128/#469).
+//
+// ⚠️ THE PRIVACY LINE IS STRUCTURAL, NOT A FILTER, AND THIS FILE IS WHERE IT
+// SHOWS. There is no user coordinate in any shape below, because the query
+// that counts users selects none — so none can reach this dashboard. A city's
+// point is either the curated anchor or the mean of its PUBLIC + ACTIVE pools
+// (both already public data, since Discover publishes a public pool's
+// coordinates to every signed-in user), and exact pins exist only for pools
+// whose owner opted in (#21). An individual's raw coordinates stay on the
+// AUDITED `GET /admin/users/:id`, which is the whole reason this aggregate is
+// allowed to be un-audited: it names nobody.
+
+/** Where a city's map point came from. */
+export enum AdminGeographyCentroidSource {
+  /** The curated `CITIES` anchor coordinate. */
+  Curated = 'curated',
+  /** The mean coordinate of the city's PUBLIC + ACTIVE pools. */
+  Pools = 'pools',
+}
+
+/** One city — one canonical `locationCityKey`. */
+export interface AdminGeographyCity {
+  /** The key exactly as stored — and the value `?city=` filters on. */
+  key: string;
+  /** Human-readable name: the curated label, else a stored display string. */
+  display: string;
+  /** Subdivision code parsed from the key (US/CA only, #469), uppercase. */
+  regionCode: string | null;
+  /** ISO alpha-2 parsed from the key, uppercase; null when the key has none. */
+  countryCode: string | null;
+  userCount: number;
+  poolCount: number;
+  /** Of `userCount`, created inside the window. */
+  newUserCount: number;
+  /** Of `poolCount`, created inside the window. */
+  newPoolCount: number;
+  /** The city's map point, or null when neither source exists. */
+  lat: number | null;
+  lng: number | null;
+  centroidSource: AdminGeographyCentroidSource | null;
+}
+
+/** Cities rolled up to their country. `countryCode` null = keys carrying none. */
+export interface AdminGeographyCountry {
+  countryCode: string | null;
+  userCount: number;
+  poolCount: number;
+  cityCount: number;
+}
+
+/** Cities rolled up to their subdivision (US states / CA provinces, #469). */
+export interface AdminGeographyRegion {
+  countryCode: string;
+  regionCode: string;
+  regionName: string | null;
+  userCount: number;
+  poolCount: number;
+  cityCount: number;
+}
+
+/**
+ * One PUBLIC + ACTIVE pool whose owner opted into showing its exact venue
+ * (#21) — data Discover already publishes — and nothing else about it.
+ */
+export interface AdminGeographyVenuePin {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  venueAddress: string | null;
+}
+
+export interface AdminGeographyMetrics {
+  window: AdminMetricsWindow;
+  /**
+   * Sorted by `userCount + poolCount` desc, then key, and CAPPED — with
+   * `citiesTruncated` saying so. ⚠️ Never present a truncated list as the whole
+   * world: the roll-ups below are computed over EVERY city before the cap, so a
+   * truncated list never under-counts a country.
+   */
+  cities: AdminGeographyCity[];
+  citiesTruncated: boolean;
+  countries: AdminGeographyCountry[];
+  regions: AdminGeographyRegion[];
+  /** Non-deleted users with no city. */
+  usersWithoutCity: number;
+  /** Non-deleted pools with no city. */
+  poolsWithoutCity: number;
+  /** Newest first, capped. */
+  exactVenuePools: AdminGeographyVenuePin[];
+  exactVenuePoolsTruncated: boolean;
+}
+
 // ─── #81 funnels / money-event counts (source: analytics.types.ts) ───────────
 
 export interface FunnelStageCount {
@@ -406,6 +502,15 @@ export interface AdminUserSummary {
   isSuspended: boolean;
   deletedAt: string | null;
   createdAt: string;
+  /**
+   * #624 — the city, CITY-LEVEL ONLY: a display string and the canonical
+   * #128/#469 key, which is what `GET /admin/users?city=` filters on. There are
+   * deliberately no coordinates on a list row; those stay on the audited detail
+   * read. Optional for the #618 reason — an older API simply omits them, and
+   * the column renders "—" rather than the page breaking.
+   */
+  locationCity?: string | null;
+  locationCityKey?: string | null;
 }
 
 export interface AdminUserMembershipSummary {
@@ -549,6 +654,9 @@ export interface AdminPoolSummary {
   memberCount: number;
   creatorId: string;
   createdAt: string;
+  /** #624 — the pool's city; the key is what `GET /admin/pools?city=` filters on. */
+  locationCity?: string | null;
+  locationCityKey?: string | null;
 }
 
 export interface AdminPoolCreatorSummary {

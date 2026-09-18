@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Loader2, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { CityFilter } from '@/components/admin/CityFilter';
 import { poolsApi } from '@/lib/admin/adminApi';
 import { formatDate, formatMoney, humanizeEnum } from '@/lib/admin/format';
 import { PoolStatus, PoolVisibility, type AdminPoolSummary } from '@/lib/admin/types';
@@ -17,12 +19,30 @@ import { PoolStatus, PoolVisibility, type AdminPoolSummary } from '@/lib/admin/t
 const PAGE_SIZE = 25;
 const ANY = 'any';
 
+/** Suspense for `useSearchParams` — see the note on the Users list. */
 export default function AdminPoolsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <PoolsList />
+    </Suspense>
+  );
+}
+
+function PoolsList() {
+  const searchParams = useSearchParams();
   const [q, setQ] = useState('');
   const [submittedQ, setSubmittedQ] = useState('');
   const [status, setStatus] = useState<string>(ANY);
   const [visibility, setVisibility] = useState<string>(ANY);
   const [includeDeleted, setIncludeDeleted] = useState(false);
+  /** The server's own opaque city key, passed through unchanged (#128/#469). */
+  const [city, setCity] = useState<string | null>(() => searchParams.get('city'));
   const [offset, setOffset] = useState(0);
   const [pools, setPools] = useState<AdminPoolSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -37,6 +57,7 @@ export default function AdminPoolsPage() {
         q: submittedQ || undefined,
         status: status === ANY ? undefined : (status as PoolStatus),
         visibility: visibility === ANY ? undefined : (visibility as PoolVisibility),
+        city: city ?? undefined,
         includeDeleted,
         limit: PAGE_SIZE,
         offset,
@@ -48,7 +69,7 @@ export default function AdminPoolsPage() {
     } finally {
       setLoading(false);
     }
-  }, [submittedQ, status, visibility, includeDeleted, offset]);
+  }, [submittedQ, status, visibility, city, includeDeleted, offset]);
 
   useEffect(() => {
     void load();
@@ -131,6 +152,15 @@ export default function AdminPoolsPage() {
         </Select>
       </div>
 
+      <CityFilter
+        value={city}
+        onChange={(key) => {
+          resetPage();
+          setCity(key);
+        }}
+        className="lg:max-w-sm"
+      />
+
       <Card>
         <CardContent className="p-0 sm:p-4">
           {loading ? (
@@ -140,7 +170,9 @@ export default function AdminPoolsPage() {
           ) : error ? (
             <div className="py-12 text-center text-sm text-destructive">{error}</div>
           ) : pools.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">No pools found</div>
+            <div className="py-12 text-center text-muted-foreground">
+              {city ? 'No pools in this city' : 'No pools found'}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -149,6 +181,7 @@ export default function AdminPoolsPage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Visibility</TableHead>
+                    <TableHead>City</TableHead>
                     <TableHead className="text-right">Members</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
                     <TableHead>Created</TableHead>
@@ -168,6 +201,10 @@ export default function AdminPoolsPage() {
                       </TableCell>
                       <TableCell>{humanizeEnum(p.status)}</TableCell>
                       <TableCell>{humanizeEnum(p.visibility)}</TableCell>
+                      {/* City-level; `title` carries the canonical key the filter matches on. */}
+                      <TableCell className="text-muted-foreground" title={p.locationCityKey ?? undefined}>
+                        {p.locationCity ?? '—'}
+                      </TableCell>
                       <TableCell className="text-right">{p.memberCount}</TableCell>
                       <TableCell className="text-right font-mono">{formatMoney(p.balanceCents)}</TableCell>
                       <TableCell className="text-muted-foreground">{formatDate(p.createdAt)}</TableCell>
@@ -188,8 +225,10 @@ export default function AdminPoolsPage() {
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
           {total > 0
-            ? `Showing ${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} of ${total}`
-            : '0 pools'}
+            ? `Showing ${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} of ${total}${city ? ' in this city' : ''}`
+            : city
+              ? '0 pools in this city'
+              : '0 pools'}
         </span>
         <div className="flex gap-2">
           <Button
