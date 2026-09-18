@@ -8,10 +8,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev       # Start development server
 npm run build     # Production build
 npm run start     # Start production server
-npm run lint      # Run ESLint
+pnpm lint         # ESLint (next/core-web-vitals) — runnable since #7
 pnpm test         # Unit tests (vitest, tests/unit — offline, Firestore faked)
 pnpm typecheck    # tsc --noEmit
 ```
+
+⚠️ **`pnpm build` is NOT a safety gate.** `next.config.mjs` sets
+`eslint.ignoreDuringBuilds` and `typescript.ignoreBuildErrors`, so the build
+passes with type errors *and* lint failures. Both flags are kept deliberately —
+flipping them would make a lint regression a failed **production deploy** — so
+the real gate is `.github/workflows/ci.yml` (#7), which runs typecheck, lint,
+unit tests and the build on every PR. `react/no-unescaped-entities` is off in
+`.eslintrc.json`: it is cosmetic, and the copy it flags is marketing text this
+repo's brand rules say to keep verbatim.
 
 Unit tests live in `tests/unit` (vitest, `vitest.config.mts`); the Playwright suite in `tests/e2e` is separate and staging-only.
 

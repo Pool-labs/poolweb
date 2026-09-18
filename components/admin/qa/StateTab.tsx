@@ -546,18 +546,61 @@ function SyntheticUsersCard({ max }: { max: number }) {
 // ─── Shared result rendering ──────────────────────────────────────────────────
 
 /**
- * Row counts after a seed/wipe. `preservedUserCount` is called out separately —
- * it is the number of admin/allowlisted accounts deliberately kept, and the one
- * figure that confirms the operator did not delete their own access.
+ * Row counts after a seed/wipe, and WHICH datasets the run built (#18).
+ *
+ * ⚠️ THE COUNTS ARE THE DEPLOYMENT'S, NOT THE CHOSEN DATASET'S. Since
+ * poolmobile#525 a reseed builds the profile that was asked for and then
+ * additively seeds every remaining switchable cohort, because #479's demo
+ * switcher re-anchors the viewer instead of re-seeding — a cohort with nothing
+ * behind it is a switch position that lands on an empty Discover. This panel
+ * used to print `profile`'s name beside those counts, which told the founder
+ * that `default` had built all of them. It now names every dataset the run
+ * produced and says what the numbers actually count.
+ *
+ * `profile` and `alsoSeeded` are ABSENT-TOLERANT: an older API omits them and
+ * the panel falls back to the counts alone rather than rendering "Seeded
+ * undefined".
+ *
+ * `preservedUserCount` is called out separately — it is the number of
+ * admin/allowlisted accounts deliberately kept, and the one figure that
+ * confirms the operator did not delete their own access.
  */
 function SeedResult({ result }: { result: QaSeedResponse }) {
+  const alsoSeeded = result.alsoSeeded ?? [];
   return (
     <div className="space-y-2">
+      {result.profile && (
+        <p className="text-sm">
+          Seeded <strong>{result.profile}</strong>
+          {alsoSeeded.length > 0 && (
+            <>
+              , plus{' '}
+              {alsoSeeded.map((name, i) => (
+                <span key={name}>
+                  {i > 0 && ', '}
+                  <strong>{name}</strong>
+                </span>
+              ))}
+            </>
+          )}
+          .{' '}
+          <span className="text-muted-foreground">
+            {alsoSeeded.length > 0
+              ? 'Every switchable cohort is present, so the #479 demo switcher has data behind both positions.'
+              : 'This run reported no other cohorts.'}
+          </span>
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Stat label="Users" value={result.userCount} />
         <Stat label="Pools" value={result.poolCount} />
         <Stat label="Transactions" value={result.transactionCount} />
       </div>
+      <p className="text-xs text-muted-foreground">
+        {result.profile
+          ? 'Live totals for the whole deployment after the run — not this dataset\u2019s alone, and not a sum of per-dataset figures.'
+          : 'Live totals for the whole deployment after the run.'}
+      </p>
       <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">
           Preserved accounts
@@ -608,7 +651,8 @@ function SeedCard() {
         <CardDescription className="text-destructive/90">
           <strong>Destructive and irreversible.</strong> Re-runs the demo seed, which{' '}
           <strong>wipes first</strong> — anything a teammate is mid-test on is gone. Platform admins
-          and allowlisted accounts are preserved.
+          and allowlisted accounts are preserved. Since poolmobile#525 one run builds{' '}
+          <strong>every switchable cohort</strong>, so expect it to take around a minute.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -636,8 +680,24 @@ function SeedCard() {
           }}
         >
           {action.busy && <BusySpinner />}
-          Wipe and reseed
+          {action.busy ? 'Reseeding…' : 'Wipe and reseed'}
         </Button>
+
+        {action.busy && (
+          /*
+           * ⚠️ A 504 HERE DOES NOT MEAN IT FAILED. The reseed now builds every
+           * cohort and runs past the staging ALB's 60s idle timeout, so the
+           * browser can be handed a gateway timeout while the seed is still
+           * running and finishes fine. The API refuses a concurrent run with a
+           * 409, but a second click is the wrong instinct to leave unaddressed,
+           * so the button says so rather than relying on that refusal.
+           */
+          <p className="text-xs text-muted-foreground">
+            This takes around a minute. <strong>Do not click again</strong> — if the request times
+            out (504) the seed is still running; reload and check the counts rather than re-running
+            it.
+          </p>
+        )}
 
         <ErrorAlert message={action.error} />
         {action.result && (

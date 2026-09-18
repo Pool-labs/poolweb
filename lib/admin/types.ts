@@ -1145,11 +1145,34 @@ export interface QaConfirmationBody {
 
 /** Shared response of seed-demo AND wipe-demo. */
 export interface QaSeedResponse {
+  /**
+   * ⚠️ THE DEPLOYMENT'S LIVE ROW COUNTS AFTER THE RUN — not the chosen
+   * dataset's alone, and not a sum of per-dataset figures (#612). Since #525 a
+   * reseed builds every switchable cohort, so presenting these beside a single
+   * profile name (as this console did) told the founder that `default` had
+   * built 60 users when most of them belong to the other cohorts.
+   */
   userCount: number;
   poolCount: number;
   transactionCount: number;
   /** Accounts the wipe deliberately KEPT (platform admins + allowlisted). */
   preservedUserCount: number;
+  /**
+   * #258 — WHICH dataset now sits in the database, echoed back by the run
+   * rather than assumed from the form. Null for a bare wipe, which builds
+   * nothing. Optional here because a pre-#258 API omits it entirely.
+   */
+  profile?: string | null;
+  /**
+   * #525 — the OTHER cohorts the same run seeded, additively, after `profile`.
+   * A reseed establishes every switchable cohort, because #479's demo switcher
+   * re-anchors the viewer rather than re-seeding: a cohort with nothing behind
+   * it is a switch position that lands on an empty Discover.
+   *
+   * Optional, and treated as absent-tolerant on purpose — that is exactly how
+   * a console built against the pre-#525 shape keeps working.
+   */
+  alsoSeeded?: string[];
 }
 
 export interface QaSyntheticUsersBody {
