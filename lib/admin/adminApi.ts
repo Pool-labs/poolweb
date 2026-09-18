@@ -38,6 +38,7 @@ import type {
   AdminCreateUserBody,
   AdminCreateUserResponse,
   AdminGeographyMetrics,
+  LeaderboardHeadlines,
   AdminPointsMetrics,
   AdminSignupsMetrics,
   AdminTransactionMetrics,
@@ -55,6 +56,7 @@ import type {
   SupportReplyResponse,
   ObservabilityUserLogsQuery,
   PoolFunnelReport,
+  LeaderboardPeriod,
   PoolStatus,
   PoolVisibility,
   ReportStatus,
@@ -188,6 +190,16 @@ export const metricsApi = {
    */
   geography: (days?: number) =>
     request<AdminGeographyMetrics>(`/metrics/geography${query({ days })}`),
+  /**
+   * Rank 1 of every global board (#681).
+   *
+   * ⚠️ Takes a PERIOD, not `days` — the boards' own vocabulary, so the
+   * dashboard and the app cannot be looking at differently-scoped rankings.
+   * The Stats range control is in days, so the page maps one to the other
+   * explicitly rather than pretending they are the same axis.
+   */
+  leaderboards: (period?: LeaderboardPeriod) =>
+    request<LeaderboardHeadlines>(`/metrics/leaderboards${query({ period })}`),
 };
 
 // ─── Funnels / money events (#81) ─────────────────────────────────────────────

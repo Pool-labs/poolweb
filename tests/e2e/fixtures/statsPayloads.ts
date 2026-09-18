@@ -298,6 +298,22 @@ export function userRow(over: Record<string, unknown> = {}) {
 
 export const USERS_LIST = { users: [userRow()], total: 1, limit: 25, offset: 0 };
 
+/**
+ * Leaderboard headlines (#681). ⚠️ `longestRunning` is deliberately an EMPTY
+ * board — the server reports one rather than omitting it, and "no pool
+ * qualifies yet" must not render like a pool scoring zero.
+ */
+export const LEADERBOARDS = {
+  period: 'month',
+  boards: [
+    { board: 'topPoolsByTransactions', poolId: 'pool-1', poolName: 'Thursday football', value: 42 },
+    { board: 'mostActive', poolId: 'pool-2', poolName: 'Flat 3B', value: 30 },
+    { board: 'mostMembers', poolId: 'pool-3', poolName: 'Ski trip', value: 12 },
+    { board: 'longestRunning', poolId: null, poolName: null, value: null },
+    { board: 'fastestGrowing', poolId: 'pool-4', poolName: 'Book club', value: 5 },
+  ],
+};
+
 export const ALERTS = {
   status: 'ok',
   criticalCount: 0,
@@ -342,5 +358,6 @@ export const STATS_ROUTES: Record<string, unknown> = {
   'analytics/funnels/discover': DISCOVER_FUNNEL,
   'analytics/money-events': MONEY_EVENTS,
   'metrics/geography': GEOGRAPHY,
+  'metrics/leaderboards': LEADERBOARDS,
   'observability/alerts': ALERTS,
 };

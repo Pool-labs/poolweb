@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { LEGACY_POOLS, LEGACY_SIGNUPS } from '../fixtures/statsPayloads';
+import { LEGACY_POOLS, LEGACY_SIGNUPS, STATS_ROUTES } from '../fixtures/statsPayloads';
 import { plantOfflineSession, serveAdminFixtures } from '../helpers/offlineAdmin';
 
 /**
@@ -66,21 +66,13 @@ test.describe('Stats (fixtures)', () => {
   });
 
   test('every metrics call failing is the one case that takes the whole page', async ({ page }) => {
+    // ⚠️ DERIVED, not a hand-written list. Twice now a new metrics call was
+    // added to the page and this list was not updated, so "every call failed"
+    // quietly stopped meaning that and the spec passed for the wrong reason.
+    // Every stubbed route EXCEPT the alerts read is a metrics call — that is
+    // the page's own rule: alerts never decide its fate.
     await serveAdminFixtures(page, {
-      fail: [
-        'metrics/active-users',
-        'metrics/signups',
-        'metrics/activation',
-        'metrics/pools',
-        'metrics/transactions',
-        'metrics/engagement',
-        'metrics/points',
-        'analytics/funnels/auth',
-        'analytics/funnels/pool',
-        'analytics/funnels/discover',
-        'analytics/money-events',
-        'metrics/geography',
-      ],
+      fail: Object.keys(STATS_ROUTES).filter((path) => path !== 'observability/alerts'),
     });
     await page.goto('/admin/stats');
 
@@ -191,6 +183,43 @@ test.describe('Stats (fixtures)', () => {
     }
     const windowed = page.getByText('Transactions per day', { exact: true }).locator('xpath=../../..');
     await expect(windowed).toContainText('No data in this window.');
+  });
+
+  test('the leaderboard headline names the pool, the unit, and an EMPTY board', async ({
+    page,
+  }) => {
+    await serveAdminFixtures(page);
+    await page.goto('/admin/stats');
+    await page.getByRole('tab', { name: 'Engagement' }).click();
+
+    const panel = page.getByText('Leaderboard headline').locator('xpath=../../..');
+
+    // The pool links through, and the value carries its NOUN — `value` counts
+    // expenses on one board and DAYS on another, so a bare number would be
+    // read as the wrong thing.
+    await expect(panel.getByRole('link', { name: 'Thursday football' })).toHaveAttribute(
+      'href',
+      '/admin/pools/pool-1',
+    );
+    await expect(panel).toContainText('42 expenses');
+    await expect(panel).toContainText('12 members');
+
+    // ⚠️ An empty board says so, and is NOT rendered as a zero.
+    await expect(panel).toContainText('No pool qualifies yet');
+    await expect(panel).not.toContainText('0 days');
+
+    // The board period is stated, because it is not the range control's axis.
+    await expect(panel).toContainText('month boards');
+  });
+
+  test('a failed leaderboards call degrades that panel alone', async ({ page }) => {
+    await serveAdminFixtures(page, { fail: ['metrics/leaderboards'] });
+    await page.goto('/admin/stats');
+    await page.getByRole('tab', { name: 'Engagement' }).click();
+
+    await expect(page.getByText(/leaderboards metric did not answer/)).toBeVisible();
+    // The rest of the tab still has its numbers.
+    await expect(page.getByText('Points awarded by earning rule')).toBeVisible();
   });
 
   test('stickiness is unanswerable, not 0%, with no monthly base', async ({ page }) => {

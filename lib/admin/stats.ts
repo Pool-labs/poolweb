@@ -10,12 +10,14 @@
 import { computeDelta, type WindowDelta } from './charts';
 import { humanizeEnum } from './format';
 import { countryDisplayName } from './cityKey';
+import { GlobalLeaderboardBoard, LeaderboardPeriod } from './types';
 import type {
   AdminActivationMetrics,
   AdminGeographyCity,
   AdminGeographyCountry,
   AdminGeographyMetrics,
   AdminGeographyRegion,
+  LeaderboardHeadlines,
   AdminActiveUsersMetrics,
   AdminAlertState,
   AdminEngagementMetrics,
@@ -44,6 +46,7 @@ export interface StatsData {
   discoverFunnel: FunnelReport | null;
   moneyEvents: MoneyEventCountsReport | null;
   geography: AdminGeographyMetrics | null;
+  leaderboards: LeaderboardHeadlines | null;
   alerts: AdminAlertState | null;
 }
 
@@ -267,4 +270,46 @@ export function mappableCities(cities: AdminGeographyCity[] | undefined): {
   const all = cities ?? [];
   const withPoint = all.filter((c) => c.lat !== null && c.lng !== null).length;
   return { withPoint, withoutPoint: all.length - withPoint };
+}
+
+// ─── Leaderboard headlines (#681) ────────────────────────────────────────────
+
+/**
+ * Board → the words for it, and the noun its ranking value counts.
+ *
+ * ⚠️ THE UNIT IS PART OF THE FACT. `value` is a bare number whose meaning
+ * changes per board — expenses on one, days on another — so rendering it
+ * without the noun would put "412" under "Longest running" and let a reader
+ * take it for a count of something.
+ */
+export const LEADERBOARD_BOARD_COPY: Record<
+  GlobalLeaderboardBoard,
+  { label: string; unit: string }
+> = {
+  [GlobalLeaderboardBoard.TopPoolsByTransactions]: {
+    label: 'Most expenses logged',
+    unit: 'expenses',
+  },
+  [GlobalLeaderboardBoard.MostActive]: { label: 'Most active', unit: 'events' },
+  [GlobalLeaderboardBoard.MostMembers]: { label: 'Most members', unit: 'members' },
+  [GlobalLeaderboardBoard.LongestRunning]: { label: 'Longest running', unit: 'days' },
+  [GlobalLeaderboardBoard.FastestGrowing]: {
+    label: 'Fastest growing',
+    unit: 'new members',
+  },
+};
+
+/**
+ * The Stats range (in days) → the nearest board PERIOD that contains it.
+ *
+ * ⚠️ THE TWO AXES ARE NOT THE SAME, and the panel says which period it used
+ * rather than implying the range applied. The boards have a fixed four-period
+ * vocabulary; 90 days has no exact member, so it maps to the year — the
+ * smallest period that still contains the window. Mapping it DOWN would show a
+ * board narrower than the range the reader selected.
+ */
+export function boardPeriodForDays(days: number): LeaderboardPeriod {
+  if (days <= 7) return LeaderboardPeriod.Week;
+  if (days <= 31) return LeaderboardPeriod.Month;
+  return LeaderboardPeriod.Year;
 }

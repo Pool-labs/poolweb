@@ -16,7 +16,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { funnelsApi, metricsApi, observabilityApi } from '@/lib/admin/adminApi';
-import { WINDOW_OPTIONS, type StatsData } from '@/lib/admin/stats';
+import { boardPeriodForDays, WINDOW_OPTIONS, type StatsData } from '@/lib/admin/stats';
 import type { StatsTabProps } from '@/components/admin/stats/types';
 
 /**
@@ -62,6 +62,7 @@ const EMPTY: StatsData = {
   discoverFunnel: null,
   moneyEvents: null,
   geography: null,
+  leaderboards: null,
   alerts: null,
 };
 
@@ -145,6 +146,7 @@ export default function AdminStatsPage() {
       discoverFunnel,
       moneyEvents,
       geography,
+      leaderboards,
       alerts,
     ] = await Promise.allSettled([
       metricsApi.activeUsers(windowDays),
@@ -162,6 +164,10 @@ export default function AdminStatsPage() {
       funnelsApi.discover(windowDays),
       funnelsApi.moneyEvents(windowDays),
       metricsApi.geography(windowDays),
+      // ⚠️ A PERIOD, not `days` — the boards' own vocabulary. `boardPeriodForDays`
+      // maps the range explicitly and the panel states which period it used,
+      // rather than implying the two axes are the same.
+      metricsApi.leaderboards(boardPeriodForDays(windowDays)),
       // Live, un-windowed: the Health tab's source (#190).
       observabilityApi.alerts(),
     ]);
@@ -179,6 +185,7 @@ export default function AdminStatsPage() {
       discoverFunnel: pick(discoverFunnel),
       moneyEvents: pick(moneyEvents),
       geography: pick(geography),
+      leaderboards: pick(leaderboards),
       alerts: pick(alerts),
     };
     // The metrics calls decide the page's fate; the alerts read never does — a
