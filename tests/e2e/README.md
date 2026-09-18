@@ -64,6 +64,10 @@ Mailtrap credentials and no environment**. Every `/admin/api/**` call is
 fulfilled in the browser from `tests/e2e/fixtures/`, and an un-stubbed path is
 ABORTED rather than forwarded, so these specs cannot reach staging by accident.
 
+It covers the Stats page, the Geography tab and the city filter, and — since
+the login path broke — the **widened detail pages** (poolweb#31 AC 1–3), whose
+API-backed twin `admin/detail-rich.spec.ts` cannot run without a session.
+
 It exists for the three states a healthy environment cannot produce:
 
 1. **Known numbers**, so the page's only arithmetic — this window against the
