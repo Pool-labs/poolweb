@@ -12,8 +12,10 @@ import {
   formatRate,
   funnelSteps,
   poolCategoryLabel,
+  activeUserTrendToRows,
   moneySeriesToRows,
   recordToRows,
+  trendCoverageNote,
   seriesToRows,
   stickiness,
   topNWithOther,
@@ -263,5 +265,95 @@ describe('formatDelta on a money figure', () => {
 
   it('leaves "No change" alone', () => {
     expect(formatDelta(computeDelta(100, 100), formatMoney)).toBe('No change');
+  });
+});
+
+describe('trendCoverageNote (poolmobile#648)', () => {
+  const trend = (over: Record<string, unknown> = {}) => ({
+    window: { days: 30, since: '2026-08-19T00:00:00.000Z' },
+    series: [],
+    collectingSince: '2026-09-15',
+    daysCaptured: 3,
+    daysMissingInWindow: 0,
+    ...over,
+  });
+
+  it('says a SHORT line is young, not a decline', () => {
+    // ⚠️ THE SENTENCE THIS FUNCTION EXISTS FOR. Three points in a 30-day window
+    // is the normal state right after the capture job ships — and it is
+    // pixel-identical to a platform that lost all its users.
+    const note = trendCoverageNote(trend() as never, 30);
+    expect(note).toContain('Collecting since 2026-09-15');
+    expect(note).toContain('3 days captured so far, not 30');
+    expect(note).toContain('a young series, not a decline');
+  });
+
+  it('says a GAP is the job having failed, and is unrecoverable', () => {
+    const note = trendCoverageNote(trend({ daysMissingInWindow: 2 }) as never, 30);
+    expect(note).toContain('2 days are missing');
+    expect(note).toContain('cannot be recovered');
+    expect(note).toContain('drawn straight through the gap');
+  });
+
+  it('says BOTH when the series is young AND gappy', () => {
+    const note = trendCoverageNote(trend({ daysMissingInWindow: 1 }) as never, 30);
+    expect(note).toContain('young series');
+    expect(note).toContain('1 day is missing');
+  });
+
+  it('is SILENT when the line is complete', () => {
+    // A caveat on a trustworthy chart trains the reader to ignore caveats.
+    const note = trendCoverageNote(
+      trend({ daysCaptured: 30, daysMissingInWindow: 0 }) as never,
+      30,
+    );
+    expect(note).toBeNull();
+  });
+
+  it('explains the empty state before the job has ever run', () => {
+    const note = trendCoverageNote(
+      trend({ collectingSince: null, daysCaptured: 0 }) as never,
+      30,
+    );
+    expect(note).toContain('Nothing has been captured yet');
+    expect(note).toContain('cannot be backfilled');
+  });
+
+  it('says nothing at all when the call FAILED', () => {
+    // ⚠️ A failed read is not a statement about coverage. The chart's own
+    // `unavailable` empty state owns that case; adding a coverage sentence
+    // here would describe data nobody has.
+    expect(trendCoverageNote(null, 30)).toBeNull();
+  });
+
+  it('gets the singular right, because "1 days" reads as a bug', () => {
+    expect(trendCoverageNote(trend({ daysCaptured: 1 }) as never, 30)).toContain('1 day captured');
+    expect(trendCoverageNote(trend({ daysMissingInWindow: 1 }) as never, 30)).toContain(
+      '1 day is missing',
+    );
+  });
+});
+
+describe('activeUserTrendToRows (poolmobile#648)', () => {
+  it('carries all three overlapping windows onto one row', () => {
+    const rows = activeUserTrendToRows([{ date: '2026-09-15', dau: 40, wau: 120, mau: 300 }]);
+    expect(rows).toEqual([
+      { label: '2026-09-15', value: 40, dau: 40, wau: 120, mau: 300 },
+    ]);
+  });
+
+  it('does NOT zero-fill a missing day', () => {
+    // ⚠️ A hard zero on a chart of how many people used the product is the most
+    // alarming thing this dashboard can say — and for a day the capture job
+    // merely missed, it would be false.
+    const rows = activeUserTrendToRows([
+      { date: '2026-09-15', dau: 40, wau: 120, mau: 300 },
+      { date: '2026-09-18', dau: 51, wau: 133, mau: 311 },
+    ]);
+    expect(rows.map((r) => r.label)).toEqual(['2026-09-15', '2026-09-18']);
+  });
+
+  it('reads a missing series as no rows', () => {
+    expect(activeUserTrendToRows(undefined)).toEqual([]);
   });
 });

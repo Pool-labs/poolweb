@@ -103,13 +103,17 @@ test.describe('Stats (fixtures)', () => {
     await expect(page.getByText(/does not report the size distribution/)).toBeVisible();
   });
 
-  test('the last by-decision panel explains itself', async ({ page }) => {
+  test('the by-decision panels are gone — both shipped', async ({ page }) => {
     await serveAdminFixtures(page);
     await page.goto('/admin/stats');
 
+    // ⚠️ poolmobile#648 SHIPPED, so the Activity tab's trend is a real chart.
+    // The old "the API does not serve this yet" copy must not survive: a panel
+    // still refusing to show a figure the API now returns is worse than one
+    // that never had it, because nobody goes looking twice.
     await page.getByRole('tab', { name: 'Activity' }).click();
-    await expect(page.getByText(/poolmobile#648/)).toBeVisible();
-    await expect(page.getByText('The API does not serve this yet.').first()).toBeVisible();
+    await expect(page.getByText(/poolmobile#648/)).toHaveCount(0);
+    await expect(page.getByText('The API does not serve this yet.')).toHaveCount(0);
 
     // ⚠️ poolmobile#647 SHIPPED, so the Money tab's volume panel is no longer
     // one of these. Its old "deliberately not served" copy must be GONE — a
@@ -117,6 +121,45 @@ test.describe('Stats (fixtures)', () => {
     // than one that never had it, because nobody goes looking.
     await page.getByRole('tab', { name: 'Money' }).click();
     await expect(page.getByText(/deliberately not served/)).toHaveCount(0);
+  });
+
+  test('the activity trend says it is YOUNG and GAPPY, not that activity fell', async ({
+    page,
+  }) => {
+    // ⚠️ THE WHOLE POINT OF #648's PAYLOAD. The series cannot be backfilled, so
+    // three points inside a 30-day window is the normal state for a new
+    // install — and it is pixel-identical to a platform that lost its users.
+    // Only these sentences tell them apart, and the fixture is deliberately
+    // both young AND missing a day so both are exercised at once.
+    await serveAdminFixtures(page);
+    await page.goto('/admin/stats');
+    await page.getByRole('tab', { name: 'Activity' }).click();
+
+    const panel = page
+      .getByText('DAU / WAU / MAU over time', { exact: true })
+      .locator('xpath=../../..');
+
+    await expect(panel).toContainText('Collecting since 2026-09-15');
+    await expect(panel).toContainText('3 days captured so far, not 30');
+    await expect(panel).toContainText('a young series, not a decline');
+    await expect(panel).toContainText('1 day is missing from this window');
+    await expect(panel).toContainText('cannot be recovered');
+  });
+
+  test('a dead trend call never reads as nobody being active', async ({ page }) => {
+    await serveAdminFixtures(page, { fail: ['metrics/active-users/trend'] });
+    await page.goto('/admin/stats');
+    await page.getByRole('tab', { name: 'Activity' }).click();
+
+    const panel = page
+      .getByText('DAU / WAU / MAU over time', { exact: true })
+      .locator('xpath=../../..');
+    await expect(panel).toContainText('did not answer for this environment');
+    await expect(panel).toContainText('not the same as nobody being active');
+
+    // The live snapshot tiles beside it are fed by the OTHER call and stand.
+    const dau = page.getByText('DAU', { exact: true }).locator('xpath=../..');
+    await expect(dau).not.toContainText('—');
   });
 
   test('money volume renders as DOLLARS, never as raw cents', async ({ page }) => {

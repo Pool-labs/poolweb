@@ -127,6 +127,27 @@ export const TRANSACTIONS = {
 };
 
 /**
+ * The captured activity series (poolmobile#648).
+ *
+ * ⚠️ DELIBERATELY INCOMPLETE, because completeness is the uninteresting case.
+ * Three points inside a 30-day window, with `daysMissingInWindow: 1` — so the
+ * fixture exercises BOTH honesty sentences at once: the series is young AND the
+ * capture job missed a day. A full 30-point series would prove nothing about
+ * the only thing this panel has to get right.
+ */
+export const ACTIVE_USER_TREND = {
+  window: WINDOW,
+  series: [
+    { date: '2026-09-15', dau: 40, wau: 120, mau: 300 },
+    { date: '2026-09-16', dau: 44, wau: 126, mau: 305 },
+    { date: '2026-09-18', dau: 51, wau: 133, mau: 311 },
+  ],
+  collectingSince: '2026-09-15',
+  daysCaptured: 3,
+  daysMissingInWindow: 1,
+};
+
+/**
  * Platform money volume (poolmobile#647) — the ONE payload here carrying cents.
  *
  * ⚠️ EVERY FIGURE IS INTEGER CENTS, and they are chosen so a 100× display bug
@@ -373,6 +394,7 @@ export const LEGACY_SIGNUPS = {
 /** Path suffix → payload, for the happy-path route handler. */
 export const STATS_ROUTES: Record<string, unknown> = {
   'metrics/active-users': ACTIVE_USERS,
+  'metrics/active-users/trend': ACTIVE_USER_TREND,
   'metrics/signups': SIGNUPS,
   'metrics/activation': ACTIVATION,
   'metrics/pools': POOLS,

@@ -21,6 +21,8 @@ import type {
   AdminActiveUsersMetrics,
   AdminAlertState,
   AdminEngagementMetrics,
+  AdminActiveUserTrend,
+  AdminActiveUserTrendPoint,
   AdminMoneyDayPoint,
   AdminMoneyMetrics,
   AdminPointsMetrics,
@@ -42,6 +44,7 @@ export interface StatsData {
   pools: AdminPoolMetrics | null;
   transactions: AdminTransactionMetrics | null;
   money: AdminMoneyMetrics | null;
+  activeUserTrend: AdminActiveUserTrend | null;
   engagement: AdminEngagementMetrics | null;
   points: AdminPointsMetrics | null;
   authFunnel: FunnelReport | null;
@@ -120,6 +123,58 @@ export function recordToEntries(
 /** A `{ date, count }` series → chart rows. */
 export function seriesToRows(series: TimeSeriesPoint[] | undefined): LabelledRow[] {
   return (series ?? []).map((p) => ({ label: p.date, value: p.count }));
+}
+
+/**
+ * The captured activity series → chart rows (poolmobile#648).
+ *
+ * ⚠️ THE GAPS ARE REAL AND MUST NOT BE FILLED. A day the capture job missed is
+ * absent, and it is unrecoverable — zero-filling it would put a hard zero on a
+ * chart of how many people used the product, which is the most alarming thing
+ * this dashboard could say and would be false.
+ */
+export function activeUserTrendToRows(
+  series: AdminActiveUserTrendPoint[] | undefined,
+): LabelledRow[] {
+  return (series ?? []).map((point) => ({
+    label: point.date,
+    value: point.dau,
+    dau: point.dau,
+    wau: point.wau,
+    mau: point.mau,
+  }));
+}
+
+/**
+ * What the trend panel should SAY about its own completeness.
+ *
+ * ⚠️ THE FUNCTION THIS WHOLE FEATURE TURNS ON. The series cannot be backfilled,
+ * so a short or gappy line is normal — and visually identical to a collapse.
+ * This turns the three honesty fields into the one sentence that tells them
+ * apart. `null` means the line is complete and needs no caveat.
+ */
+export function trendCoverageNote(
+  trend: AdminActiveUserTrend | null,
+  days: number,
+): string | null {
+  if (!trend) return null;
+
+  if (trend.collectingSince === null) {
+    return 'Nothing has been captured yet. This series starts the first time the nightly capture runs — it cannot be backfilled, because the underlying figure is overwritten each day.';
+  }
+
+  const parts: string[] = [];
+  if (trend.daysCaptured < days) {
+    parts.push(
+      `Collecting since ${trend.collectingSince} — ${trend.daysCaptured} ${trend.daysCaptured === 1 ? 'day' : 'days'} captured so far, not ${days}. A short line here means a young series, not a decline.`,
+    );
+  }
+  if (trend.daysMissingInWindow > 0) {
+    parts.push(
+      `⚠️ ${trend.daysMissingInWindow} ${trend.daysMissingInWindow === 1 ? 'day is' : 'days are'} missing from this window — the capture job did not run. Those days cannot be recovered, and the line is drawn straight through the gap.`,
+    );
+  }
+  return parts.length > 0 ? parts.join(' ') : null;
 }
 
 /**

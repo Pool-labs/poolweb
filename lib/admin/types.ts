@@ -305,6 +305,44 @@ export interface AdminTransactionMetrics {
 }
 
 /**
+ * The CAPTURED daily activity series (poolmobile#648).
+ *
+ * ⚠️ THIS IS THE ONE ADMIN SERIES THAT IS STORED, NOT DERIVED, and every
+ * consumer has to understand why. `users.lastActivityAt` is a single mutable
+ * column overwritten in place, so the server literally cannot answer "how many
+ * were active on the 3rd" after the 4th begins. A nightly job captures it, and
+ * NOTHING CAN BACKFILL IT.
+ *
+ * ⚠️ WHICH IS WHY `collectingSince`, `daysCaptured` AND `daysMissingInWindow`
+ * ARE NOT OPTIONAL GARNISH. Five points inside a 30-day window is the identical
+ * picture for "we started collecting five days ago", "activity collapsed" and
+ * "the capture job has been broken for three weeks" — wildly different facts,
+ * one chart. A panel that draws the line without rendering these is telling a
+ * story the data cannot support.
+ */
+export interface AdminActiveUserTrendPoint {
+  /** UTC `YYYY-MM-DD`. */
+  date: string;
+  /** ⚠️ The three windows OVERLAP: dau ⊆ wau ⊆ mau. Never sum them. */
+  dau: number;
+  wau: number;
+  mau: number;
+}
+
+/** GET /admin/metrics/active-users/trend — inner `data`. */
+export interface AdminActiveUserTrend {
+  window: AdminMetricsWindow;
+  /** Oldest first. A day never captured is ABSENT, never a zero row. */
+  series: AdminActiveUserTrendPoint[];
+  /** The earliest day ever captured, or null before the job's first run. */
+  collectingSince: string | null;
+  /** Total rows ever captured, across all time — not just this window. */
+  daysCaptured: number;
+  /** Days in the window with no row. Non-zero means the job missed days. */
+  daysMissingInWindow: number;
+}
+
+/**
  * Platform-wide money volume (poolmobile#647) — the ONE admin response that
  * carries cents.
  *

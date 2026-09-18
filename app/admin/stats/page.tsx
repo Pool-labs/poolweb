@@ -52,6 +52,7 @@ import type { StatsTabProps } from '@/components/admin/stats/types';
 
 const EMPTY: StatsData = {
   activeUsers: null,
+  activeUserTrend: null,
   signups: null,
   activation: null,
   pools: null,
@@ -137,6 +138,7 @@ export default function AdminStatsPage() {
     setError(null);
     const [
       activeUsers,
+      activeUserTrend,
       signups,
       activation,
       pools,
@@ -153,6 +155,12 @@ export default function AdminStatsPage() {
       alerts,
     ] = await Promise.allSettled([
       metricsApi.activeUsers(windowDays),
+      // ⚠️ A SECOND call beside the snapshot, not instead of it (poolmobile#648).
+      // The tile is "how many right now"; this is the history a nightly job
+      // stored, because `lastActivityAt` is overwritten in place. The Activity
+      // tab shows both, and they agree because the job stores what the tile
+      // computes.
+      metricsApi.activeUserTrend(windowDays),
       metricsApi.signups(windowDays),
       // Same window as signups on purpose (#592): the two answer the same
       // question from two sources, and only a shared window makes a divergence
@@ -181,6 +189,7 @@ export default function AdminStatsPage() {
 
     const next: StatsData = {
       activeUsers: pick(activeUsers),
+      activeUserTrend: pick(activeUserTrend),
       signups: pick(signups),
       activation: pick(activation),
       pools: pick(pools),

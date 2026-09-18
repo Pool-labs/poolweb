@@ -39,6 +39,7 @@ import type {
   AdminCreateUserResponse,
   AdminGeographyMetrics,
   LeaderboardHeadlines,
+  AdminActiveUserTrend,
   AdminMoneyMetrics,
   AdminPointsMetrics,
   AdminSignupsMetrics,
@@ -191,6 +192,16 @@ export const metricsApi = {
    */
   geography: (days?: number) =>
     request<AdminGeographyMetrics>(`/metrics/geography${query({ days })}`),
+  /**
+   * The CAPTURED daily DAU/WAU/MAU series (poolmobile#648).
+   *
+   * ⚠️ A SIBLING of `activeUsers` above, not a replacement. That one is a live
+   * snapshot ("how many right now"); this is the history a nightly job stored,
+   * because `lastActivityAt` is overwritten in place and cannot be looked back
+   * at. Both are read, and the panel shows both.
+   */
+  activeUserTrend: (days?: number) =>
+    request<AdminActiveUserTrend>(`/metrics/active-users/trend${query({ days })}`),
   /**
    * Platform-wide money volume in integer cents (poolmobile#647).
    *
