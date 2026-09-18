@@ -213,6 +213,91 @@ export const MONEY_EVENTS = {
   totals: { deposit_completed: 21, expense_logged: 64 },
 };
 
+/**
+ * Geography (#624). ⚠️ Note `amman||JO` — a TWO-segment legacy key with no
+ * region. Those are published exactly as stored and must stay filterable, which
+ * is the reason nothing in this repo normalizes a key.
+ */
+export const GEOGRAPHY = {
+  window: WINDOW,
+  cities: [
+    {
+      key: 'columbia|MO|US',
+      display: 'Columbia, MO',
+      regionCode: 'MO',
+      countryCode: 'US',
+      userCount: 18,
+      poolCount: 6,
+      newUserCount: 4,
+      newPoolCount: 1,
+      lat: 38.95,
+      lng: -92.33,
+      centroidSource: 'curated',
+    },
+    {
+      key: 'austin|TX|US',
+      display: 'Austin, TX',
+      regionCode: 'TX',
+      countryCode: 'US',
+      userCount: 7,
+      poolCount: 9,
+      newUserCount: 2,
+      newPoolCount: 3,
+      lat: 30.27,
+      lng: -97.74,
+      centroidSource: 'pools',
+    },
+    {
+      key: 'amman||JO',
+      display: 'Amman',
+      regionCode: null,
+      countryCode: 'JO',
+      userCount: 5,
+      poolCount: 0,
+      newUserCount: 1,
+      newPoolCount: 0,
+      lat: null,
+      lng: null,
+      centroidSource: null,
+    },
+  ],
+  citiesTruncated: false,
+  countries: [
+    { countryCode: 'US', userCount: 25, poolCount: 15, cityCount: 2 },
+    { countryCode: 'JO', userCount: 5, poolCount: 0, cityCount: 1 },
+  ],
+  regions: [
+    { countryCode: 'US', regionCode: 'MO', regionName: 'Missouri', userCount: 18, poolCount: 6, cityCount: 1 },
+    { countryCode: 'US', regionCode: 'TX', regionName: 'Texas', userCount: 7, poolCount: 9, cityCount: 1 },
+  ],
+  usersWithoutCity: 11,
+  poolsWithoutCity: 3,
+  exactVenuePools: [
+    { id: 'pool-1', name: 'Thursday football', lat: 38.94, lng: -92.32, venueAddress: '1 Field Rd' },
+  ],
+  exactVenuePoolsTruncated: false,
+};
+
+/** A user list row, for the city-filter specs. */
+export function userRow(over: Record<string, unknown> = {}) {
+  return {
+    id: 'user-1',
+    email: 'someone@example.com',
+    username: 'someone',
+    displayName: 'Someone',
+    firstName: 'Some',
+    lastName: 'One',
+    isSuspended: false,
+    deletedAt: null,
+    createdAt: '2026-09-01T00:00:00.000Z',
+    locationCity: 'Columbia, MO',
+    locationCityKey: 'columbia|MO|US',
+    ...over,
+  };
+}
+
+export const USERS_LIST = { users: [userRow()], total: 1, limit: 25, offset: 0 };
+
 export const ALERTS = {
   status: 'ok',
   criticalCount: 0,
@@ -256,5 +341,6 @@ export const STATS_ROUTES: Record<string, unknown> = {
   'analytics/funnels/pool': POOL_FUNNEL,
   'analytics/funnels/discover': DISCOVER_FUNNEL,
   'analytics/money-events': MONEY_EVENTS,
+  'metrics/geography': GEOGRAPHY,
   'observability/alerts': ALERTS,
 };

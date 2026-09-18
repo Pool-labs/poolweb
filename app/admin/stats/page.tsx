@@ -6,6 +6,7 @@ import { Loader2, RefreshCw } from 'lucide-react';
 import { ActivityTab } from '@/components/admin/stats/ActivityTab';
 import { EngagementTab } from '@/components/admin/stats/EngagementTab';
 import { FunnelsTab } from '@/components/admin/stats/FunnelsTab';
+import { GeographyTab } from '@/components/admin/stats/GeographyTab';
 import { GrowthTab } from '@/components/admin/stats/GrowthTab';
 import { HealthTab } from '@/components/admin/stats/HealthTab';
 import { MoneyTab } from '@/components/admin/stats/MoneyTab';
@@ -60,6 +61,7 @@ const EMPTY: StatsData = {
   poolFunnel: null,
   discoverFunnel: null,
   moneyEvents: null,
+  geography: null,
   alerts: null,
 };
 
@@ -98,6 +100,14 @@ const TABS: TabDef[] = [
   },
   { value: 'funnels', label: 'Funnels', scope: windowScope, Panel: FunnelsTab },
   {
+    value: 'geography',
+    label: 'Geography',
+    // The city and roll-up totals are ALL TIME — `days` scopes only the "new"
+    // columns, so a range that changed everything else would look broken here.
+    scope: (days) => `All time · "new" columns are the last ${days} days`,
+    Panel: GeographyTab,
+  },
+  {
     value: 'health',
     label: 'Health',
     scope: () => 'Live — not scoped to the range',
@@ -134,6 +144,7 @@ export default function AdminStatsPage() {
       poolFunnel,
       discoverFunnel,
       moneyEvents,
+      geography,
       alerts,
     ] = await Promise.allSettled([
       metricsApi.activeUsers(windowDays),
@@ -150,6 +161,7 @@ export default function AdminStatsPage() {
       funnelsApi.pool(windowDays),
       funnelsApi.discover(windowDays),
       funnelsApi.moneyEvents(windowDays),
+      metricsApi.geography(windowDays),
       // Live, un-windowed: the Health tab's source (#190).
       observabilityApi.alerts(),
     ]);
@@ -166,6 +178,7 @@ export default function AdminStatsPage() {
       poolFunnel: pick(poolFunnel),
       discoverFunnel: pick(discoverFunnel),
       moneyEvents: pick(moneyEvents),
+      geography: pick(geography),
       alerts: pick(alerts),
     };
     // The metrics calls decide the page's fate; the alerts read never does — a
@@ -231,7 +244,7 @@ export default function AdminStatsPage() {
             <TabsContent key={value} value={value} className="space-y-3">
               {/*
                 Each tab is a landmark named by its own heading, and states what
-                its panels are scoped to — three of the seven are not (or not
+                its panels are scoped to — four of the eight are not (or not
                 fully) scoped by the range control, and a reader who assumes
                 otherwise misreads every number under them.
               */}

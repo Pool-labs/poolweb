@@ -79,6 +79,7 @@ test.describe('Stats (fixtures)', () => {
         'analytics/funnels/pool',
         'analytics/funnels/discover',
         'analytics/money-events',
+        'metrics/geography',
       ],
     });
     await page.goto('/admin/stats');

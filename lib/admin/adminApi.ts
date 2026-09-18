@@ -33,6 +33,7 @@ import type {
   AdminReportListResponse,
   AdminReviewReportInput,
   AdminActivationMetrics,
+  AdminGeographyMetrics,
   AdminPointsMetrics,
   AdminSignupsMetrics,
   AdminTransactionMetrics,
@@ -169,6 +170,17 @@ export const metricsApi = {
     request<AdminEngagementMetrics>(`/metrics/engagement${query({ days })}`),
   /** The #251 points economy — awards by reason, and the daily-cap hit rate. */
   points: (days?: number) => request<AdminPointsMetrics>(`/metrics/points${query({ days })}`),
+  /**
+   * Users and pools by canonical city key (#624), plus the country/region
+   * roll-ups and the #21 exact-venue pins.
+   *
+   * ⚠️ `days` scopes only the `new…Count` columns — the city list, the roll-ups
+   * and the pins are all-time. That is why the city FILTER on the Users and
+   * Pools lists can read this endpoint at any window and still offer every
+   * city.
+   */
+  geography: (days?: number) =>
+    request<AdminGeographyMetrics>(`/metrics/geography${query({ days })}`),
 };
 
 // ─── Funnels / money events (#81) ─────────────────────────────────────────────
@@ -188,6 +200,13 @@ export const funnelsApi = {
 
 export interface UserSearchParams {
   q?: string;
+  /**
+   * A canonical city key, passed EXACTLY as the geography response returned it
+   * (#624). The server matches by equality and never normalizes: pre-#128 and
+   * pre-#469 legacy keys are published too, so re-deriving or tidying a key
+   * here would make exactly those cities unfilterable.
+   */
+  city?: string;
   includeDeleted?: boolean;
   limit?: number;
   offset?: number;
@@ -217,6 +236,8 @@ export interface PoolSearchParams {
   q?: string;
   status?: PoolStatus;
   visibility?: PoolVisibility;
+  /** A canonical city key, passed exactly as published — see `UserSearchParams`. */
+  city?: string;
   includeDeleted?: boolean;
   limit?: number;
   offset?: number;

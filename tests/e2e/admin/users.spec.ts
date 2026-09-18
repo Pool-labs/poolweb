@@ -20,6 +20,10 @@ test.describe('Users', () => {
     // "Showing 1–25 of N" (en dash) only renders over a non-empty page.
     await expect(page.getByText(/Showing 1–\d+ of \d+/)).toBeVisible();
 
+    // #33 Part B — the city column and its filter.
+    await expect(page.getByRole('columnheader', { name: 'City' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Filter by city' })).toBeVisible();
+
     // exact: true — role-name matching is substring by default, so a bare
     // 'View' would match any nav link containing the word.
     await page.getByRole('link', { name: 'View', exact: true }).first().click();

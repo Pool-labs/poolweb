@@ -77,6 +77,10 @@ test.describe('Stats', () => {
       await expect(page.getByText(funnel, { exact: true })).toBeVisible();
     }
 
+    await openTab(page, 'Geography');
+    await expect(page.getByText('Users by city')).toBeVisible();
+    await expect(page.getByText('Every city')).toBeVisible();
+
     // Health links into Errors & Health rather than duplicating it.
     await openTab(page, 'Health');
     await expect(page.getByRole('link', { name: 'Open Errors & Health' })).toHaveAttribute(
@@ -132,6 +136,10 @@ test.describe('Stats', () => {
       await expect(page.getByRole('region', { name: tab })).toContainText('Last 7 days');
     }
 
+    // Geography's totals are all time — only its "new" columns follow the range.
+    await openTab(page, 'Geography');
+    await expect(page.getByRole('region', { name: 'Geography' })).toContainText('All time');
+
     // ⚠️ Three tabs are NOT scoped by the range, and each says so rather than
     // letting the control imply it filtered something.
     await openTab(page, 'Activity');
@@ -153,5 +161,46 @@ test.describe('Stats', () => {
     await openTab(page, 'Money');
     await expect(page.getByText('Volume in cents')).toBeVisible();
     await expect(page.getByText(/poolmobile#647/)).toBeVisible();
+  });
+});
+
+/**
+ * The city filter against the real staging API (#33 Part B).
+ *
+ * ⚠️ READ-ONLY: it picks a city the SERVER published and checks that the list
+ * narrows. It never types a key of its own — the whole contract is that a key
+ * is opaque and travels unchanged.
+ */
+test.describe('City filter', () => {
+  test('narrows the Users list to a city the server published', async ({ page }) => {
+    await page.goto('/admin/stats');
+    await openTab(page, 'Geography');
+
+    const openLink = page.getByRole('link', { name: /^Open users in / }).first();
+    if ((await openLink.count()) === 0) {
+      test.skip(true, 'Staging has no city with users recorded against it.');
+      return;
+    }
+    const href = await openLink.getAttribute('href');
+    expect(href).toMatch(/^\/admin\/users\?city=/);
+
+    await openLink.click();
+    await page.waitForURL(/\/admin\/users\?city=/);
+
+    // The filter is in force and says which city, and the list is not an error.
+    await expect(page.getByRole('button', { name: 'Clear city' })).toBeVisible();
+    await expect(page.getByText('Failed to load users')).toHaveCount(0);
+    await expect(page.getByText(/Showing 1–\d+ of \d+ in this city|0 users in this city/)).toBeVisible();
+
+    // Clearing it widens the list again.
+    await page.getByRole('button', { name: 'Clear city' }).click();
+    await expect(page.getByRole('combobox', { name: 'Filter by city' })).toBeVisible();
+  });
+
+  test('the Pools list carries the same column and filter', async ({ page }) => {
+    await page.goto('/admin/pools');
+    await expect(page.getByRole('heading', { name: 'Pools' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'City' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Filter by city' })).toBeVisible();
   });
 });
