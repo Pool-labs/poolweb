@@ -14,13 +14,21 @@ import { ArrowLeft } from "lucide-react"
 export function LegalDoc({ html }: { html: string }) {
   return (
     <div className="container mx-auto max-w-4xl py-12 px-4">
-      <div className="mb-8 flex items-center justify-between">
+      {/*
+        ⚠️ STACKS BELOW `sm`, and the nav WRAPS. On a phone this row put "Back
+        to Home" and three long link labels on one line with `justify-between`
+        and no wrap strategy — flex shrank the items below their content and the
+        labels printed ON TOP of each other ("Back to Ho[me]" under "Privacy
+        Policy"). These are the documents an app-store reviewer opens on a
+        handset, so the phone layout is the one that matters most.
+      */}
+      <div className="mb-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Link href="/">
-          <Button variant="ghost" className="gap-2">
+          <Button variant="ghost" className="gap-2 px-0 sm:px-4">
             <ArrowLeft className="h-4 w-4" /> Back to Home
           </Button>
         </Link>
-        <nav className="flex gap-4 text-sm text-muted-foreground">
+        <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
           <Link href="/privacy" className="underline underline-offset-4">
             Privacy Policy
           </Link>

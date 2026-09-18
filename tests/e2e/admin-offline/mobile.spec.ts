@@ -98,6 +98,53 @@ test.describe('Stats at phone width', () => {
   });
 });
 
+test.describe('Nav at phone width', () => {
+  test('collapses to a hamburger, and the environment stays on the BAR', async ({ page }) => {
+    // ⚠️ The env badge must never move inside the menu. It is the #112 SAFETY
+    // signal, and a signal you have to open a menu to see is not one.
+    await serveAdminFixtures(page);
+    await page.goto('/admin/stats');
+
+    // ⚠️ `.first()`: BOTH layout branches are in the DOM (the desktop row is
+    // `hidden lg:flex`), so a TEXT query matches twice while a role query sees
+    // only the visible one — `display: none` is out of the accessibility tree.
+    await expect(page.getByText('Pool Admin').first()).toBeInViewport();
+    await expect(
+      page.getByTitle(/Insights are for the staging environment/).first(),
+    ).toBeInViewport();
+
+    // Closed: the destinations are not on screen, so nothing can scrunch.
+    await expect(page.getByRole('navigation', { name: 'Admin' })).toHaveCount(0);
+
+    const toggle = page.getByRole('button', { name: 'Menu' });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await toggle.click();
+
+    const menu = page.getByRole('navigation', { name: 'Admin' });
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('link', { name: 'Users' })).toBeInViewport();
+    await expect(menu.getByRole('button', { name: /Sign out of/ })).toBeVisible();
+    await expectNoPageOverflow(page);
+  });
+
+  test('closes on Escape and on navigating', async ({ page }) => {
+    await serveAdminFixtures(page);
+    await page.goto('/admin/stats');
+
+    await page.getByRole('button', { name: 'Menu' }).click();
+    await expect(page.getByRole('navigation', { name: 'Admin' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('navigation', { name: 'Admin' })).toHaveCount(0);
+
+    // ⚠️ And on arriving somewhere — a menu left open over the page you just
+    // landed on is what makes a hamburger feel broken.
+    await page.getByRole('button', { name: 'Menu' }).click();
+    await page.getByRole('navigation', { name: 'Admin' }).getByRole('link', { name: 'Users' }).click();
+    await page.waitForURL('**/admin/users');
+    await expect(page.getByRole('navigation', { name: 'Admin' })).toHaveCount(0);
+  });
+});
+
 test.describe('Lists at phone width', () => {
   test('a Users row can still be OPENED, not just read', async ({ page }) => {
     await serveAdminFixtures(page);

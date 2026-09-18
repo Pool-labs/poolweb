@@ -1,9 +1,12 @@
 'use client';
 
+import { useEffect, useRef, useState, type ComponentType } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BarChart3,
+  Menu,
+  X,
   Users,
   Layers,
   ClipboardList,
@@ -58,6 +61,9 @@ const NAV_ITEMS = [
  */
 const NON_PROD_NAV_ITEMS = [{ href: '/admin/qa', label: 'QA', icon: FlaskConical }] as const;
 
+/** Ties the hamburger's `aria-controls` to the panel it opens. */
+const MOBILE_MENU_ID = 'admin-mobile-menu';
+
 /**
  * Production-only entries (#602). The Waitlist tab reads — and can delete —
  * live marketing-site signups straight from the ONE shared Firestore, which the
@@ -93,10 +99,39 @@ const PROD_ONLY_NAV_ITEMS = [
  */
 export function AdminNav({ env }: { env: ApiEnv }) {
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
   const isProd = env === 'production';
   const items = isProd
     ? [...NAV_ITEMS, ...PROD_ONLY_NAV_ITEMS]
     : [...NAV_ITEMS, ...NON_PROD_NAV_ITEMS];
+
+  // Close on navigation. ⚠️ Keyed on `pathname`, not on the link's onClick:
+  // the QA console and the env switcher both navigate programmatically, and a
+  // menu still open over the page they landed on is the thing that makes a
+  // hamburger feel broken.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  // Escape and an outside click, the two dismissals a disclosure has to have.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    const onPointer = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onPointer);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onPointer);
+    };
+  }, [open]);
 
   return (
     <header
@@ -106,54 +141,126 @@ export function AdminNav({ env }: { env: ApiEnv }) {
         isProd && 'border-b-2 border-red-600 bg-red-500/5',
       )}
     >
-      <div className="container mx-auto flex flex-col gap-2 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-1 overflow-x-auto">
-          <span className="mr-2 font-bold">Pool Admin</span>
-          <span
-            title={`Insights are for the ${ENV_LABELS[env].toLowerCase()} environment — ${ENV_DESCRIPTIONS[env]}`}
-            className={cn(
-              'mr-2 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold tracking-wide',
-              ENV_BADGE[env].className,
-            )}
-          >
-            {ENV_LABELS[env]}
-          </span>
-          {items.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(`${href}/`);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  'flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors',
-                  active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </Link>
-            );
-          })}
-        </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-2">
+      <div ref={panelRef} className="container mx-auto px-4 py-3">
+        {/* ── Phone: brand + environment + a hamburger ─────────────────────
+            ⚠️ THE ENVIRONMENT BADGE STAYS ON THE BAR, never inside the menu.
+            It is the one thing on this header that is a SAFETY signal (#112),
+            and a signal you have to open a menu to see is not one. */}
+        <div className="flex items-center justify-between gap-2 lg:hidden">
+          <Brand env={env} />
           <Button
+            type="button"
             variant="ghost"
             size="sm"
-            // Scoped to the selected environment — the other session survives,
-            // which is the whole point of separate sessions. Said out loud in
-            // the label so nobody assumes "sign out" meant everywhere.
-            title={`Ends the ${ENV_LABELS[env]} session only. Other environments stay signed in.`}
-            onClick={() => void adminLogout()}
-            className="text-muted-foreground hover:text-destructive"
+            aria-label={open ? 'Close menu' : 'Menu'}
+            aria-expanded={open}
+            aria-controls={MOBILE_MENU_ID}
+            onClick={() => setOpen((v) => !v)}
           >
-            <LogOut className="mr-1 h-4 w-4" />
-            Sign out of {ENV_LABELS[env]}
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
+        </div>
+
+        {open && (
+          <nav
+            id={MOBILE_MENU_ID}
+            aria-label="Admin"
+            className="mt-2 flex flex-col gap-1 border-t pt-2 lg:hidden"
+          >
+            {items.map((item) => (
+              <NavItemLink
+                key={item.href}
+                item={item}
+                pathname={pathname}
+                className="w-full"
+              />
+            ))}
+            <SignOutButton env={env} className="mt-1 justify-start" />
+          </nav>
+        )}
+
+        {/* ── Desktop: the single row, unchanged ───────────────────────── */}
+        <div className="hidden lg:flex lg:items-center lg:justify-between lg:gap-2">
+          <div className="flex items-center gap-1">
+            <Brand env={env} />
+            {items.map((item) => (
+              <NavItemLink key={item.href} item={item} pathname={pathname} />
+            ))}
+          </div>
+          <SignOutButton env={env} />
         </div>
       </div>
     </header>
+  );
+}
+
+/** The wordmark + the environment badge — identical in both layouts. */
+function Brand({ env }: { env: ApiEnv }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="whitespace-nowrap font-bold">Pool Admin</span>
+      <span
+        title={`Insights are for the ${ENV_LABELS[env].toLowerCase()} environment — ${ENV_DESCRIPTIONS[env]}`}
+        className={cn(
+          'whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold tracking-wide',
+          ENV_BADGE[env].className,
+        )}
+      >
+        {ENV_LABELS[env]}
+      </span>
+    </div>
+  );
+}
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+}
+
+/** One destination. Same active rule in both layouts, so they cannot disagree. */
+function NavItemLink({
+  item: { href, label, icon: Icon },
+  pathname,
+  className,
+}: {
+  item: NavItem;
+  pathname: string;
+  className?: string;
+}) {
+  const active = pathname === href || pathname.startsWith(`${href}/`);
+  return (
+    <Link
+      href={href}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm transition-colors lg:py-1.5',
+        active
+          ? 'bg-primary text-primary-foreground'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        className,
+      )}
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </Link>
+  );
+}
+
+function SignOutButton({ env, className }: { env: ApiEnv; className?: string }) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      // Scoped to the selected environment — the other session survives, which
+      // is the whole point of separate sessions. Said out loud in the label so
+      // nobody assumes "sign out" meant everywhere.
+      title={`Ends the ${ENV_LABELS[env]} session only. Other environments stay signed in.`}
+      onClick={() => void adminLogout()}
+      className={cn('text-muted-foreground hover:text-destructive', className)}
+    >
+      <LogOut className="mr-1 h-4 w-4" />
+      Sign out of {ENV_LABELS[env]}
+    </Button>
   );
 }
