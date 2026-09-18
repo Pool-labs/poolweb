@@ -50,6 +50,9 @@ import type {
   ObservabilityErrorsFeed,
   ObservabilityErrorsQuery,
   ObservabilityUserLogs,
+  SupportConversationListResponse,
+  SupportMessageListResponse,
+  SupportReplyResponse,
   ObservabilityUserLogsQuery,
   PoolFunnelReport,
   PoolStatus,
@@ -291,6 +294,32 @@ export const poolsApi = {
     request<AdminLedgerSettlementsResponse>(
       `/pools/${id}/ledger/settlements${query({ cursor, limit })}`,
     ),
+};
+
+// ─── In-app support (#683) ───────────────────────────────────────────────────
+// Read and answer support threads without signing into the mobile app as the
+// support account. The server delegates every call AS that account, so these
+// return the member-facing shapes unchanged.
+//
+// ⚠️ ALL THREE 404 WHEN MESSAGING IS KILLSWITCHED OFF, before the identity
+// gate — the same degraded state the mobile client treats as "messaging does
+// not exist in this build". The page renders that as a stated fact, never as
+// an empty queue.
+
+export const supportApi = {
+  conversations: (limit?: number, cursor?: string) =>
+    request<SupportConversationListResponse>(
+      `/support/conversations${query({ limit, cursor })}`,
+    ),
+  messages: (conversationId: string, limit?: number, cursor?: string) =>
+    request<SupportMessageListResponse>(
+      `/support/conversations/${conversationId}/messages${query({ limit, cursor })}`,
+    ),
+  reply: (conversationId: string, body: string) =>
+    request<SupportReplyResponse>(`/support/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }),
 };
 
 // ─── Admin allowlist (the "Admins" page) ─────────────────────────────────────
