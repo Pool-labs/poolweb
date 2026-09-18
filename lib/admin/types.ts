@@ -30,6 +30,15 @@ export enum PoolVisibility {
   Public = 'PUBLIC',
 }
 
+/** Pool kind (source: pool.types.ts `PoolType`). Lowercase on the wire. */
+export enum PoolType {
+  Roommates = 'roommates',
+  Trip = 'trip',
+  GoingOut = 'going_out',
+  Recurring = 'recurring',
+  Custom = 'custom',
+}
+
 /**
  * Transaction row status.
  *
@@ -512,6 +521,85 @@ export interface AdminUserSummary {
   locationCity?: string | null;
   locationCityKey?: string | null;
 }
+
+/**
+ * ── ADMIN CREATION (poolmobile#684) ────────────────────────────────────────
+ *
+ * ⚠️ NOT SERVED YET. `POST /admin/users` and `POST /admin/pools` do not exist
+ * on any environment as of 2026-09-18 — the admin API can suspend, restore,
+ * flag, adjust and impersonate, but it cannot create. Both calls therefore 404
+ * today, and the dialogs say exactly that rather than showing a generic
+ * failure; `describeCreateFailure` in `lib/admin/adminErrors.ts` is where that
+ * lives.
+ *
+ * These shapes are this repo's HALF of a contract that does not exist yet, so
+ * they are pinned on poolmobile#684 for the server to match. The one naming
+ * decision worth defending: `isNewUser`, because that is what
+ * `findOrCreateUserByEmail` already returns — the endpoint is a thin
+ * delegation to it, and inventing a second word for the same fact is how two
+ * repos drift (#618/#623).
+ */
+
+/** POST /admin/users — body. */
+export interface AdminCreateUserBody {
+  email: string;
+  /** Free text, AUDITED (#26). Required: these rows are otherwise
+   *  indistinguishable from organic signups six months later. */
+  reason: string;
+}
+
+/**
+ * POST /admin/users — inner `data`.
+ *
+ * ⚠️ `isNewUser` IS LOAD-BEARING. The endpoint delegates to
+ * `findOrCreateUserByEmail`, which is find-OR-create: reporting "created" for
+ * an address that already had an account is a silent lie, and the UI branches
+ * on this to say "this account already existed" instead.
+ */
+export interface AdminCreateUserResponse {
+  user: AdminUserSummary;
+  isNewUser: boolean;
+}
+
+/** POST /admin/pools — body. */
+export interface AdminCreatePoolBody {
+  /**
+   * The pool's OWNER — an explicitly chosen existing user, never the acting
+   * admin by default. An admin-owned pool is a support artefact nobody else
+   * can leave or govern.
+   */
+  ownerUserId: string;
+  name: string;
+  type: PoolType;
+  /**
+   * ⚠️ PRIVATE from this surface. `createPoolSchema` requires a PUBLIC pool to
+   * carry a non-empty short description AND a canonical city — and #194 makes
+   * that city PICKER-ONLY, so a typed one is a 400. This dashboard has no
+   * canonical city picker (the geography list is cities already in use, which
+   * is the wrong domain for a brand-new pool), so the admin path creates the
+   * invite-first private pool and the owner turns it public in-app through the
+   * guarded visibility endpoint that exists for exactly that.
+   */
+  visibility: PoolVisibility;
+  /** Integer cents, `0` for none. */
+  contributionAmountCents: number;
+  /** Free text, AUDITED (#26), same rule as the user create. */
+  reason: string;
+}
+
+/** POST /admin/pools — inner `data`. */
+export interface AdminCreatePoolResponse {
+  pool: AdminPoolSummary;
+}
+
+/** Pool name bounds (source: `POOL_NAME_LENGTH`). */
+export const POOL_NAME_LENGTH = { MIN: 1, MAX: 50 } as const;
+
+/** Contribution ceiling (source: `POOL_LIMITS.MAX_DEPOSIT_CENTS`). */
+export const MAX_CONTRIBUTION_CENTS = 10_000_00;
+
+/** Audited-reason bounds, matching the #84 impersonation precedent. */
+export const ADMIN_CREATE_REASON_LENGTH = { MIN: 10, MAX: 280 } as const;
 
 export interface AdminUserMembershipSummary {
   owner: number;
