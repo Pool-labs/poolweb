@@ -148,37 +148,52 @@ function UsersList() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>City</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    {/*
+                      ⚠️ Email and Joined are hidden below `sm`/`md`, and the
+                      ACTION column never is. Six columns at phone width pushed
+                      `View` off the right edge — the row was readable and
+                      un-openable, reachable only by a horizontal scroll with no
+                      affordance. Name identifies the person; email is the long
+                      one and is on the detail page anyway.
+                    */}
+                    <TableHead className="px-2 sm:px-4">Name</TableHead>
+                    <TableHead className="hidden sm:table-cell">Email</TableHead>
+                    <TableHead className="px-2 sm:px-4">City</TableHead>
+                    <TableHead className="px-2 sm:px-4">Status</TableHead>
+                    <TableHead className="hidden md:table-cell">Joined</TableHead>
+                    <TableHead className="px-2 text-right sm:px-4">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.map((u) => (
                     <TableRow key={u.id}>
-                      <TableCell className="font-medium">{name(u)}</TableCell>
-                      <TableCell className="text-muted-foreground">{u.email ?? '—'}</TableCell>
+                      <TableCell className="px-2 font-medium sm:px-4">{name(u)}</TableCell>
+                      <TableCell className="hidden text-muted-foreground sm:table-cell">
+                        {u.email ?? '—'}
+                      </TableCell>
                       {/*
                         City-level only, and that is the whole exposure here: a
                         list row carries no coordinates (those stay on the
                         audited detail page). `title` shows the canonical key,
                         which is what the filter and the API match on.
                       */}
-                      <TableCell className="text-muted-foreground" title={u.locationCityKey ?? undefined}>
+                      <TableCell
+                        className="px-2 text-muted-foreground sm:px-4"
+                        title={u.locationCityKey ?? undefined}
+                      >
                         {u.locationCity ?? '—'}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="px-2 sm:px-4">
                         {u.isSuspended ? (
                           <Badge variant="destructive">Suspended</Badge>
                         ) : (
                           <Badge variant="secondary">Active</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{formatDate(u.createdAt)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="hidden text-muted-foreground md:table-cell">
+                        {formatDate(u.createdAt)}
+                      </TableCell>
+                      <TableCell className="px-2 text-right sm:px-4">
                         <Button asChild variant="ghost" size="sm">
                           <Link href={`/admin/users/${u.id}`}>View</Link>
                         </Button>

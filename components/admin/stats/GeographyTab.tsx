@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { MapPin } from 'lucide-react';
 
 import { ChartCard, ChartEmpty, HorizontalBarChart, StatTile } from '@/components/admin/charts';
+import { useNarrowViewport } from '@/components/admin/useNarrowViewport';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { chartColor } from '@/lib/admin/charts';
@@ -47,6 +48,9 @@ const CITY_BARS = 25;
 export function GeographyTab({ data, days }: StatsTabProps) {
   const { geography } = data;
   const [measure, setMeasure] = useState<GeographyMeasure>('users');
+  // A 180px category axis on a 390px screen leaves the bars under half the
+  // card; recharts wants a number, so this cannot be a responsive class.
+  const narrow = useNarrowViewport();
 
   const cities = geography?.cities ?? [];
   const bars = topNWithOther(cityRows(cities, measure), CITY_BARS);
@@ -117,7 +121,7 @@ export function GeographyTab({ data, days }: StatsTabProps) {
           rows={bars}
           xLabel={GEOGRAPHY_MEASURE_LABEL[measure]}
           valueName={GEOGRAPHY_MEASURE_LABEL[measure]}
-          labelWidth={180}
+          labelWidth={narrow ? 104 : 180}
           emptyReason={geography ? 'none-yet' : 'unavailable'}
           emptyDetail={
             geography
@@ -143,31 +147,44 @@ export function GeographyTab({ data, days }: StatsTabProps) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>City</TableHead>
-                  <TableHead>Region</TableHead>
-                  <TableHead>Country</TableHead>
-                  <TableHead className="text-right">Users</TableHead>
-                  <TableHead className="text-right">Pools</TableHead>
-                  <TableHead className="text-right">{`New (${days}d)`}</TableHead>
-                  <TableHead className="text-right">Open</TableHead>
+                  {/*
+                    ⚠️ Region, Country and "New" are hidden below `md`, and the
+                    ACTION never is. Seven columns at phone width pushed the
+                    link that makes a row useful off the right edge, where the
+                    only way to reach it was a horizontal scroll with no
+                    affordance. Region and country are also both derivable from
+                    the city name beside them, which is what makes them the
+                    right ones to drop.
+                  */}
+                  <TableHead className="px-2 sm:px-4">City</TableHead>
+                  <TableHead className="hidden md:table-cell">Region</TableHead>
+                  <TableHead className="hidden md:table-cell">Country</TableHead>
+                  <TableHead className="px-2 text-right sm:px-4">Users</TableHead>
+                  <TableHead className="px-2 text-right sm:px-4">Pools</TableHead>
+                  <TableHead className="hidden text-right md:table-cell">{`New (${days}d)`}</TableHead>
+                  <TableHead className="px-2 text-right sm:px-4">Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {cities.map((city) => (
                   <TableRow key={city.key}>
-                    <TableCell className="font-medium">{city.display}</TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="px-2 font-medium sm:px-4">{city.display}</TableCell>
+                    <TableCell className="hidden text-muted-foreground md:table-cell">
                       {city.regionCode ?? '—'}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="hidden text-muted-foreground md:table-cell">
                       {city.countryCode ?? '—'}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{city.userCount}</TableCell>
-                    <TableCell className="text-right tabular-nums">{city.poolCount}</TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                    <TableCell className="px-2 text-right tabular-nums sm:px-4">
+                      {city.userCount}
+                    </TableCell>
+                    <TableCell className="px-2 text-right tabular-nums sm:px-4">
+                      {city.poolCount}
+                    </TableCell>
+                    <TableCell className="hidden text-right tabular-nums text-muted-foreground md:table-cell">
                       {measure === 'users' ? city.newUserCount : city.newPoolCount}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="px-2 text-right sm:px-4">
                       {/*
                         The key travels EXACTLY as published — encoded for the
                         URL, never re-derived or tidied. Legacy two-segment keys
@@ -205,7 +222,7 @@ export function GeographyTab({ data, days }: StatsTabProps) {
             xLabel={GEOGRAPHY_MEASURE_LABEL[measure]}
             valueName={GEOGRAPHY_MEASURE_LABEL[measure]}
             color={chartColor('series-3')}
-            labelWidth={150}
+            labelWidth={narrow ? 104 : 150}
             emptyReason={geography ? 'none-yet' : 'unavailable'}
           />
         </ChartCard>
@@ -221,7 +238,7 @@ export function GeographyTab({ data, days }: StatsTabProps) {
             xLabel={GEOGRAPHY_MEASURE_LABEL[measure]}
             valueName={GEOGRAPHY_MEASURE_LABEL[measure]}
             color={chartColor('series-4')}
-            labelWidth={150}
+            labelWidth={narrow ? 104 : 150}
             emptyReason={geography ? 'none-yet' : 'unavailable'}
             emptyDetail={
               geography ? 'No city key carries a US/CA subdivision yet.' : undefined
