@@ -56,6 +56,23 @@
     --chart-serious: #ec835a;
     --chart-critical: #d03b3b;
     --chart-neutral: #7c8899;
+
+    /* ---- Admin map basemap (poolweb #33, unblocked by poolmobile#649) ----
+     * ⚠️ WEBGL CANNOT READ A CSS CUSTOM PROPERTY. A MapLibre style is a plain
+     * JSON document handed to the GPU, so `GeographyMap` reads these with
+     * `getComputedStyle` and passes the RESOLVED values into
+     * `buildAdminMapStyle`. They live here anyway so dark mode is a palette
+     * swap and nothing else, and so the basemap cannot drift from the surface
+     * it sits on.
+     * Deliberately MUTED: this basemap is the backdrop to the data circles,
+     * and anything with presence competes with the only marks that carry a
+     * number. Raw values, like the chart palette above. */
+    --map-land: #f6f4ef;
+    --map-water: #dbe7f2;
+    --map-green: #e8efe4;
+    --map-boundary: #c3cbd6;
+    --map-label: #6b7789;
+    --map-label-halo: #ffffff;
   }
 
   .dark {
@@ -96,6 +113,17 @@
     --chart-serious: #ec835a;
     --chart-critical: #d03b3b;
     --chart-neutral: #7c8899;
+
+    /* ---- Admin map basemap, dark steps ----
+     * The same cartography re-stepped for the dark card surface. Land sits
+     * just above the card so the map reads as a distinct object, and the
+     * boundary lines stay the dimmest thing that is still visible. */
+    --map-land: #141c2b;
+    --map-water: #1b2b40;
+    --map-green: #182624;
+    --map-boundary: #38455c;
+    --map-label: #93a1b8;
+    --map-label-halo: #0d1420;
   }
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { MapPin } from 'lucide-react';
 
@@ -8,7 +9,8 @@ import { ChartCard, ChartEmpty, HorizontalBarChart, StatTile } from '@/component
 import { useNarrowViewport } from '@/components/admin/useNarrowViewport';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { chartColor } from '@/lib/admin/charts';
+import { chartColor, seriesColor } from '@/lib/admin/charts';
+import { hasTileSource, mapTilesBaseUrl } from '@/lib/admin/mapStyle';
 import {
   cityCount,
   cityRows,
@@ -21,10 +23,36 @@ import {
   topNWithOther,
   type GeographyMeasure,
 } from '@/lib/admin/stats';
+import type { AdminGeographyCity, AdminGeographyVenuePin } from '@/lib/admin/types';
 import type { StatsTabProps } from './types';
 
 /** The bar chart's cap. The table below it is the full (capped) list. */
 const CITY_BARS = 25;
+
+/** The map's drawn height, in px. Tall enough for the continental US to read. */
+const MAP_HEIGHT = 420;
+
+/**
+ * ⚠️ `ssr: false` IS LOAD-BEARING, NOT AN OPTIMISATION. `maplibre-gl` reaches
+ * for `window` and a WebGL context at module scope, so server-rendering it
+ * fails the BUILD, not just the page. Loading it lazily also keeps ~200 KB of
+ * renderer out of every other admin route's bundle — this is the only page
+ * that draws a map.
+ */
+const GeographyMap = dynamic(
+  () => import('./GeographyMap').then((m) => m.GeographyMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="flex items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground"
+        style={{ height: MAP_HEIGHT }}
+      >
+        Loading the map…
+      </div>
+    ),
+  },
+);
 
 /**
  * Geography — where users and pools ARE (#33 Part B).
@@ -250,6 +278,9 @@ export function GeographyTab({ data, days }: StatsTabProps) {
       </div>
 
       <MapPanel
+        cities={geography?.cities}
+        venuePinList={geography?.exactVenuePools}
+        measure={measure}
         withPoint={mappable.withPoint}
         withoutPoint={mappable.withoutPoint}
         venuePins={geography?.exactVenuePools.length}
@@ -261,87 +292,116 @@ export function GeographyTab({ data, days }: StatsTabProps) {
 }
 
 /**
- * The map, as an explained empty state.
+ * The map.
  *
- * ⚠️ This is NOT "no data" and must never read as it. The data is here and the
- * counts below prove it; what is missing is the RENDERER. `maplibre-gl` is not
- * a dependency of this repo, so there is nothing yet to draw the markers with.
+ * ⚠️ IT WAS AN EXPLAINED EMPTY STATE FOR MOST OF #33's LIFE, AND THE REASON IS
+ * WORTH KEEPING. The tiles CDN served correct ranged reads but carried no
+ * `Access-Control-Allow-Origin` and refused the preflight, so a browser map
+ * was impossible whatever we wrote — adding `maplibre-gl` then would have
+ * shipped a blank canvas failing in the console instead of a panel that
+ * explained itself. poolmobile#649 fixed the CORS configuration; verified live
+ * before this was built: a ranged `GET` returns 206 with
+ * `access-control-allow-origin: *` and `access-control-expose-headers` naming
+ * `Content-Range` (pmtiles cannot read a byte range without it), the glyph PBFs
+ * carry the same headers, and the preflight answers 200.
  *
- * ⚠️ AND IT IS NO LONGER BLOCKED — do not restore the old copy. This panel used
- * to say the tiles were unreadable from a browser, and that was true: a ranged
- * `GET` on `basemap/us.pmtiles` returned 206 with a correct `content-range`,
- * but carried no `Access-Control-Allow-Origin`, and the `OPTIONS` preflight
- * returned 403. poolmobile#649 shipped the CORS configuration and the fix is
- * live — the same ranged `GET` now returns 206 WITH `access-control-allow-
- * origin: *` and `access-control-expose-headers` naming `Content-Range`
- * (pmtiles needs that one to read a byte range at all), and the preflight
- * answers 200. Whoever builds this can add the dependency and go.
+ * ⚠️ THE MAP IS NEVER THE ONLY ROUTE TO THE DATA, and the panel below it is not
+ * decoration. A canvas carries no text, so it is unreadable to a screen reader
+ * and unsearchable; the city table further down this tab is the accessible
+ * equivalent and stays the complete answer.
+ *
+ * ⚠️ AND IT STILL SAYS WHAT IT COULD NOT PLOT. `mappableCities` counts the
+ * cities with no point — the server has neither a curated anchor nor a public
+ * pool to average — and those are real users the map silently omits. A map
+ * looks complete by its nature, so the count of what is missing from it is
+ * printed underneath rather than left to be inferred (#116's rule, applied to
+ * a surface that has no empty state to hang it on).
  */
 function MapPanel({
+  cities,
+  venuePinList,
+  measure,
   withPoint,
   withoutPoint,
   venuePins,
   venuePinsTruncated,
   loaded,
 }: {
+  cities: AdminGeographyCity[] | undefined;
+  venuePinList: AdminGeographyVenuePin[] | undefined;
+  measure: GeographyMeasure;
   withPoint: number;
   withoutPoint: number;
   venuePins: number | undefined;
   venuePinsTruncated: boolean | undefined;
   loaded: boolean;
 }) {
+  const baseUrl = mapTilesBaseUrl();
+  const configured = hasTileSource(baseUrl);
+  const coverage = (
+    <p className="mt-3 text-xs text-muted-foreground">
+      Plotted: <strong className="tabular-nums">{withPoint}</strong>{' '}
+      {withPoint === 1 ? 'city' : 'cities'} with a point
+      {withoutPoint > 0 && (
+        <>
+          {' '}
+          — ⚠️ <span className="tabular-nums">{withoutPoint}</span> not on the map
+          (no curated anchor and no public pool to average), so the table below
+          lists more than you can see here
+        </>
+      )}
+      {venuePins !== undefined && (
+        <>
+          . <strong className="tabular-nums">{venuePins}</strong> exact-venue{' '}
+          {venuePins === 1 ? 'pin' : 'pins'}
+          {venuePinsTruncated ? ' (capped)' : ''}
+        </>
+      )}
+      . City points sit on a coarsened grid; no individual&apos;s location is here.
+    </p>
+  );
+
   return (
     <ChartCard
       title="Map"
-      description="One marker per city, sized by count, plus exact pins for pools that opted into showing their venue"
-      aside={
-        <span className="whitespace-nowrap rounded-full border border-amber-500/50 bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
-          Renderer not built
-        </span>
-      }
+      description="One circle per city — AREA is the count, not radius — plus exact pins for pools that opted into showing their venue"
     >
       {!loaded ? (
         <ChartEmpty
           reason="unavailable"
           detail="The geography metric did not answer, so there is nothing to plot either way."
         />
-      ) : (
+      ) : !configured ? (
+        // ⚠️ Unset is a first-class state, not a crash: a local checkout
+        // without the env var, or an environment where the CDN was never
+        // configured. Say which, rather than rendering a broken canvas.
         <div className="flex flex-col items-center gap-3 py-8 text-center">
           <MapPin className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
-          <p className="max-w-prose text-sm font-medium text-amber-700 dark:text-amber-400">
-            The map itself is not built yet — this is missing work, not missing
-            data and no longer a blocked dependency.
+          <p className="max-w-prose text-sm font-medium">
+            No map tiles origin is configured for this deployment.
           </p>
           <p className="max-w-prose text-xs text-muted-foreground">
-            The tiles CDN used to refuse browser reads, which is why this panel
-            existed. poolmobile#649 shipped the CORS rule and it is live: a
-            ranged request for the basemap returns 206 with
-            <code className="mx-1">Access-Control-Allow-Origin</code>
-            and the preflight succeeds. What is left is the renderer —{' '}
-            <code>maplibre-gl</code> is not a dependency of this app yet. The
-            native app reads the same tiles directly and was never affected.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Ready to plot the moment it is drawn:{' '}
-            <strong className="tabular-nums">{withPoint}</strong>{' '}
-            {withPoint === 1 ? 'city has' : 'cities have'} a point
-            {withoutPoint > 0 && (
-              <>
-                {' '}
-                (<span className="tabular-nums">{withoutPoint}</span> without one — no
-                curated anchor and no public pool to average)
-              </>
-            )}
-            {venuePins !== undefined && (
-              <>
-                , and <strong className="tabular-nums">{venuePins}</strong> exact-venue{' '}
-                {venuePins === 1 ? 'pin' : 'pins'}
-                {venuePinsTruncated ? ' (capped)' : ''}
-              </>
-            )}
-            .
+            Set <code>NEXT_PUBLIC_MAP_TILES_BASE_URL</code> to the CloudFront
+            distribution in front of the tiles bucket. This says nothing about
+            the data — the city table below is unaffected.
           </p>
         </div>
+      ) : (
+        <>
+          <GeographyMap
+            baseUrl={baseUrl}
+            cities={cities}
+            venuePins={venuePinList}
+            measure={measure}
+            // The same hue the city bar chart uses, so a city reads as the same
+            // thing in both panels; venues take a second slot because they are
+            // a different KIND of mark, not a bigger one.
+            accent={seriesColor(0)}
+            venueAccent={seriesColor(1)}
+            height={MAP_HEIGHT}
+          />
+          {coverage}
+        </>
       )}
     </ChartCard>
   );

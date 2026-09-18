@@ -55,6 +55,17 @@ export async function serveAdminFixtures(
   page: Page,
   { overrides = {}, fail = [] }: OfflineOptions = {},
 ): Promise<void> {
+  // ⚠️ THE MAP TILES ARE NOT PART OF THE API AND WOULD OTHERWISE GO OUT TO THE
+  // REAL CDN. `NEXT_PUBLIC_MAP_TILES_BASE_URL` has a committed default, so the
+  // Geography map really does try to fetch the basemap archive and its glyphs
+  // from CloudFront — from an "offline" spec, over the network, on every run.
+  // These specs are offline by construction and must stay that way, so the
+  // basemap is refused here and the map's own failure path is what renders.
+  // That path is a first-class state worth exercising anyway: a browser with no
+  // WebGL reaches it too.
+  await page.route('**/*.pmtiles*', (route: Route) => route.abort('failed'));
+  await page.route('**/fonts/**', (route: Route) => route.abort('failed'));
+
   await page.route('**/admin/api/**', async (route: Route) => {
     const path = new URL(route.request().url()).pathname.replace(/^\/admin\/api\//, '');
 
