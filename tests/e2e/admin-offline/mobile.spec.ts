@@ -99,19 +99,30 @@ test.describe('Stats at phone width', () => {
 });
 
 test.describe('Nav at phone width', () => {
-  test('collapses to a hamburger, and the environment stays on the BAR', async ({ page }) => {
-    // ⚠️ The env badge must never move inside the menu. It is the #112 SAFETY
-    // signal, and a signal you have to open a menu to see is not one.
+  test('collapses to a hamburger, and the environment is stated ABOVE it', async ({ page }) => {
+    // ⚠️ THIS SPEC USED TO PIN THE OPPOSITE, and the change is deliberate
+    // (2026-09-18). The bar carried a "Pool Admin · Staging" wordmark-and-badge
+    // that repeated, less well, what the `EnvBanner` directly above already
+    // says: "You are on STAGING", what that MEANS, and the switcher. The old
+    // argument for keeping it — that it survives the banner scrolling away —
+    // did not hold: neither element is `sticky` or `fixed`, so they scroll off
+    // together a few pixels apart.
+    //
+    // The #112 safety requirement is unchanged and still asserted, just at its
+    // real source: the banner, plus the production tint on this bar.
     await serveAdminFixtures(page);
     await page.goto('/admin/stats');
 
-    // ⚠️ `.first()`: BOTH layout branches are in the DOM (the desktop row is
-    // `hidden lg:flex`), so a TEXT query matches twice while a role query sees
-    // only the visible one — `display: none` is out of the accessibility tree.
-    await expect(page.getByText('Pool Admin').first()).toBeInViewport();
-    await expect(
-      page.getByTitle(/Insights are for the staging environment/).first(),
-    ).toBeInViewport();
+    // The environment is stated, in full, above the nav.
+    await expect(page.getByRole('region', { name: /Current Pool environment/ })).toBeInViewport();
+    await expect(page.getByText('You are on')).toBeInViewport();
+
+    // ⚠️ And the duplicate is GONE from both layout branches. `.first()` is not
+    // enough here: `toHaveCount(0)` over the whole page is the assertion,
+    // because BOTH branches are in the DOM (the desktop row is `hidden lg:flex`)
+    // and a badge left behind in the hidden one would come back at width.
+    await expect(page.getByText('Pool Admin')).toHaveCount(0);
+    await expect(page.getByTitle(/Insights are for the staging environment/)).toHaveCount(0);
 
     // Closed: the destinations are not on screen, so nothing can scrunch.
     await expect(page.getByRole('navigation', { name: 'Admin' })).toHaveCount(0);
