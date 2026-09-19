@@ -79,7 +79,12 @@ test.describe('Stats', () => {
 
     await openTab(page, 'Geography');
     await expect(page.getByText('Users by city')).toBeVisible();
-    await expect(page.getByText('Every city')).toBeVisible();
+    // ⚠️ `exact` — "Every city" also appears inside two longer descriptions
+    // ("Rolled up over every city, before the cap"), and a substring match
+    // resolves to three elements and fails strict mode. This spec had never
+    // actually run: the admin project could not log in, so the ambiguity sat
+    // here unnoticed from the day it was written.
+    await expect(page.getByText('Every city', { exact: true })).toBeVisible();
 
     // Health links into Errors & Health rather than duplicating it.
     await openTab(page, 'Health');
@@ -148,19 +153,27 @@ test.describe('Stats', () => {
     await expect(page.getByRole('region', { name: 'Health' })).toContainText('Live');
   });
 
-  test('a panel that cannot be served says WHY, never "no data"', async ({ page }) => {
+  test('the two by-decision panels are now REAL, against the live API', async ({ page }) => {
+    // ⚠️ THIS SPEC USED TO ASSERT THE OPPOSITE, and the reversal is the point.
+    // The Activity trend and the Money volume panels were empty by a
+    // written-down decision (poolmobile#648 and #647). Both shipped on
+    // 2026-09-18, so a panel still refusing to show a figure the API now
+    // returns would be worse than one that never had it — nobody looks twice.
+    //
+    // This runs against the LIVE staging API, so it also proves the server
+    // actually serves both, which no fixture can.
     await page.goto('/admin/stats');
 
-    // The two panels that are empty by a written-down decision. This is the
-    // #116 rule at its sharpest: an unexplained empty chart lets "we do not
-    // serve this" pass for "nothing is happening".
     await openTab(page, 'Activity');
-    await expect(page.getByText('The API does not serve this yet.').first()).toBeVisible();
-    await expect(page.getByText(/poolmobile#648/)).toBeVisible();
+    await expect(page.getByText('DAU / WAU / MAU over time')).toBeVisible();
+    await expect(page.getByText(/poolmobile#648/)).toHaveCount(0);
+    await expect(page.getByText('The API does not serve this yet.')).toHaveCount(0);
 
     await openTab(page, 'Money');
-    await expect(page.getByText('Volume in cents')).toBeVisible();
-    await expect(page.getByText(/poolmobile#647/)).toBeVisible();
+    await expect(page.getByText('Money moved per day')).toBeVisible();
+    await expect(page.getByText(/deliberately not served/)).toHaveCount(0);
+    // The one panel still empty by decision is gone from this page entirely.
+    await expect(page.getByText(/poolmobile#647/)).toHaveCount(0);
   });
 });
 
