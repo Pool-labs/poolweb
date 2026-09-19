@@ -66,6 +66,51 @@ test.describe('Geography tab (fixtures)', () => {
     await expect(map).not.toContainText('not built yet');
   });
 
+  test('the map canvas stays INSIDE its card', async ({ page }) => {
+    /**
+     * ⚠️ THE GLITCH THIS EXISTS FOR WAS REPORTED FROM THE LIVE SITE: the map
+     * painted at the TOP OF THE PAGE, nowhere near its card.
+     *
+     * MapLibre positions its canvas absolutely, so it needs a positioned
+     * ancestor. `.maplibregl-map { position: relative }` comes from MapLibre's
+     * own stylesheet — which was imported inside a component loaded through
+     * `next/dynamic({ ssr: false })`, so it landed in the dynamic chunk and was
+     * not in effect when the canvas first painted. It now lives in
+     * `globals.css`, and the container carries `relative` as well.
+     *
+     * ⚠️ THIS TEST DID NOT CATCH THAT BUG, AND THE NOTE IS HERE SO NOBODY
+     * TRUSTS IT TO. It was written for it, the fix was then reverted
+     * underneath it, and the suite stayed GREEN — because the bug is a TIMING
+     * one: by the time any assertion runs, the dynamic chunk carrying the
+     * stylesheet has loaded and the canvas sits where it belongs. The real
+     * guard is the source scan in `tests/unit/admin/mapStylesheet.test.ts`,
+     * which is deterministic.
+     *
+     * What this DOES hold is the standing invariant — the canvas belongs
+     * inside its card — which is cheap here, needs no network (the canvas
+     * exists whether or not a tile ever arrives) and would catch a layout
+     * change that moved it for some other reason.
+     */
+    await serveAdminFixtures(page);
+    await page.goto('/admin/stats');
+    await page.getByRole('tab', { name: 'Geography' }).click();
+
+    const card = page.getByText('Map', { exact: true }).locator('xpath=../../..');
+    const canvas = page.locator('canvas').first();
+    await expect(canvas).toBeAttached();
+
+    const cardBox = await card.boundingBox();
+    const canvasBox = await canvas.boundingBox();
+    expect(cardBox).not.toBeNull();
+    expect(canvasBox).not.toBeNull();
+
+    // Top edge within the card, not at the top of the document.
+    expect(canvasBox!.y).toBeGreaterThanOrEqual(cardBox!.y - 2);
+    expect(canvasBox!.y).toBeLessThan(cardBox!.y + cardBox!.height);
+    // And horizontally within it too, so a half-escaped canvas fails as well.
+    expect(canvasBox!.x).toBeGreaterThanOrEqual(cardBox!.x - 2);
+  });
+
   test('a basemap that cannot load says so, and never renders a silent blank', async ({
     page,
   }) => {
