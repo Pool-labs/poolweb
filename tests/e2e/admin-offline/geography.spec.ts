@@ -50,8 +50,9 @@ test.describe('Geography tab (fixtures)', () => {
     await serveAdminFixtures(page);
     await page.goto('/admin/stats');
     await page.getByRole('tab', { name: 'Geography' }).click();
+    await page.getByRole('tab', { name: 'Map' }).click();
 
-    const map = page.getByText('Map', { exact: true }).locator('xpath=../../..');
+    const map = page.getByText('Map', { exact: true }).last().locator('xpath=../../..');
     await expect(map).toContainText('Plotted:');
     await expect(map).toContainText('not on the map');
     await expect(map).toContainText('the table below lists more than you can see');
@@ -64,6 +65,44 @@ test.describe('Geography tab (fixtures)', () => {
     // next reader to fix something that is already done.
     await expect(map).not.toContainText('not readable from a browser yet');
     await expect(map).not.toContainText('not built yet');
+  });
+
+  test('MapLibre ACCEPTS the data layers — no var() reaches the GPU', async ({ page }) => {
+    /**
+     * ⚠️ THE BUG THIS EXISTS FOR SHIPPED, AND IT WAS INVISIBLE. The city
+     * circles were painted with `seriesColor(0)`, which returns
+     * `var(--chart-series-1)`. MapLibre parses paint properties for the GPU and
+     * cannot resolve a CSS custom property, so it REFUSED both data layers:
+     *
+     *   layers.city-circles.paint.circle-color: color expected,
+     *     "var(--chart-series-1)" found
+     *
+     * The basemap rendered perfectly, the panel reported "Plotted: 2 cities",
+     * and nothing was drawn. A map that looks healthy and plots nothing is the
+     * worst version of this — the reader concludes there is no data.
+     *
+     * The same trap is documented for the BASEMAP palette, which resolves its
+     * tokens through `getComputedStyle`, and was then walked into anyway for
+     * the data marks. So this asserts the outcome rather than the mechanism:
+     * MapLibre accepted every layer. It catches any invalid paint value, not
+     * just a colour, and it needs no network.
+     */
+    const rejected: string[] = [];
+    page.on('console', (message) => {
+      const text = message.text();
+      if (text.includes('[admin map]')) rejected.push(text);
+    });
+
+    await serveAdminFixtures(page);
+    await page.goto('/admin/stats');
+    await page.getByRole('tab', { name: 'Geography' }).click();
+    await page.getByRole('tab', { name: 'Map' }).click();
+    await expect(page.locator('canvas').first()).toBeAttached();
+    // Give MapLibre a beat to parse the style and add the layers.
+    await page.waitForTimeout(1500);
+
+    const paintErrors = rejected.filter((line) => /expected/.test(line));
+    expect(paintErrors, `MapLibre refused a layer:\n${paintErrors.join('\n')}`).toEqual([]);
   });
 
   test('the map canvas stays INSIDE its card', async ({ page }) => {
@@ -94,8 +133,9 @@ test.describe('Geography tab (fixtures)', () => {
     await serveAdminFixtures(page);
     await page.goto('/admin/stats');
     await page.getByRole('tab', { name: 'Geography' }).click();
+    await page.getByRole('tab', { name: 'Map' }).click();
 
-    const card = page.getByText('Map', { exact: true }).locator('xpath=../../..');
+    const card = page.getByText('Map', { exact: true }).last().locator('xpath=../../..');
     const canvas = page.locator('canvas').first();
     await expect(canvas).toBeAttached();
 
@@ -122,12 +162,16 @@ test.describe('Geography tab (fixtures)', () => {
     await serveAdminFixtures(page);
     await page.goto('/admin/stats');
     await page.getByRole('tab', { name: 'Geography' }).click();
+    await page.getByRole('tab', { name: 'Map' }).click();
 
-    const map = page.getByText('Map', { exact: true }).locator('xpath=../../..');
+    const map = page.getByText('Map', { exact: true }).last().locator('xpath=../../..');
     await expect(map.getByText('The map could not be drawn.')).toBeVisible();
     await expect(map).toContainText('says nothing about where your users are');
 
-    // And the data beside it is untouched — the failure is scoped to the canvas.
+    // ⚠️ And the data is untouched — the failure is scoped to the canvas. It
+    // now lives on the sibling sub-tab, so this crosses back to prove it: a
+    // basemap that cannot draw must not cost the reader the actual figures.
+    await page.getByRole('tab', { name: 'Breakdown' }).click();
     await expect(page.getByText('Columbia, MO').first()).toBeVisible();
   });
 

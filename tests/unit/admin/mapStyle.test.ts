@@ -7,11 +7,13 @@ import {
   buildAdminMapStyle,
   buildGlyphsUrl,
   buildPmtilesUrl,
+  circleColorExpression,
   circleRadiusExpression,
   cityFeatures,
   hasTileSource,
   maxCount,
   venueFeatures,
+  type MapDataPalette,
   type MapPalette,
 } from '@/lib/admin/mapStyle';
 import { AdminGeographyCentroidSource } from '@/lib/admin/types';
@@ -236,5 +238,44 @@ describe('maxCount', () => {
 
   it('is 0 for an empty collection, so the ramp goes flat instead of NaN', () => {
     expect(maxCount({ type: 'FeatureCollection', features: [] })).toBe(0);
+  });
+});
+
+describe('circleColorExpression', () => {
+  const DATA: MapDataPalette = {
+    circleLow: '#93c5fd',
+    circleHigh: '#1d4ed8',
+    circleStroke: '#1e3a8a',
+    venue: '#eb6834',
+  };
+
+  it('never emits a CSS variable — the GPU cannot resolve one', () => {
+    /**
+     * ⚠️ THE BUG THIS SHIPPED WITH. The circles were painted with
+     * `seriesColor(0)`, which returns `var(--chart-series-1)`. MapLibre parses
+     * paint properties for the GPU, so it REFUSED the whole layer —
+     * `circle-color: color expected, "var(--chart-series-1)" found` — and the
+     * map rendered a perfect basemap with nothing plotted on it.
+     */
+    const expression = JSON.stringify(circleColorExpression(100, DATA));
+    expect(expression).not.toContain('var(');
+    expect(expression).toContain('#93c5fd');
+    expect(expression).toContain('#1d4ed8');
+  });
+
+  it('ramps light → dark by count, on the SAME scale as the radius', () => {
+    // Sequential, one hue, and `sqrt` so colour and area agree about what a
+    // count means — redundant encoding, which is the point.
+    const expression = circleColorExpression(100, DATA) as unknown[];
+    expect(expression[0]).toBe('interpolate');
+    expect(expression[2]).toEqual(['sqrt', ['get', 'count']]);
+    expect(expression[4]).toBe(DATA.circleLow);
+    expect(expression[6]).toBe(DATA.circleHigh);
+  });
+
+  it('is a flat colour when there is no spread to ramp across', () => {
+    // One city, or all tied: a ramp would imply a difference that is not there.
+    expect(circleColorExpression(1, DATA)).toBe(DATA.circleHigh);
+    expect(circleColorExpression(0, DATA)).toBe(DATA.circleHigh);
   });
 });

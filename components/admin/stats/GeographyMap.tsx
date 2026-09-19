@@ -16,12 +16,15 @@ import {
   CITY_SOURCE_ID,
   MAP_CAMERA,
   MAP_FONTS,
+  VENUE_PIN,
   VENUE_SOURCE_ID,
   buildAdminMapStyle,
+  circleColorExpression,
   circleRadiusExpression,
   cityFeatures,
   maxCount,
   venueFeatures,
+  type MapDataPalette,
   type MapPalette,
 } from '@/lib/admin/mapStyle';
 import { GEOGRAPHY_MEASURE_LABEL, type GeographyMeasure } from '@/lib/admin/stats';
@@ -120,15 +123,33 @@ function readPalette(element: HTMLElement): MapPalette {
   };
 }
 
+/**
+ * Read the resolved DATA-mark colours off the document.
+ *
+ * ⚠️ NEVER PASS A `var(--…)` STRING INTO A MAPLIBRE PAINT PROPERTY. It is
+ * parsed for the GPU, cannot resolve a custom property, and refuses the whole
+ * layer with `circle-color: color expected`. The city circles did not exist at
+ * all for exactly this reason while the basemap rendered perfectly — the map
+ * looked healthy and plotted nothing. The fallbacks below are real colours so
+ * the marks survive even a missing token.
+ */
+function readDataPalette(element: HTMLElement): MapDataPalette {
+  const styles = getComputedStyle(element);
+  const read = (name: string, fallback: string): string =>
+    styles.getPropertyValue(name).trim() || fallback;
+  return {
+    circleLow: read('--map-circle-low', '#93c5fd'),
+    circleHigh: read('--map-circle-high', '#1d4ed8'),
+    circleStroke: read('--map-circle-stroke', '#1e3a8a'),
+    venue: read('--map-venue', '#eb6834'),
+  };
+}
+
 interface GeographyMapProps {
   baseUrl: string;
   cities: AdminGeographyCity[] | undefined;
   venuePins: AdminGeographyVenuePin[] | undefined;
   measure: GeographyMeasure;
-  /** Circle fill — the same hue the bar chart uses for this measure. */
-  accent: string;
-  /** Venue-pin fill, deliberately a different hue from the circles. */
-  venueAccent: string;
   height: number;
 }
 
@@ -137,8 +158,6 @@ export function GeographyMap({
   cities,
   venuePins,
   measure,
-  accent,
-  venueAccent,
   height,
 }: GeographyMapProps) {
   const container = useRef<HTMLDivElement | null>(null);
@@ -209,7 +228,11 @@ export function GeographyMap({
 
     const cityCollection = cityFeatures(cities, measure);
     const venueCollection = venueFeatures(venuePins);
-    const radius = circleRadiusExpression(maxCount(cityCollection));
+    const peak = maxCount(cityCollection);
+    const radius = circleRadiusExpression(peak);
+    // ⚠️ Resolved values, never `var(--…)` — see `readDataPalette`.
+    const data = readDataPalette(document.documentElement);
+    const fill = circleColorExpression(peak, data);
 
     const upsert = (id: string, data: unknown): void => {
       const existing = instance.getSource(id);
@@ -229,12 +252,14 @@ export function GeographyMap({
         type: 'circle',
         source: CITY_SOURCE_ID,
         paint: {
-          'circle-color': accent,
-          'circle-opacity': 0.55,
-          // A ring in the surface colour, so two overlapping circles read as
-          // two rather than merging into one larger blob.
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 1.5,
+          // Sequential ramp on the count — see `circleColorExpression`.
+          'circle-color': fill as never,
+          // Semi-transparent so two overlapping cities stay readable as two
+          // rather than merging into one solid blob.
+          'circle-opacity': CITY_CIRCLE.FILL_OPACITY,
+          'circle-stroke-color': data.circleStroke,
+          'circle-stroke-opacity': 0.9,
+          'circle-stroke-width': CITY_CIRCLE.STROKE_WIDTH,
           'circle-radius': radius as never,
         },
       });
@@ -264,15 +289,19 @@ export function GeographyMap({
         type: 'circle',
         source: VENUE_SOURCE_ID,
         paint: {
-          'circle-color': venueAccent,
-          'circle-radius': 4,
+          'circle-color': data.venue,
+          'circle-radius': VENUE_PIN.RADIUS,
+          // A white ring keeps a small warm dot legible on top of a large
+          // cool circle — the one place these two marks overlap.
           'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 1.5,
+          'circle-stroke-width': VENUE_PIN.STROKE_WIDTH,
         },
       });
     } else {
       instance.setPaintProperty('city-circles', 'circle-radius', radius as never);
-      instance.setPaintProperty('city-circles', 'circle-color', accent);
+      instance.setPaintProperty('city-circles', 'circle-color', fill as never);
+      instance.setPaintProperty('city-circles', 'circle-stroke-color', data.circleStroke);
+      instance.setPaintProperty('venue-pins', 'circle-color', data.venue);
     }
 
     // Hover readout. A circle whose size is its only encoding is unreadable
@@ -309,7 +338,7 @@ export function GeographyMap({
       instance.off('mouseleave', 'city-circles', onLeave);
       popup.remove();
     };
-  }, [ready, cities, venuePins, measure, accent, venueAccent]);
+  }, [ready, cities, venuePins, measure]);
 
   return (
     // ⚠️ `relative` is load-bearing, not spacing. MapLibre positions its canvas
