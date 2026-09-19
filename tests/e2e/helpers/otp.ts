@@ -50,11 +50,54 @@ function decodeQuotedPrintable(body: string): string {
     );
 }
 
+/**
+ * Decode every BASE64 MIME part of the message.
+ *
+ * ⚠️ THIS IS WHY THE ADMIN LOGIN COULD NOT READ ITS OWN OTP. The API sends a
+ * `multipart/alternative` whose text/plain AND text/html parts are both
+ * `Content-Transfer-Encoding: base64`. The plain part contains the sentence
+ * this file looks for, verbatim — but base64-encoded it is just a wall of
+ * letters, so scanning the raw message (or quoted-printable-decoding it, which
+ * is a no-op here) finds nothing and the login times out claiming no OTP
+ * arrived. The mail was always there; it was unreadable to us.
+ *
+ * ⚠️ AND THE HTML PART IS NOT A FALLBACK. It renders the digits in their own
+ * styled `<p>` with `letter-spacing`, so the words "verification code is" and
+ * the number are in DIFFERENT elements and the sentence never appears. Only
+ * the plain part can be matched — which is a reason to keep sending one.
+ */
+function decodeBase64Parts(rawMessage: string): string[] {
+  const decoded: string[] = [];
+
+  // Split on MIME boundaries; each chunk is headers, a blank line, then body.
+  for (const part of rawMessage.split(/\r?\n--/)) {
+    if (!/content-transfer-encoding:\s*base64/i.test(part)) continue;
+    const separator = part.search(/\r?\n\r?\n/);
+    if (separator === -1) continue;
+    const body = part.slice(separator).replace(/\s+/g, '');
+    if (!body) continue;
+    try {
+      decoded.push(Buffer.from(body, 'base64').toString('utf8'));
+    } catch {
+      // A part that will not decode simply has no code in it.
+    }
+  }
+
+  return decoded;
+}
+
 function extractCode(rawMessage: string): string | null {
-  const direct = OTP_SENTENCE.exec(rawMessage);
-  if (direct) return direct[1];
-  const decoded = OTP_SENTENCE.exec(decodeQuotedPrintable(rawMessage));
-  return decoded ? decoded[1] : null;
+  // Cheapest first: a plaintext message, then quoted-printable, then the
+  // base64 parts the API actually sends.
+  for (const candidate of [
+    rawMessage,
+    decodeQuotedPrintable(rawMessage),
+    ...decodeBase64Parts(rawMessage),
+  ]) {
+    const match = OTP_SENTENCE.exec(candidate);
+    if (match) return match[1];
+  }
+  return null;
 }
 
 async function scanOnce(
