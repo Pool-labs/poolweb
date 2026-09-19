@@ -15,7 +15,7 @@ import { cityCount, type GeographyMeasure } from './stats';
  * Discover is a street-level surface: somebody is looking for a pool at a
  * venue, so roads and buildings are the context that makes a pin mean
  * something. This map is the opposite question — "where are our users and
- * pools, across the country" — read at country and state zoom, where every one
+ * pools, across the world" — read at continent and country zoom, where every one
  * of those layers is pure noise behind the circles that carry the actual
  * answer. Rendering less is the correct behaviour here, and it also means far
  * less surface to drift out of sync between two repos that hand-copy from each
@@ -37,8 +37,19 @@ import { cityCount, type GeographyMeasure } from './stats';
  * carry the same headers, and the preflight answers 200.
  */
 
-/** Key of the `.pmtiles` region extract inside the bucket. Mobile's twin. */
-export const BASEMAP_KEY = 'basemap/us.pmtiles';
+/**
+ * Key of the `.pmtiles` basemap inside the bucket. Mobile's twin
+ * (poolmobile `MAP_TILES.BASEMAP_KEY`).
+ *
+ * ⚠️ THE WHOLE PLANET, zoom 0–15. It was `basemap/us.pmtiles`, a continental-US
+ * extract, and this map showed it: pan anywhere else and the land was blank,
+ * except the parts of Europe and Africa that happened to share a low-zoom tile
+ * with the US bounding box — which made it look like a deliberate crop rather
+ * than missing data. Pool launched internationally (poolmobile, 2026-09-19).
+ * The archive is read by range request, so this map fetches only the handful
+ * of low-zoom tiles it draws, never the 138 GB file.
+ */
+export const BASEMAP_KEY = 'basemap/world.pmtiles';
 /** Glyph (font PBF) prefix — self-hosted beside the tiles. */
 export const GLYPHS_KEY = 'fonts';
 
@@ -69,13 +80,19 @@ const SOURCE_LAYERS = {
 } as const;
 
 /**
- * Camera. A wide continental frame: this map's job is the shape of the whole
- * distribution, and opening zoomed into one city would misrepresent it.
+ * Camera. The WHOLE WORLD: this map's job is the shape of the whole
+ * distribution, and opening zoomed into one city — or, as it did until the
+ * international launch, onto the continental US — would misrepresent it.
+ *
+ * Centred slightly north of the equator because that is where the land (and so
+ * the users) is; zoom 1 fits the inhabited world in the admin card's width.
+ * `MIN_ZOOM` 0.5 rather than 0 so the world never shrinks to a stamp in the
+ * middle of the card.
  */
 export const MAP_CAMERA = {
-  CENTER: [-96.5, 38.5] as [number, number],
-  ZOOM: 3.2,
-  MIN_ZOOM: 1.5,
+  CENTER: [10, 25] as [number, number],
+  ZOOM: 1,
+  MIN_ZOOM: 0.5,
   MAX_ZOOM: 14,
 } as const;
 
