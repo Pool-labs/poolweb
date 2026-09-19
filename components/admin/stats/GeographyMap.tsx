@@ -37,14 +37,26 @@ import 'maplibre-gl/dist/maplibre-gl.css';
  * imports this through `next/dynamic` with `ssr: false`. Importing it directly
  * from a server component breaks the build, not just the page.
  *
- * ⚠️ NAMED IMPORTS, NEVER A DEFAULT. `maplibre-gl` v6 is pure ESM and exports
- * NO default — `import maplibregl from 'maplibre-gl'` gives `undefined` at
- * runtime. It type-checks perfectly, because `allowSyntheticDefaultImports`
- * invents the default for the compiler, so the first sign of trouble is
- * `Cannot read properties of undefined (reading 'addProtocol')` in the browser,
- * which takes the whole React subtree down with it — the Geography tab's charts
- * vanished too. Measured here, not theorised: `pnpm typecheck` was green while
- * the page was broken.
+ * ⚠️ MAPLIBRE-GL IS PINNED TO v5 AND MUST STAY THERE. On v6 this map renders a
+ * completely BLANK canvas — no error, no empty state, no console warning, just
+ * a correctly-sized canvas with nothing drawn. Measured against the real CDN by
+ * counting requests to it: v6 makes ONE (the pmtiles header, then zero tile
+ * ranges and zero glyph PBFs); v5 makes nine, carrying real tile data and the
+ * fonts. v6 appears to load tiles somewhere a main-thread `addProtocol` handler
+ * no longer reaches — it exports `importScriptInWorkers`, which is how a custom
+ * protocol would be given to the workers. `pmtiles` declares no peer dependency
+ * on maplibre, so a routine upgrade resolves a broken pair silently.
+ * `tests/unit/admin/mapDeps.test.ts` is the guard, and carries the full
+ * measurement and what to re-run before changing it.
+ *
+ * ⚠️ NAMED IMPORTS, NEVER A DEFAULT. `maplibre-gl` exports NO default —
+ * `import maplibregl from 'maplibre-gl'` gives `undefined` at runtime. It
+ * type-checks perfectly, because `allowSyntheticDefaultImports` invents the
+ * default for the compiler, so the first sign of trouble is `Cannot read
+ * properties of undefined (reading 'addProtocol')` in the browser, which takes
+ * the whole React subtree down with it — the Geography tab's charts vanished
+ * too. Measured here, not theorised: `pnpm typecheck` was green while the page
+ * was broken.
  *
  * ⚠️ THE PMTILES PROTOCOL IS REGISTERED ONCE PER PAGE, GLOBALLY. MapLibre keeps
  * protocol handlers in module state, so registering per mount would stack
