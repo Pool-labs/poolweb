@@ -89,6 +89,20 @@
     --map-boundary: #c3cbd6;
     --map-label: #6b7789;
     --map-label-halo: #ffffff;
+
+    /* ---- Admin map DATA marks ----
+     * ⚠️ REAL VALUES, RESOLVED BEFORE THEY REACH WEBGL. MapLibre paint
+     * properties are parsed by the GPU pipeline and cannot resolve a CSS
+     * custom property: handing it `var(--x)` makes it reject the whole layer
+     * with "color expected". That is exactly how the city circles silently did
+     * not exist while the basemap drew perfectly. `GeographyMap` reads these
+     * with `getComputedStyle` and passes the resolved strings.
+     * Low → high is a SEQUENTIAL ramp on the city's count: one hue, light to
+     * dark, which is the correct encoding for magnitude. */
+    --map-circle-low: #93c5fd;
+    --map-circle-high: #1d4ed8;
+    --map-circle-stroke: #1e3a8a;
+    --map-venue: #eb6834;
   }
 
   .dark {
@@ -140,6 +154,13 @@
     --map-boundary: #38455c;
     --map-label: #93a1b8;
     --map-label-halo: #0d1420;
+
+    /* Data marks, re-stepped for the dark basemap: the ramp has to stay
+     * visible against #141c2b land, so it runs brighter rather than darker. */
+    --map-circle-low: #3b82f6;
+    --map-circle-high: #93c5fd;
+    --map-circle-stroke: #dbeafe;
+    --map-venue: #fb923c;
   }
 }
 

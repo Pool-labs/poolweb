@@ -9,7 +9,8 @@ import { ChartCard, ChartEmpty, HorizontalBarChart, StatTile } from '@/component
 import { useNarrowViewport } from '@/components/admin/useNarrowViewport';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { chartColor, seriesColor } from '@/lib/admin/charts';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { chartColor } from '@/lib/admin/charts';
 import { hasTileSource, mapTilesBaseUrl } from '@/lib/admin/mapStyle';
 import {
   cityCount,
@@ -29,8 +30,15 @@ import type { StatsTabProps } from './types';
 /** The bar chart's cap. The table below it is the full (capped) list. */
 const CITY_BARS = 25;
 
-/** The map's drawn height, in px. Tall enough for the continental US to read. */
-const MAP_HEIGHT = 420;
+/**
+ * The map's drawn height, in px.
+ *
+ * ⚠️ Sized for its OWN sub-tab, not for a strip under the charts. At 420px,
+ * stacked beneath the bars and the table, the continent was wide and flat and
+ * the circles were too small to compare. With the view to itself it can be
+ * tall enough to actually read.
+ */
+const MAP_HEIGHT = 620;
 
 /**
  * ⚠️ `ssr: false` IS LOAD-BEARING, NOT AN OPTIMISATION. `maplibre-gl` reaches
@@ -78,6 +86,9 @@ const GeographyMap = dynamic(
 export function GeographyTab({ data, days }: StatsTabProps) {
   const { geography } = data;
   const [measure, setMeasure] = useState<GeographyMeasure>('users');
+  // Breakdown first: the table is the complete answer and the map is the
+  // readable one. A reader arriving at Geography wants the numbers.
+  const [view, setView] = useState('breakdown');
   // A 180px category axis on a 390px screen leaves the bars under half the
   // card; recharts wants a number, so this cannot be a responsive class.
   const narrow = useNarrowViewport();
@@ -125,6 +136,36 @@ export function GeographyTab({ data, days }: StatsTabProps) {
         )}
       </div>
 
+      {/*
+        ⚠️ THE MAP GETS ITS OWN SUB-TAB, and the reason is room. Stacked under
+        the bars and the table it had a 420px strip of a continent, which is
+        enough to see that circles exist and not enough to read them. On its own
+        view it takes the full height and the marks become legible.
+
+        Two views over ONE dataset and ONE measure toggle — the toggle sits
+        above this switch on purpose, so moving between Breakdown and Map never
+        silently changes what is being counted.
+      */}
+      <Tabs value={view} onValueChange={setView} className="w-full">
+        <TabsList>
+          <TabsTrigger value="breakdown">Breakdown</TabsTrigger>
+          <TabsTrigger value="map">Map</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="map" className="mt-4">
+          <MapPanel
+            cities={geography?.cities}
+            venuePinList={geography?.exactVenuePools}
+            measure={measure}
+            withPoint={mappable.withPoint}
+            withoutPoint={mappable.withoutPoint}
+            venuePins={geography?.exactVenuePools.length}
+            venuePinsTruncated={geography?.exactVenuePoolsTruncated}
+            loaded={geography !== null}
+          />
+        </TabsContent>
+
+        <TabsContent value="breakdown" className="mt-4 space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatTile
           label="Cities"
@@ -276,17 +317,8 @@ export function GeographyTab({ data, days }: StatsTabProps) {
           />
         </ChartCard>
       </div>
-
-      <MapPanel
-        cities={geography?.cities}
-        venuePinList={geography?.exactVenuePools}
-        measure={measure}
-        withPoint={mappable.withPoint}
-        withoutPoint={mappable.withoutPoint}
-        venuePins={geography?.exactVenuePools.length}
-        venuePinsTruncated={geography?.exactVenuePoolsTruncated}
-        loaded={geography !== null}
-      />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -393,11 +425,6 @@ function MapPanel({
             cities={cities}
             venuePins={venuePinList}
             measure={measure}
-            // The same hue the city bar chart uses, so a city reads as the same
-            // thing in both panels; venues take a second slot because they are
-            // a different KIND of mark, not a bigger one.
-            accent={seriesColor(0)}
-            venueAccent={seriesColor(1)}
             height={MAP_HEIGHT}
           />
           {coverage}

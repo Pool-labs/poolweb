@@ -79,12 +79,28 @@ export const MAP_CAMERA = {
   MAX_ZOOM: 14,
 } as const;
 
-/** Circle radii in px, interpolated across the count range. */
+/**
+ * Circle geometry.
+ *
+ * ⚠️ `MIN_RADIUS` is a VISIBILITY floor, not a scale point. A city with one
+ * user still has to be findable on a continental map, so the ramp starts well
+ * above "a dot"; below about 7px a semi-transparent circle reads as noise on
+ * the basemap.
+ */
 export const CITY_CIRCLE = {
-  MIN_RADIUS: 5,
-  MAX_RADIUS: 26,
+  MIN_RADIUS: 8,
+  MAX_RADIUS: 34,
+  /** Semi-transparent so overlapping cities remain individually readable. */
+  FILL_OPACITY: 0.65,
+  STROKE_WIDTH: 2,
   /** Below this the label is omitted — it would collide with its neighbours. */
   LABEL_MIN_ZOOM: 3.5,
+} as const;
+
+/** The venue pin, which is a different KIND of mark, not a smaller circle. */
+export const VENUE_PIN = {
+  RADIUS: 5,
+  STROKE_WIDTH: 2,
 } as const;
 
 /**
@@ -239,6 +255,45 @@ export interface MapPalette {
   boundary: string;
   label: string;
   labelHalo: string;
+}
+
+/**
+ * The colours of the DATA marks, already resolved to real values.
+ *
+ * ⚠️ RESOLVED IS THE WHOLE POINT. MapLibre parses paint properties for the GPU
+ * and cannot read a CSS custom property — given `var(--chart-series-1)` it
+ * rejects the entire layer with `circle-color: color expected`. That is how the
+ * city circles came to not exist at all while the basemap rendered perfectly:
+ * the layer was refused, the map looked fine, and nothing was plotted.
+ */
+export interface MapDataPalette {
+  /** Sequential ramp for the city circles: fewest → most. */
+  circleLow: string;
+  circleHigh: string;
+  circleStroke: string;
+  venue: string;
+}
+
+/**
+ * Circle FILL as a MapLibre expression: a sequential ramp on the count.
+ *
+ * ⚠️ Colour here is REDUNDANT with size, deliberately. Both encode the same
+ * count, which is the one case where double-encoding is a feature: area is hard
+ * to judge precisely, and a darker circle reads as "more" at a glance and
+ * survives being small. One hue, light to dark — never a rainbow, which would
+ * imply the categories are unordered.
+ */
+export function circleColorExpression(max: number, palette: MapDataPalette): unknown {
+  if (max <= 1) return palette.circleHigh;
+  return [
+    'interpolate',
+    ['linear'],
+    ['sqrt', ['get', 'count']],
+    1,
+    palette.circleLow,
+    Math.sqrt(max),
+    palette.circleHigh,
+  ];
 }
 
 export function buildAdminMapStyle(baseUrl: string, palette: MapPalette): unknown {
