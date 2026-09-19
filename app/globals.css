@@ -1,3 +1,19 @@
+/* ⚠️ MAPLIBRE'S STYLESHEET LOADS HERE, NOT IN THE MAP COMPONENT, AND THAT IS A
+   BUG FIX rather than a preference. It used to be imported inside
+   `components/admin/stats/GeographyMap.tsx`, which is pulled in through
+   `next/dynamic({ ssr: false })` — so its CSS landed in the DYNAMIC chunk and
+   was applied only once that chunk had loaded and hydrated.
+
+   Until it did, `.maplibregl-map { position: relative }` was not in effect, and
+   MapLibre's absolutely-positioned canvas anchored to the nearest positioned
+   ancestor — i.e. escaped its card and painted at the TOP OF THE PAGE. Reported
+   from the live admin site as "the map renders at top of screen like a glitch".
+
+   An `@import` here puts it in the page's main stylesheet, which the browser
+   has before anything renders. `@import` must precede every rule in the file,
+   which is why it sits above the Tailwind directives. */
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

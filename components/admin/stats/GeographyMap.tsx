@@ -27,7 +27,11 @@ import {
 import { GEOGRAPHY_MEASURE_LABEL, type GeographyMeasure } from '@/lib/admin/stats';
 import type { AdminGeographyCity, AdminGeographyVenuePin } from '@/lib/admin/types';
 
-import 'maplibre-gl/dist/maplibre-gl.css';
+// ⚠️ MapLibre's stylesheet is imported in `app/globals.css`, NOT here. This
+// component is loaded through `next/dynamic({ ssr: false })`, so a CSS import
+// in this file lands in the dynamic chunk and is applied only after that chunk
+// hydrates — and until it is, the absolutely-positioned canvas escapes the card
+// and paints at the top of the page. See the note in globals.css.
 
 /**
  * The Geography map (poolweb#33), unblocked by poolmobile#649.
@@ -67,6 +71,22 @@ import 'maplibre-gl/dist/maplibre-gl.css';
  * answer; the cartography is context. If the CDN is unreachable, the style
  * fails and MapLibre emits `error` — the panel then says so in words rather
  * than showing an empty grey rectangle that reads as "no users anywhere".
+ *
+ * ⚠️ BUT ONLY AN ERROR *BEFORE* `load` IS FATAL, and the distinction is a bug
+ * fix. MapLibre emits `error` for transient, local things too — one tile that
+ * 404s, one glyph range that is missing from the fontstack — and the first
+ * version treated every one of them as fatal. A map that had drawn perfectly
+ * well was replaced, seconds later, by "The map could not be drawn." Reported
+ * from the live admin site.
+ *
+ * After `load`, an error means "something in this frame is missing", not "this
+ * map does not work", so it is logged to the console and the map keeps running.
+ *
+ * ⚠️ AND THE CONTAINER IS NEVER UNMOUNTED, which is the other half of the same
+ * fix. Swapping the container `<div>` out for a message while a live MapLibre
+ * instance still holds it leaves the canvas orphaned mid-teardown. The failure
+ * message is an OVERLAY inside the same container, so the element MapLibre was
+ * handed exists for the whole life of the component.
  */
 
 /** Registered at most once per page — see the note above. */
@@ -156,11 +176,23 @@ export function GeographyMap({
     map.current = instance;
     instance.addControl(new NavigationControl({ showCompass: false }), 'top-right');
 
-    // ⚠️ `error` covers the case that matters: the tiles or glyphs being
-    // unreachable. MapLibre reports it and carries on with a blank canvas,
-    // which is precisely the silent-empty state this panel exists to prevent.
-    instance.on('error', () => setFailed(true));
-    instance.on('load', () => setReady(true));
+    // ⚠️ Fatal ONLY before `load`. An error at that point means the style or the
+    // source never came up, which is the silent-blank-canvas state this panel
+    // exists to prevent. An error after it is one missing tile or glyph range,
+    // and tearing the whole map down for that is worse than the gap.
+    let loaded = false;
+    instance.on('load', () => {
+      loaded = true;
+      setReady(true);
+    });
+    instance.on('error', (event: { error?: Error }) => {
+      if (!loaded) {
+        setFailed(true);
+        return;
+      }
+      // eslint-disable-next-line no-console
+      console.warn('[admin map] non-fatal after load:', event?.error?.message ?? event);
+    });
 
     return () => {
       instance.remove();
@@ -279,33 +311,36 @@ export function GeographyMap({
     };
   }, [ready, cities, venuePins, measure, accent, venueAccent]);
 
-  if (failed) {
-    return (
-      <div
-        className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed p-6 text-center"
-        style={{ height }}
-      >
-        <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-          The map could not be drawn.
-        </p>
-        <p className="max-w-prose text-xs text-muted-foreground">
-          The basemap tiles or the browser&apos;s WebGL context were unavailable.
-          This says nothing about where your users are — the city table and the
-          roll-ups below are unaffected and remain the complete answer.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div
-      ref={container}
-      style={{ height }}
-      className="overflow-hidden rounded-md border"
-      // The canvas carries no text, so the figure is named for a screen reader
-      // and the table below is the real accessible route to the same data.
-      role="img"
-      aria-label={`Map of ${GEOGRAPHY_MEASURE_LABEL[measure].toLowerCase()} by city. The table below lists the same figures.`}
-    />
+    // ⚠️ `relative` is load-bearing, not spacing. MapLibre positions its canvas
+    // absolutely; without a positioned ancestor it anchors to the viewport and
+    // paints at the top of the page. The stylesheet (globals.css) sets this on
+    // `.maplibregl-map` too — this is the belt to that braces, because the
+    // symptom is bizarre enough to cost an hour to recognise.
+    <div className="relative" style={{ height }}>
+      <div
+        ref={container}
+        className="h-full w-full overflow-hidden rounded-md border"
+        // The canvas carries no text, so the figure is named for a screen reader
+        // and the table below is the real accessible route to the same data.
+        role="img"
+        aria-label={`Map of ${GEOGRAPHY_MEASURE_LABEL[measure].toLowerCase()} by city. The table below lists the same figures.`}
+      />
+      {failed && (
+        // An OVERLAY, never a replacement: the container above must stay
+        // mounted for the whole life of this component, because a live MapLibre
+        // instance is holding it.
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-md border border-dashed bg-card p-6 text-center">
+          <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+            The map could not be drawn.
+          </p>
+          <p className="max-w-prose text-xs text-muted-foreground">
+            The basemap tiles or the browser&apos;s WebGL context were unavailable.
+            This says nothing about where your users are — the city table and the
+            roll-ups below are unaffected and remain the complete answer.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
