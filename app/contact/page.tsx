@@ -13,17 +13,23 @@ export default function ContactPage() {
     message: "",
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle")
+  // "invalid" is the visitor's to fix; "failed" is ours. Telling someone to
+  // re-check their fields when our email provider is down sends them round in
+  // circles — that is what this page did while RESEND_API_KEY was missing.
+  const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "invalid" | "failed">("idle")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
     setSubmitStatus("idle")
 
+    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
+      setSubmitStatus("invalid")
+      setIsSubmitting(false)
+      return
+    }
+
     try {
-      if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
-        throw new Error("Please fill in all fields")
-      }
 
       const response = await fetch("/api/contact", {
         method: "POST",
@@ -33,15 +39,19 @@ export default function ContactPage() {
         body: JSON.stringify(formData),
       })
 
+      if (response.status === 400) {
+        setSubmitStatus("invalid")
+        return
+      }
       if (!response.ok) {
-        throw new Error("Failed to send message")
+        throw new Error(`Contact form returned ${response.status}`)
       }
 
       setSubmitStatus("success")
       setFormData({ name: "", email: "", message: "" })
     } catch (error) {
       console.error("Form submission error:", error)
-      setSubmitStatus("error")
+      setSubmitStatus("failed")
     } finally {
       setIsSubmitting(false)
     }
@@ -75,10 +85,23 @@ export default function ContactPage() {
                 </div>
               )}
 
-              {submitStatus === "error" && (
+              {submitStatus === "invalid" && (
                 <div className="mb-6 p-4 bg-pool-pink/15 border-2 border-navy rounded-2xl flex items-center gap-2 text-navy font-medium">
                   <AlertCircle size={20} className="text-pool-pink shrink-0" />
                   <span>Please make sure all fields are filled out correctly.</span>
+                </div>
+              )}
+
+              {submitStatus === "failed" && (
+                <div className="mb-6 p-4 bg-pool-pink/15 border-2 border-navy rounded-2xl flex items-center gap-2 text-navy font-medium">
+                  <AlertCircle size={20} className="text-pool-pink shrink-0" />
+                  <span>
+                    {"Something went wrong on our side and your message wasn't sent. Please email us at "}
+                    <a href="mailto:support@poolapp.co" className="underline font-bold">
+                      support@poolapp.co
+                    </a>
+                    {"."}
+                  </span>
                 </div>
               )}
 
