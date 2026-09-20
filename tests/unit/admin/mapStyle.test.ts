@@ -321,7 +321,16 @@ describe('place labels read English first', () => {
 
   it('is what the place-label layer actually uses', () => {
     // The helper being right buys nothing if the layer still asks for `name`.
-    const style = buildAdminMapStyle('https://cdn.example.com', PALETTE);
+    // `buildAdminMapStyle` returns `unknown` (the style spec is not a
+    // dependency here), so the shape is named at the call site like every
+    // other assertion in this file.
+    const style = buildAdminMapStyle('https://cdn.example.com', PALETTE) as {
+      layers: {
+        id: string;
+        type: string;
+        layout?: { 'text-field'?: unknown };
+      }[];
+    };
     const labels = style.layers.filter(
       (l) => l.type === 'symbol' && l.id.startsWith('place'),
     );
