@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BASEMAP_KEY,
   CITY_CIRCLE,
+  PLACE_NAME_EXPRESSION,
   MAP_CAMERA,
   MAP_SOURCE_ID,
   buildAdminMapStyle,
@@ -303,5 +304,30 @@ describe('the basemap and camera are GLOBAL (international launch)', () => {
   it('never lets the viewer zoom out past the world into a stamp', () => {
     expect(MAP_CAMERA.MIN_ZOOM).toBeGreaterThan(0);
     expect(MAP_CAMERA.MIN_ZOOM).toBeLessThanOrEqual(MAP_CAMERA.ZOOM);
+  });
+});
+
+describe('place labels read English first', () => {
+  // The raw `name` is whatever OpenStreetMap carries: Libya's cities are
+  // labelled in Tifinagh, which this English-only console cannot read and
+  // which Libyans do not write. English first, raw name only as a last resort.
+  it('prefers name:en and keeps name as the fallback, in that order', () => {
+    expect(PLACE_NAME_EXPRESSION).toEqual([
+      'coalesce',
+      ['get', 'name:en'],
+      ['get', 'name'],
+    ]);
+  });
+
+  it('is what the place-label layer actually uses', () => {
+    // The helper being right buys nothing if the layer still asks for `name`.
+    const style = buildAdminMapStyle('https://cdn.example.com', PALETTE);
+    const labels = style.layers.filter(
+      (l) => l.type === 'symbol' && l.id.startsWith('place'),
+    );
+    expect(labels.length).toBeGreaterThan(0);
+    for (const layer of labels) {
+      expect(layer.layout?.['text-field']).toEqual(PLACE_NAME_EXPRESSION);
+    }
   });
 });

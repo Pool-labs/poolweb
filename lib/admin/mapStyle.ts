@@ -66,6 +66,27 @@ export const MAP_FONTS = {
  */
 export const MAP_ATTRIBUTION = '© OpenStreetMap contributors';
 
+/**
+ * What a place label reads, in preference order.
+ *
+ * ⚠️ THE RAW `name` IS NOT "THE LOCAL LANGUAGE" — IT IS WHATEVER OPENSTREETMAP
+ * CARRIES, AND IT IS OFTEN A MINORITY SCRIPT. Found on a device the day the
+ * basemap went worldwide: every Libyan city is labelled in **Tifinagh**, the
+ * Amazigh alphabet (Tripoli is `ⵟⴰⵕⴰⴱⵍⵓⵙ`), while Tunisia's cities next door
+ * are in Arabic. Nothing was broken — the map drew `name` faithfully — but it
+ * is unreadable to this surface's audience, and not what Libyans write.
+ *
+ * This admin console is English-only (there is no language control anywhere in
+ * it), so English comes first and the raw `name` is the last resort rather
+ * than the first choice. The mobile app makes the same decision one step
+ * richer: it prefers the VIEWER's language before English.
+ */
+export const PLACE_NAME_EXPRESSION = [
+  'coalesce',
+  ['get', 'name:en'],
+  ['get', 'name'],
+];
+
 export const MAP_SOURCE_ID = 'protomaps';
 export const CITY_SOURCE_ID = 'pool-cities';
 export const VENUE_SOURCE_ID = 'pool-venues';
@@ -379,7 +400,7 @@ export function buildAdminMapStyle(baseUrl: string, palette: MapPalette): unknow
         minzoom: 3,
         filter: ['in', ['get', 'kind'], ['literal', ['country', 'region']]],
         layout: {
-          'text-field': ['get', 'name'],
+          'text-field': PLACE_NAME_EXPRESSION,
           'text-font': [MAP_FONTS.MEDIUM],
           'text-size': ['interpolate', ['linear'], ['zoom'], 3, 9, 7, 13],
           'text-transform': 'uppercase',
