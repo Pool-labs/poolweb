@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BASEMAP_KEY,
   CITY_CIRCLE,
+  MAP_CAMERA,
   MAP_SOURCE_ID,
   buildAdminMapStyle,
   buildGlyphsUrl,
@@ -277,5 +278,30 @@ describe('circleColorExpression', () => {
     // One city, or all tied: a ramp would imply a difference that is not there.
     expect(circleColorExpression(1, DATA)).toBe(DATA.circleHigh);
     expect(circleColorExpression(0, DATA)).toBe(DATA.circleHigh);
+  });
+});
+
+describe('the basemap and camera are GLOBAL (international launch)', () => {
+  // Pool ships worldwide, so a map that can only draw one continent is wrong
+  // twice over: it hides users, and — because a handful of low-zoom tiles
+  // reach well past a US extract's bounding box — it looks like a deliberate
+  // crop rather than missing data, which is how it survived unreported.
+  it('reads the planet archive, not a region extract', () => {
+    expect(BASEMAP_KEY).toBe('basemap/world.pmtiles');
+  });
+
+  it('opens on the whole world, not on one country', () => {
+    const [lng, lat] = MAP_CAMERA.CENTER;
+    // Zoom 1 fits the inhabited world in the card; 3.2 was the old US frame.
+    expect(MAP_CAMERA.ZOOM).toBeLessThanOrEqual(1.5);
+    // Centred off the Americas and north of the equator, where the land is.
+    expect(lng).toBeGreaterThan(-30);
+    expect(lng).toBeLessThan(60);
+    expect(Math.abs(lat)).toBeLessThan(45);
+  });
+
+  it('never lets the viewer zoom out past the world into a stamp', () => {
+    expect(MAP_CAMERA.MIN_ZOOM).toBeGreaterThan(0);
+    expect(MAP_CAMERA.MIN_ZOOM).toBeLessThanOrEqual(MAP_CAMERA.ZOOM);
   });
 });
