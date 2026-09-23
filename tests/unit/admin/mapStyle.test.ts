@@ -6,6 +6,7 @@ import {
   PLACE_NAME_EXPRESSION,
   MAP_CAMERA,
   MAP_SOURCE_ID,
+  STREETS,
   buildAdminMapStyle,
   buildGlyphsUrl,
   buildPmtilesUrl,
@@ -52,6 +53,7 @@ const PALETTE: MapPalette = {
   boundary: '#c3cbd6',
   label: '#6b7789',
   labelHalo: '#ffffff',
+  road: '#ffffff',
 };
 
 describe('tile URLs', () => {
@@ -120,11 +122,73 @@ describe('buildAdminMapStyle', () => {
     };
     const referenced = style.layers.map((l) => l['source-layer']).filter(Boolean);
 
-    for (const banned of ['roads', 'pois', 'transit', 'buildings', 'landuse']) {
+    for (const banned of ['pois', 'transit', 'buildings', 'landuse']) {
       expect(referenced).not.toContain(banned);
     }
     expect(referenced).toContain('earth');
     expect(referenced).toContain('boundaries');
+  });
+
+  it('keeps roads, creeks and street names OUT of the world view — city zoom only', () => {
+    // Roads came back for street names (founder request 2026-09-23), but the
+    // continental view this map opens on must stay exactly as clean.
+    const style = buildAdminMapStyle('https://cdn.example.com', PALETTE) as {
+      layers: { id: string; 'source-layer'?: string; minzoom?: number; type: string }[];
+    };
+    const streetLevel = style.layers.filter(
+      (l) => l['source-layer'] === 'roads' || l.id === 'waterways',
+    );
+    expect(streetLevel.map((l) => l.id).sort()).toEqual(['roads', 'roads-labels', 'waterways']);
+    for (const layer of streetLevel) {
+      expect(layer.minzoom ?? 0).toBeGreaterThanOrEqual(STREETS.ROADS_MIN_ZOOM);
+    }
+  });
+
+  it('fills ONLY water polygons — never creek centerlines (the "underwater" map)', () => {
+    const style = buildAdminMapStyle('https://cdn.example.com', PALETTE) as {
+      layers: { id: string; type: string; filter?: unknown; 'source-layer'?: string }[];
+    };
+    const waterFills = style.layers.filter(
+      (l) => l.type === 'fill' && l['source-layer'] === 'water',
+    );
+    expect(waterFills.map((l) => l.id)).toEqual(['water']);
+    expect(waterFills[0].filter).toEqual([
+      'in',
+      ['geometry-type'],
+      ['literal', ['Polygon', 'MultiPolygon']],
+    ]);
+    const waterways = style.layers.find((l) => l.id === 'waterways');
+    expect(waterways?.type).toBe('line');
+    expect(waterways?.filter).toEqual([
+      'in',
+      ['geometry-type'],
+      ['literal', ['LineString', 'MultiLineString']],
+    ]);
+  });
+
+  it('labels street names along the road, English first, from street zoom', () => {
+    const style = buildAdminMapStyle('https://cdn.example.com', PALETTE) as {
+      layers: {
+        id: string;
+        type: string;
+        minzoom?: number;
+        filter?: unknown;
+        layout?: Record<string, unknown>;
+        paint?: Record<string, unknown>;
+      }[];
+    };
+    const labels = style.layers.find((l) => l.id === 'roads-labels');
+    expect(labels?.type).toBe('symbol');
+    expect(labels?.minzoom).toBe(STREETS.LABELS_MIN_ZOOM);
+    expect(labels?.layout?.['symbol-placement']).toBe('line');
+    expect(labels?.layout?.['text-field']).toEqual(PLACE_NAME_EXPRESSION);
+    expect(labels?.filter).toEqual([
+      'in',
+      ['get', 'kind'],
+      ['literal', ['highway', 'major_road', 'minor_road']],
+    ]);
+    const roads = style.layers.find((l) => l.id === 'roads');
+    expect(roads?.paint?.['line-color']).toBe(PALETTE.road);
   });
 
   it('paints every colour from the passed palette, never a literal', () => {

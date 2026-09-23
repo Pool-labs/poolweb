@@ -10,7 +10,9 @@ import { cityCount, type GeographyMeasure } from './stats';
  * `apps/mobile/src/components/discover/map/mapStyle.ts` is Pool's full
  * cartographic style: buildings, four road classes with casings, landcover,
  * landuse, two label tiers. This is a DELIBERATE REDUCTION of it, not a copy
- * that fell behind — keep it that way.
+ * that fell behind — keep it that way. The one exception is roads + street
+ * names, and those exist ONLY past city zoom (`STREETS`), so the world view
+ * below is exactly as described.
  *
  * Discover is a street-level surface: somebody is looking for a pool at a
  * venue, so roads and buildings are the context that makes a pin mean
@@ -96,8 +98,33 @@ const SOURCE_LAYERS = {
   EARTH: 'earth',
   WATER: 'water',
   LANDCOVER: 'landcover',
+  ROADS: 'roads',
   BOUNDARIES: 'boundaries',
   PLACES: 'places',
+} as const;
+
+/**
+ * Geometry types, as `['geometry-type']` reports them. Both spellings of each
+ * because MapLibre versions differ on what a multi-geometry reports.
+ */
+export const GEOMETRY_TYPES = {
+  POLYGONS: ['Polygon', 'MultiPolygon'],
+  LINES: ['LineString', 'MultiLineString'],
+} as const;
+
+/**
+ * Streets — present ONLY once zoomed into a city (founder request 2026-09-23).
+ *
+ * The world view this map opens on is unchanged: roads appear from `ROADS_MIN`
+ * and their names from `LABELS_MIN`, both far past the country zooms where
+ * they would be noise behind the circles. Mirrors poolmobile's
+ * `MAP_LABEL_MIN_ZOOM.STREET`. The tiles carry highway and major-road names
+ * from z12 and residential streets from z14.
+ */
+export const STREETS = {
+  KINDS: ['highway', 'major_road', 'minor_road'],
+  ROADS_MIN_ZOOM: 11,
+  LABELS_MIN_ZOOM: 13,
 } as const;
 
 /**
@@ -293,6 +320,7 @@ export interface MapPalette {
   boundary: string;
   label: string;
   labelHalo: string;
+  road: string;
 }
 
 /**
@@ -373,7 +401,46 @@ export function buildAdminMapStyle(baseUrl: string, palette: MapPalette): unknow
         type: 'fill',
         source: MAP_SOURCE_ID,
         'source-layer': SOURCE_LAYERS.WATER,
+        /**
+         * ⚠️ POLYGONS ONLY — THIS FILTER IS WHAT KEEPS THE LAND DRY.
+         *
+         * The Protomaps `water` layer also carries every river, creek and
+         * canal CENTERLINE as a LineString, and a `fill` layer does not skip
+         * lines: it closes each one into a polygon and fills it, so a winding
+         * creek became a lake the size of a town ("underwater" around
+         * St. Louis, founder report 2026-09-23). Same bug and same fix as
+         * poolmobile's Discover style.
+         */
+        filter: ['in', ['geometry-type'], ['literal', [...GEOMETRY_TYPES.POLYGONS]]],
         paint: { 'fill-color': palette.water },
+      },
+      // The centerlines drawn as what they are — thin lines — only once zoomed
+      // in far enough that a creek means something.
+      {
+        id: 'waterways',
+        type: 'line',
+        source: MAP_SOURCE_ID,
+        'source-layer': SOURCE_LAYERS.WATER,
+        minzoom: STREETS.ROADS_MIN_ZOOM,
+        filter: ['in', ['geometry-type'], ['literal', [...GEOMETRY_TYPES.LINES]]],
+        paint: {
+          'line-color': palette.water,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.5, 14, 2],
+        },
+      },
+      // Roads, city zoom only — see `STREETS`.
+      {
+        id: 'roads',
+        type: 'line',
+        source: MAP_SOURCE_ID,
+        'source-layer': SOURCE_LAYERS.ROADS,
+        minzoom: STREETS.ROADS_MIN_ZOOM,
+        filter: ['in', ['get', 'kind'], ['literal', [...STREETS.KINDS]]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': palette.road,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.6, 14, 4],
+        },
       },
       // Country and state lines: the only geography a national view needs, and
       // what makes an unlabelled circle locatable at all.
@@ -389,9 +456,29 @@ export function buildAdminMapStyle(baseUrl: string, palette: MapPalette): unknow
           'line-dasharray': [2, 2],
         },
       },
-      // Place labels only, and only above the country tier. `roads`, `pois`,
-      // `transit`, `buildings` and `landuse` are never referenced by any layer,
-      // so that clutter is ABSENT rather than styled invisible.
+      // Street names along the road, street zoom only.
+      {
+        id: 'roads-labels',
+        type: 'symbol',
+        source: MAP_SOURCE_ID,
+        'source-layer': SOURCE_LAYERS.ROADS,
+        minzoom: STREETS.LABELS_MIN_ZOOM,
+        filter: ['in', ['get', 'kind'], ['literal', [...STREETS.KINDS]]],
+        layout: {
+          'symbol-placement': 'line',
+          'text-field': PLACE_NAME_EXPRESSION,
+          'text-font': [MAP_FONTS.REGULAR],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 13, 10, 16, 13],
+        },
+        paint: {
+          'text-color': palette.label,
+          'text-halo-color': palette.labelHalo,
+          'text-halo-width': 1.5,
+        },
+      },
+      // Otherwise place labels only, above the country tier. `pois`, `transit`,
+      // `buildings` and `landuse` are never referenced by any layer, so that
+      // clutter is ABSENT rather than styled invisible.
       {
         id: 'places-region',
         type: 'symbol',
