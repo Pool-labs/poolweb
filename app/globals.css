@@ -89,6 +89,7 @@
     --map-boundary: #c3cbd6;
     --map-label: #6b7789;
     --map-label-halo: #ffffff;
+    --map-road: #ffffff;
 
     /* ---- Admin map DATA marks ----
      * ⚠️ REAL VALUES, RESOLVED BEFORE THEY REACH WEBGL. MapLibre paint
@@ -154,6 +155,7 @@
     --map-boundary: #38455c;
     --map-label: #93a1b8;
     --map-label-halo: #0d1420;
+    --map-road: #24324a;
 
     /* Data marks, re-stepped for the dark basemap: the ramp has to stay
      * visible against #141c2b land, so it runs brighter rather than darker. */

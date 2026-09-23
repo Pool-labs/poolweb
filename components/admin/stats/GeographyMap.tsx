@@ -120,6 +120,7 @@ function readPalette(element: HTMLElement): MapPalette {
     boundary: read('--map-boundary', '#c3cbd6'),
     label: read('--map-label', '#6b7789'),
     labelHalo: read('--map-label-halo', '#ffffff'),
+    road: read('--map-road', '#ffffff'),
   };
 }
 
