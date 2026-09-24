@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Roadmap
+
+The plan for what is left — across PoolWeb AND the mobile app/API — lives in the poolmobile repo: `docs/ROADMAP.md` (Pool-labs/poolmobile). PoolWeb items there are marked `web#N`.
+
 ## Build & Development Commands
 
 ```bash
