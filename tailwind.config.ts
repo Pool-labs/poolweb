@@ -65,7 +65,7 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Brand tokens — sticker-pop system (see REDESIGN_PLAN.md)
+        // Brand tokens — sticker-pop system (see CLAUDE.md → Brand System)
         "pool-blue": "#4EC3F5",
         "pool-yellow": "#FFCE3E",
         "pool-pink": "#FF77B0",
