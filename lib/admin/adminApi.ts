@@ -463,8 +463,13 @@ export const reportsApi = {
 // ─── In-app feedback inbox (poolmobile #720) ─────────────────────────────────
 // Identity-gated like the moderation queue — the catch-all proxy forwards
 // `feedback/*` to `${API}/api/v1/admin/feedback/*` with the Bearer, so no proxy
-// change was needed. Served NEWEST-first (createdAt DESC, id DESC); `cursor` is
-// the previous page's `nextCursor`. `newCount` spans every filter.
+// change was needed. Served NEWEST-first (createdAt DESC, id DESC). `cursor` is
+// the previous page's `nextCursor` passed back VERBATIM — an OPAQUE string
+// (currently `<createdAt ISO>_<uuid>`), never parsed or validated here; `query()`
+// URL-encodes it. `newCount` spans every filter.
+//
+// `setStatus` answers 409 (`error.code: "conflict"`) when another admin moved
+// the row first, and 404 for an unknown/deleted id.
 
 export interface FeedbackListParams {
   status?: FeedbackStatus;
@@ -477,7 +482,10 @@ export interface FeedbackListParams {
 export const feedbackApi = {
   list: (params: FeedbackListParams = {}) =>
     request<AdminFeedbackListResponse>(`/feedback${query({ ...params })}`),
-  /** Same-status writes are a server-side no-op; an unknown id 404s. */
+  /**
+   * Same-status writes are a server-side no-op. 409 = another admin changed the
+   * row first (the caller reloads); 404 = unknown or deleted id.
+   */
   setStatus: (id: string, status: FeedbackStatus) =>
     request<AdminFeedbackItem>(`/feedback/${encodeURIComponent(id)}/status`, {
       method: 'POST',

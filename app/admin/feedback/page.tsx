@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { FeedbackEntry, type FeedbackRowOutcome } from '@/components/admin/feedback/FeedbackEntry';
-import { feedbackApi, type FeedbackListParams } from '@/lib/admin/adminApi';
+import { AdminApiError, feedbackApi, type FeedbackListParams } from '@/lib/admin/adminApi';
 import {
   adjustNewCount,
   FEEDBACK_AREA_LABELS,
@@ -70,6 +70,9 @@ export default function AdminFeedbackPage() {
   // Per row, so two quick changes on different rows each keep their own spinner.
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const [outcomes, setOutcomes] = useState<Record<string, FeedbackRowOutcome>>({});
+  // Set when a status write lost a race with another admin (409). Page-level as
+  // well as per-row, because after the reload that row may be on a later page.
+  const [conflictNotice, setConflictNotice] = useState<string | null>(null);
 
   // A filter change while a page is in flight must not let the stale response
   // land on top of the new list. Every load takes a generation number and only
@@ -130,6 +133,7 @@ export default function AdminFeedbackPage() {
 
   const changeStatus = async (item: AdminFeedbackItem, status: FeedbackStatus) => {
     setPending((prev) => ({ ...prev, [item.id]: true }));
+    setConflictNotice(null);
     try {
       const updated = await feedbackApi.setStatus(item.id, status);
       // Updated IN PLACE. ⚠️ If a status filter is active and the row no longer
@@ -143,6 +147,19 @@ export default function AdminFeedbackPage() {
         [item.id]: { ok: true, message: `Marked ${FEEDBACK_STATUS_LABELS[updated.status]}` },
       }));
     } catch (e) {
+      if (e instanceof AdminApiError && e.status === 409) {
+        // Another admin moved this row first. Our view is stale, so re-read the
+        // list (which resets per-row outcomes), then say what happened — on the
+        // row if it is still on the first page, and above the list regardless.
+        setPending((prev) => ({ ...prev, [item.id]: false }));
+        await load();
+        const message = 'Someone else changed this first — reloaded. Nothing was saved.';
+        setConflictNotice(
+          'Someone else changed a row’s status before you did, so your change was not saved. The list has been reloaded to show the current state.',
+        );
+        setOutcomes((prev) => ({ ...prev, [item.id]: { ok: false, message } }));
+        return;
+      }
       setOutcomes((prev) => ({
         ...prev,
         [item.id]: {
@@ -169,7 +186,15 @@ export default function AdminFeedbackPage() {
             <Badge variant={newCount > 0 ? 'default' : 'secondary'}>{newCount} new</Badge>
           )}
         </div>
-        <Button variant="outline" size="sm" disabled={loading} onClick={() => void load()}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={loading}
+          onClick={() => {
+            setConflictNotice(null);
+            void load();
+          }}
+        >
           <RefreshCw className={`mr-1 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
@@ -225,6 +250,15 @@ export default function AdminFeedbackPage() {
           </SelectContent>
         </Select>
       </div>
+
+      {conflictNotice && (
+        <p
+          role="alert"
+          className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm"
+        >
+          {conflictNotice}
+        </p>
+      )}
 
       <Card>
         <CardContent className="p-0">

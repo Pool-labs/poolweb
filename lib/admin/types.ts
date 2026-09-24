@@ -2308,6 +2308,7 @@ export interface AdminFeedbackItem {
 
 export interface AdminFeedbackListResponse {
   items: AdminFeedbackItem[];
+  /** OPAQUE (`<createdAt ISO>_<uuid>` today) — pass back verbatim, never parse. */
   nextCursor: string | null;
   /** Rows still `NEW`, across EVERY filter — not just the current page. */
   newCount: number;

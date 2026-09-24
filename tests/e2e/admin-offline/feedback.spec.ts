@@ -13,6 +13,8 @@ import { plantOfflineSession } from '../helpers/offlineAdmin';
 
 const USER_ID = '00000000-0000-4000-8000-0000000000a1';
 const XSS = '<img src=x onerror="window.__pwned=1">';
+/** The server's cursor is OPAQUE (`<createdAt ISO>_<uuid>` today). */
+const OPAQUE_CURSOR = '2026-09-24T10:00:00.000Z_0b1c2d3e-4f50-4617-8a9b-0c1d2e3f4a5b';
 
 function row(id: string, over: Record<string, unknown> = {}) {
   return {
@@ -76,6 +78,16 @@ async function serveFeedback(page: Page, stubs: Stubs = {}): Promise<void> {
     if (m && route.request().method() === 'POST') {
       const body = route.request().postDataJSON() as { status: string };
       statusBodies.push(body);
+      if (statusCode === 409) {
+        return route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: false,
+            error: { code: 'conflict', message: 'Feedback status changed', statusCode: 409 },
+          }),
+        });
+      }
       return json(statusCode, row(m[1], { status: body.status, text: XSS }));
     }
     if (url.pathname.endsWith('observability/alerts')) {
@@ -130,13 +142,28 @@ test.describe('Feedback tab', () => {
     await expect(first.getByRole('button', { name: 'New' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  test('a 409 (another admin moved it first) says so and reloads the list', async ({ page }) => {
+    const listQueries: URLSearchParams[] = [];
+    await serveFeedback(page, { statusCode: 409, listQueries });
+    await page.goto('/admin/feedback');
+    await expect(page.getByTestId('feedback-row').first()).toBeVisible();
+    const loadsBefore = listQueries.length;
+
+    const first = page.getByTestId('feedback-row').first();
+    await first.getByRole('button', { name: 'Fixed' }).click();
+
+    await expect(page.getByText(/Someone else changed a row.s status before you did/)).toBeVisible();
+    await expect(first.getByRole('alert')).toContainText('Someone else changed this first');
+    expect(listQueries.length).toBe(loadsBefore + 1);
+  });
+
   test('Load more sends the cursor and appends', async ({ page }) => {
     const listQueries: URLSearchParams[] = [];
     await serveFeedback(page, {
       listQueries,
       pages: {
-        first: { items: [row('f1')], nextCursor: 'f1' },
-        f1: { items: [row('f0', { text: 'Older one' })], nextCursor: null },
+        first: { items: [row('f1')], nextCursor: OPAQUE_CURSOR },
+        [OPAQUE_CURSOR]: { items: [row('f0', { text: 'Older one' })], nextCursor: null },
       },
     });
     await page.goto('/admin/feedback');
@@ -145,7 +172,8 @@ test.describe('Feedback tab', () => {
     await expect(page.getByText('Older one')).toBeVisible();
     await expect(page.getByTestId('feedback-row')).toHaveCount(2);
     await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
-    expect(listQueries.at(-1)?.get('cursor')).toBe('f1');
+    // Passed back VERBATIM — the cursor is opaque, not a uuid.
+    expect(listQueries.at(-1)?.get('cursor')).toBe(OPAQUE_CURSOR);
   });
 
   test('a filter reaches the query string', async ({ page }) => {
