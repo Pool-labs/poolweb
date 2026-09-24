@@ -11,6 +11,11 @@ import { defineConfig } from 'vitest/config';
 const fromRoot = (relative: string) => fileURLToPath(new URL(relative, import.meta.url));
 
 export default defineConfig({
+  // tsconfig says `jsx: preserve` (Next compiles JSX itself), which would make
+  // Vite leave JSX untransformed. The first unit test that RENDERS a component
+  // (tests/unit/admin/feedback.test.ts, the #720 XSS guard, via
+  // react-dom/server) needs it compiled with the automatic runtime.
+  oxc: { jsx: { runtime: 'automatic' } },
   resolve: {
     alias: {
       '@': fromRoot('.'),

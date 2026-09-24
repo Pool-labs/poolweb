@@ -13,6 +13,7 @@ import {
   HeartPulse,
   ScrollText,
   MessageSquare,
+  MessageSquareWarning,
   ShieldAlert,
   ShieldCheck,
   Smartphone,
@@ -39,6 +40,12 @@ const NAV_ITEMS = [
   // available in EVERY environment for the same reason: the one that matters
   // is production. It renders its own explanation when messaging is off.
   { href: '/admin/support', label: 'Support', icon: MessageSquare },
+  // Feedback (poolmobile #720). The third inbox of people telling us something,
+  // so it sits with Moderation and Support, and like them it is available in
+  // EVERY environment — production is where the feedback is. No count badge on
+  // the link: Moderation and Support have none either; the page header carries
+  // the NEW count.
+  { href: '/admin/feedback', label: 'Feedback', icon: MessageSquareWarning },
   // Errors / Health (#192) — the read surface over #116. Available in EVERY
   // environment, unlike the QA console: knowing what is failing in production
   // is the whole point, and the API scopes the feed to its own log group, so

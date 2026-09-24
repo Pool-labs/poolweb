@@ -29,6 +29,11 @@ import type {
   AdminPoolListResponse,
   AdminPoolLedgerSummary,
   AdminPoolMetrics,
+  AdminFeedbackItem,
+  AdminFeedbackListResponse,
+  FeedbackArea,
+  FeedbackKind,
+  FeedbackStatus,
   AdminReportDetail,
   AdminReportListResponse,
   AdminReviewReportInput,
@@ -452,6 +457,31 @@ export const reportsApi = {
     request<AdminReportDetail>(`/reports/${encodeURIComponent(id)}/review`, {
       method: 'POST',
       body: JSON.stringify(body),
+    }),
+};
+
+// ─── In-app feedback inbox (poolmobile #720) ─────────────────────────────────
+// Identity-gated like the moderation queue — the catch-all proxy forwards
+// `feedback/*` to `${API}/api/v1/admin/feedback/*` with the Bearer, so no proxy
+// change was needed. Served NEWEST-first (createdAt DESC, id DESC); `cursor` is
+// the previous page's `nextCursor`. `newCount` spans every filter.
+
+export interface FeedbackListParams {
+  status?: FeedbackStatus;
+  area?: FeedbackArea;
+  kind?: FeedbackKind;
+  cursor?: string;
+  limit?: number;
+}
+
+export const feedbackApi = {
+  list: (params: FeedbackListParams = {}) =>
+    request<AdminFeedbackListResponse>(`/feedback${query({ ...params })}`),
+  /** Same-status writes are a server-side no-op; an unknown id 404s. */
+  setStatus: (id: string, status: FeedbackStatus) =>
+    request<AdminFeedbackItem>(`/feedback/${encodeURIComponent(id)}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
     }),
 };
 

@@ -2233,6 +2233,86 @@ export interface AdminReviewReportInput {
   notes?: string;
 }
 
+// ─── #720 in-app feedback inbox (source: feedback.types.ts) ──────────────────
+// Mirrored byte for byte from poolmobile `packages/shared/src/types/
+// feedback.types.ts`. Identity-gated like the moderation queue: every status
+// move is attributed to a named founder and audited server-side.
+
+/** Where in the app the feedback is about. Coarse on purpose — `screen` is exact. */
+export enum FeedbackArea {
+  Home = 'HOME',
+  Pools = 'POOLS',
+  LogExpense = 'LOG_EXPENSE',
+  SettleUp = 'SETTLE_UP',
+  Discover = 'DISCOVER',
+  Messages = 'MESSAGES',
+  PoolPoints = 'POOL_POINTS',
+  ProfileSettings = 'PROFILE_SETTINGS',
+  Other = 'OTHER',
+}
+
+export enum FeedbackKind {
+  Broken = 'BROKEN',
+  HardToUse = 'HARD_TO_USE',
+  LooksOff = 'LOOKS_OFF',
+  MissingFeature = 'MISSING_FEATURE',
+  Other = 'OTHER',
+}
+
+/** The team's triage state. Not a ratchet — any move is allowed, and audited. */
+export enum FeedbackStatus {
+  New = 'NEW',
+  Triaged = 'TRIAGED',
+  Fixed = 'FIXED',
+}
+
+/**
+ * Build/device facts the app attaches on its own. Bounded server-side, but
+ * still CLIENT-SUPPLIED strings — render as TEXT only, like `text`.
+ */
+export interface FeedbackContext {
+  platform: 'ios' | 'android' | 'web';
+  appVersion?: string;
+  buildNumber?: string;
+  /** `expo-updates`' running update id — which OTA the user is on. */
+  updateId?: string;
+  runtimeVersion?: string;
+  osVersion?: string;
+  locale?: string;
+  /** The navigation route name the user came from. */
+  screen?: string;
+}
+
+/**
+ * One row of the Feedback tab.
+ *
+ * ⚠️ `text` is USER-AUTHORED FREE TEXT (the #116 L3/L4 rule): TEXT children
+ * only — never `dangerouslySetInnerHTML`, never markdown, never an `href`/`src`.
+ */
+export interface AdminFeedbackItem {
+  id: string;
+  userId: string;
+  /** Live identity at read time; null once the account is gone. */
+  userDisplayName: string | null;
+  userHandle: string | null;
+  area: FeedbackArea;
+  kind: FeedbackKind;
+  status: FeedbackStatus;
+  /** Null when the user skipped the optional text. */
+  text: string | null;
+  context: FeedbackContext;
+  createdAt: string;
+  statusChangedAt: string | null;
+  statusChangedById: string | null;
+}
+
+export interface AdminFeedbackListResponse {
+  items: AdminFeedbackItem[];
+  nextCursor: string | null;
+  /** Rows still `NEW`, across EVERY filter — not just the current page. */
+  newCount: number;
+}
+
 // ─── #313 force-update gate (poolmobile #590) ────────────────────────────────
 //
 // Hand-copied from `packages/shared/src/types/app-version.types.ts` and
